@@ -1,0 +1,356 @@
+import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
+import { nanoid } from 'nanoid';
+import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
+import { generateStoryNode } from '../services/aiService';
+
+interface GameState {
+  graphData: GraphData;
+  currentStoryNode: StoryNode | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface GameContextProps extends GameState {
+  loadStoryNode: (nodeId: string) => Promise<void>;
+  chooseOption: (choiceNodeId: string) => Promise<void>;
+  resetError: () => void;
+  restartGame: () => Promise<void>;
+}
+
+const GameContext = createContext<GameContextProps | undefined>(undefined);
+
+export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<GameState>({
+    graphData: { nodes: [], edges: [] },
+    currentStoryNode: null,
+    isLoading: true,
+    error: null
+  });
+
+  const setGraphData = useCallback((newData: GraphData) => {
+    setState(prev => ({ ...prev, graphData: newData }));
+  }, []);
+
+  const setCurrentStoryNode = useCallback((node: StoryNode | null) => {
+    setState(prev => ({ ...prev, currentStoryNode: node }));
+  }, []);
+
+  const setLoading = useCallback((isLoading: boolean) => {
+    setState(prev => ({ ...prev, isLoading }));
+  }, []);
+
+  const setError = useCallback((error: string | null) => {
+    setState(prev => ({ ...prev, error }));
+  }, []);
+
+  const resetError = useCallback(() => {
+    setError(null);
+  }, [setError]);
+
+  const createInitialStory = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setState(prev => ({ ...prev, graphData: { nodes: [], edges: [] }, currentStoryNode: null }));
+      
+      const initialPrompt = `You find yourself in a medieval fantasy world. As a lone adventurer, you're about to embark on a quest. Your journey begins in a small village tavern, where rumors of adventure and danger circulate among the patrons.`;
+      
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const response = await generateStoryNode(initialPrompt);
+          
+          // Validate response structure using type guard
+          if (!isValidStoryResponse(response)) {
+            throw new Error('Invalid story response structure');
+          }
+          
+      
+      // Initial story node centered at the top
+      const initialPosition = { x: window.innerWidth / 2, y: 50 };
+      
+      const storyNode: StoryNode = {
+        id: nanoid(),
+        type: 'story',
+        content: response.story.content,
+        summary: response.story.summary,
+        position: initialPosition,
+        data: { label: response.story.summary || 'Start' }
+      };
+
+      // Position choice nodes in an arc below the story node
+      const choiceNodes: ChoiceNode[] = response.choices.map((choice, index) => {
+        const choiceCount = response.choices.length;
+        const spacing = 200; // Horizontal spacing between choices
+        const totalWidth = (choiceCount - 1) * spacing;
+        const startX = initialPosition.x - totalWidth / 2;
+
+        return {
+          id: nanoid(),
+          type: 'choice',
+          text: choice.text,
+          target: choice.nextNodeId,
+          position: {
+            x: startX + (index * spacing),
+            y: initialPosition.y + 100
+          },
+          data: { label: choice.text }
+        };
+      });
+
+      const edges: Edge[] = choiceNodes.map(choice => ({
+        id: `e-${storyNode.id}-${choice.id}`,
+        source: storyNode.id,
+        target: choice.id,
+        type: 'smoothstep'
+      }));
+
+      const newGraphData: GraphData = {
+        nodes: [storyNode, ...choiceNodes],
+        edges
+      };
+
+      setGraphData(newGraphData);
+      setCurrentStoryNode(storyNode);
+          break; // Success - exit retry loop
+          
+        } catch (error) {
+          console.error(`Attempt ${retryCount + 1} failed:`, error);
+          retryCount++;
+          
+          if (retryCount === maxRetries) {
+            throw new Error(`Failed to generate story after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate initial story';
+      console.error('Story generation failed:', error);
+      setError(`Unable to start new game: ${errorMessage}. Please refresh the page to try again.`);
+      
+      // Reset to clean state
+      setState(prev => ({
+        ...prev,
+        graphData: { nodes: [], edges: [] },
+        currentStoryNode: null,
+        isLoading: false
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStoryNode = async (nodeId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Find the node and validate its type
+      const node = state.graphData.nodes.find((n) => n.id === nodeId);
+      if (!node) {
+        throw new Error('Node not found in current graph');
+      }
+      
+      if (!isStoryNode(node)) {
+        throw new Error('Selected node is not a story node');
+      }
+      
+      // Update current node and clear any previous errors
+      setCurrentStoryNode(node);
+      setError(null);
+    } catch (error) {
+      console.error('Error loading story node:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load story node');
+      // Keep the previous story node selected if there's an error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const chooseOption = async (choiceNodeId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Validate choice node exists
+      const choiceNode = state.graphData.nodes.find((n) => n.id === choiceNodeId);
+      if (!choiceNode) {
+        throw new Error('Invalid choice selected');
+      }
+
+      if (!choiceNode || !isChoiceNode(choiceNode)) {
+        throw new Error(`Choice node not found or invalid type: ${choiceNodeId}`);
+      }
+
+      // Build context from current story path
+      const currentNodeId = state.currentStoryNode?.id;
+      const storyPath = [];
+      let currentNode = state.currentStoryNode;
+      
+      // Get last 2 story nodes for context
+      while (currentNode && storyPath.length < 2) {
+        storyPath.unshift(currentNode.content);
+        const previousEdge = state.graphData.edges.find(e => e.target === currentNode?.id);
+        const previousChoice = previousEdge ? state.graphData.nodes.find(n => n.id === previousEdge.source) : null;
+        if (previousChoice && previousChoice.type === 'choice') {
+          storyPath.unshift((previousChoice as ChoiceNode).text);
+          const previousStory = state.graphData.nodes.find(n => 
+            state.graphData.edges.some(e => e.source === n.id && e.target === previousChoice.id)
+          );
+          currentNode = previousStory as StoryNode;
+        } else {
+          break;
+        }
+      }
+
+      const context = `Previous events: ${storyPath.join(' Then ')}\n\nCurrent choice: ${(choiceNode as ChoiceNode).text}\n\nContinue the story in a D&D style, considering previous events and the chosen action. Include potential consequences and maintain narrative consistency.`;
+
+      // Generate new story node based on the enhanced context
+      const newStoryData = await generateStoryNode(context);
+
+      // Calculate new node positions based on current graph layout
+      const calculateNewNodePosition = () => {
+        const choiceNode = state.graphData.nodes.find(n => n.id === choiceNodeId);
+        if (!choiceNode) return { x: 250, y: 5 };
+
+        // Find all nodes connected to the selected choice
+        const connectedNodes = state.graphData.edges
+          .filter(e => e.source === choiceNodeId || e.target === choiceNodeId)
+          .flatMap(e => [
+            state.graphData.nodes.find(n => n.id === e.source),
+            state.graphData.nodes.find(n => n.id === e.target)
+          ])
+          .filter(Boolean);
+
+        // Calculate the next vertical position based on connected nodes
+        const connectedMaxY = Math.max(
+          ...connectedNodes.map(n => n?.position.y ?? 0)
+        );
+
+        return {
+          x: choiceNode.position.x,
+          y: connectedMaxY + 200 // Increased vertical spacing
+        };
+      };
+
+      const newPosition = calculateNewNodePosition();
+      
+      const newStoryNode: StoryNode = {
+        id: nanoid(),
+        type: 'story',
+        content: newStoryData.story.content,
+        summary: newStoryData.story.summary,
+        position: newPosition,
+        data: { label: newStoryData.story.summary || 'Continue' }
+      };
+
+      const newChoiceNodes: ChoiceNode[] = newStoryData.choices.map((choice, index) => {
+        const choiceCount = newStoryData.choices.length;
+        const spacing = 200; // Horizontal spacing between choices
+        const totalWidth = (choiceCount - 1) * spacing;
+        const startX = newPosition.x - totalWidth / 2;
+
+        return {
+          id: nanoid(),
+          type: 'choice',
+          text: choice.text,
+          target: choice.nextNodeId,
+          position: {
+            x: startX + (index * spacing),
+            y: newPosition.y + 100
+          },
+          data: { label: choice.text }
+        };
+      });
+
+      // Create edge from choice to new story node
+      const storyEdge: Edge = {
+        id: `edge-${choiceNodeId}-${newStoryNode.id}`,
+        source: choiceNodeId,
+        target: newStoryNode.id,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#718096', strokeWidth: 2, opacity: 0.8 }
+      };
+
+      // Create edges from story node to new choices
+      const choiceEdges: Edge[] = newChoiceNodes.map(choice => ({
+        id: `edge-${newStoryNode.id}-${choice.id}`,
+        source: newStoryNode.id,
+        target: choice.id,
+        type: 'smoothstep',
+        style: { stroke: '#718096', strokeWidth: 2, opacity: 0.8 }
+      }));
+
+      // Filter out any existing nodes that would be below the new story node
+      const newY = newStoryNode.position.y;
+      const filteredNodes = state.graphData.nodes.filter(node => 
+        node.position.y < newY || node.id === choiceNodeId
+      );
+
+      // Filter out edges connected to removed nodes
+      const filteredEdges = state.graphData.edges.filter(edge => {
+        const sourceNode = filteredNodes.find(n => n.id === edge.source);
+        const targetNode = filteredNodes.find(n => n.id === edge.target);
+        return sourceNode && targetNode;
+      });
+
+      const newGraphData: GraphData = {
+        nodes: [...filteredNodes, newStoryNode, ...newChoiceNodes],
+        edges: [...filteredEdges, storyEdge, ...choiceEdges]
+      };
+      
+      setGraphData(newGraphData);
+      // Directly set the current story node instead of loading it
+      setCurrentStoryNode(newStoryNode);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process choice';
+      console.error('Error processing choice:', error);
+      setError(`Unable to continue story: ${errorMessage}. Please try again or restart the game.`);
+      
+      // Revert to previous state if possible
+      if (state.currentStoryNode) {
+        await loadStoryNode(state.currentStoryNode.id);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const restartGame = async () => {
+    setState({
+      graphData: { nodes: [], edges: [] },
+      currentStoryNode: null,
+      isLoading: true,
+      error: null
+    });
+    await createInitialStory();
+  };
+
+  useEffect(() => {
+    createInitialStory();
+  }, []);
+
+  const value = {
+    ...state,
+    loadStoryNode,
+    chooseOption,
+    resetError,
+    restartGame
+  };
+
+  return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
+};
+
+export const useGame = () => {
+  const context = useContext(GameContext);
+  if (context === undefined) {
+    throw new Error('useGame must be used within a GameProvider');
+  }
+  return context;
+};
