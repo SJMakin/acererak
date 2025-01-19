@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { StoryGenerationResponse, isValidStoryResponse } from '../types';
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY;
@@ -15,7 +15,7 @@ export async function generateStoryNode(
       return getMockResponse(context);
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
     // Enhanced prompt to ensure structured story generation
     const result = await model.generateContent({
@@ -23,34 +23,44 @@ export async function generateStoryNode(
       contents: [{
         role: 'user',
         parts: [{
-          text: `You are a creative dungeon master crafting a D&D adventure. Based on this context: "${context}", generate the next story segment and 2-3 possible choices.
+          text: `You are a creative dungeon master crafting an RPG adventure. Based on this context: "${context}", generate the next story segment and 2-5 possible choices.
 
-Respond ONLY with a JSON object in the following format:
-{
-  "story": {
-    "content": "[A story segment that advances the narrative]",
-    "summary": "[A very brief 3-5 word summary of the key event or location]"
-  },
-  "choices": [
-    {
-      "text": "[First choice description]",
-      "nextNodeId": "[unique identifier]"
-    },
-    {
-      "text": "[Second choice description]",
-      "nextNodeId": "[unique identifier]"
-    }
-  ]
-}
+Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events. 
 
-Ensure the story includes fantasy elements and D&D-appropriate descriptions. Make each choice distinct and maintain consistency with previous events.`
+Do your best to keep it interesting and fun - use your ability to create choices to create a game.`
         }]
       }],
       generationConfig: {
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            story: {
+              type: SchemaType.OBJECT,
+              properties: {
+                content: { type: SchemaType.STRING },
+                summary: { type: SchemaType.STRING }
+              },
+              required: ['content', 'summary']
+            },
+            choices: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  text: { type: SchemaType.STRING },
+                  nextNodeId: { type: SchemaType.STRING }
+                },
+                required: ['text', 'nextNodeId']
+              }
+            }
+          },
+          required: ['story', 'choices']
+        },
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 1024,
+        responseMimeType: "application/json"
       },
       // Removed safetySettings as they're causing type issues
       // Will handle content safety through prompt engineering
