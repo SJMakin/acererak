@@ -7,7 +7,8 @@ import ReactFlow, {
   NodeProps,
   Handle,
   Position,
-  ReactFlowInstance
+  ReactFlowInstance,
+  MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useGame } from '../contexts/GameContext';
@@ -151,15 +152,15 @@ const GameGraph: React.FC = () => {
             strokeWidth: 2,
             opacity: 0.8,
           },
-          animated: true,
+          animated: true as const,
           markerEnd: {
-            type: 'arrowclosed',
+            type: MarkerType.ArrowClosed,
             color: '#718096',
           }
         }}
         snapToGrid={true}
         snapGrid={[20, 20]}
-        fitViewPadding={[100, 50]}
+
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}

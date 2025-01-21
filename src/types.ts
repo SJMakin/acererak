@@ -27,38 +27,42 @@ export function isChoiceNode(node: Node): node is ChoiceNode {
   return node.type === 'choice';
 }
 
-export function isValidStoryResponse(response: any): response is StoryGenerationResponse {
+export function isValidStoryResponse(response: unknown): response is StoryGenerationResponse {
   try {
     if (!response || typeof response !== 'object') {
       console.error('Invalid response structure');
       return false;
     }
     
-    if (!response.story || typeof response.story !== 'object') {
+    const typedResponse = response as Record<string, unknown>;
+    
+    if (!typedResponse.story || typeof typedResponse.story !== 'object') {
       console.error('Invalid or missing story object');
       return false;
     }
     
-    if (typeof response.story.content !== 'string') {
+    const story = typedResponse.story as Record<string, unknown>;
+    
+    if (typeof story.content !== 'string') {
       console.error('Invalid or missing story content');
       return false;
     }
     
-    if (typeof response.story.summary !== 'string') {
+    if (typeof story.summary !== 'string') {
       console.error('Invalid or missing story summary');
       return false;
     }
     
-    if (!Array.isArray(response.choices) || response.choices.length < 2) {
+    if (!Array.isArray(typedResponse.choices) || typedResponse.choices.length < 2) {
       console.error('Invalid or insufficient choices');
       return false;
     }
     
-    if (!response.choices.every((choice: { text: string; nextNodeId: string }) => 
-      typeof choice === 'object' &&
-      typeof choice.text === 'string' &&
-      typeof choice.nextNodeId === 'string'
-    )) {
+    if (!typedResponse.choices.every((choice: unknown) => {
+      if (!choice || typeof choice !== 'object') return false;
+      const typedChoice = choice as Record<string, unknown>;
+      return typeof typedChoice.text === 'string' && typeof typedChoice.nextNodeId === 'string';
+    })) {
       console.error('Invalid choice structure');
       return false;
     }
@@ -75,6 +79,12 @@ export interface Edge {
   source: string; // ID of the source StoryNode
   target: string; // ID of the target ChoiceNode
   type: "smoothstep";
+  animated?: boolean;
+  style?: {
+    stroke?: string;
+    strokeWidth?: number;
+    opacity?: number;
+  };
 }
 
 export interface GraphData {
