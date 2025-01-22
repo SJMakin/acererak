@@ -101,4 +101,8 @@ export interface StoryGenerationResponse {
     text: string;
     nextNodeId: string;
   }>;
+  characterUpdates?: Array<{
+    oldText: string;
+    newText: string;
+  }>;
 }

@@ -8,13 +8,10 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
 
 export async function generateStoryNode(
-  context: string
+  context: string,
+  characterSheet?: string
 ): Promise<StoryGenerationResponse> {
   try {
-    if (API_KEY === 'YOUR_API_KEY') {
-      return getMockResponse(context);
-    }
-
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
     // Enhanced prompt to ensure structured story generation
@@ -23,11 +20,18 @@ export async function generateStoryNode(
       contents: [{
         role: 'user',
         parts: [{
-          text: `You are a creative dungeon master crafting an RPG adventure. Based on this context: "${context}", generate the next story segment and 2-5 possible choices.
+          text: `You are a creative dungeon master crafting an RPG adventure.
 
-Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events. 
+Current Character:
+${characterSheet || 'No character sheet available'}
 
-Do your best to keep it interesting and fun - use your ability to create choices to create a game.`
+Based on this context: "${context}", generate the next story segment and 2-5 possible choices.
+
+Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events.
+
+When events affect the character (damage, healing, items, etc), include characterUpdates in your response to modify the character sheet using exact text replacements.
+
+Do your best to keep it interesting and fun - use your ability to create choices to create a game. Move the plot quickly, and make it like if Quentin Tarantino and Michael Bay made a DND film together..`
         }]
       }],
       generationConfig: {
@@ -52,6 +56,17 @@ Do your best to keep it interesting and fun - use your ability to create choices
                 },
                 required: ['text', 'nextNodeId']
               }
+            },
+            characterUpdates: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  oldText: { type: SchemaType.STRING },
+                  newText: { type: SchemaType.STRING }
+                },
+                required: ['oldText', 'newText']
+              }
             }
           },
           required: ['story', 'choices']
@@ -62,18 +77,11 @@ Do your best to keep it interesting and fun - use your ability to create choices
         maxOutputTokens: 1024,
         responseMimeType: "application/json"
       },
-      // Removed safetySettings as they're causing type issues
-      // Will handle content safety through prompt engineering
     });
 
     const response = await result.response;
     const textContent = response.text();
     
-    // For development/testing, return mock data if API key isn't set
-    if (API_KEY === 'YOUR_API_KEY') {
-      return getMockResponse(context);
-    }
-
     try {
       // Response should already be JSON due to response_mime_type
       const parsedContent = JSON.parse(textContent);
@@ -84,14 +92,13 @@ Do your best to keep it interesting and fun - use your ability to create choices
         throw new Error('AI response does not match expected structure');
       }
 
-
-
       // Clean and validate the response
       const cleanedResponse = {
         story: {
           content: parsedContent.story.content.trim(),
           summary: parsedContent.story.summary.trim()
         },
+        characterUpdates: parsedContent.characterUpdates || [],
         choices: parsedContent.choices.map(choice => {
           const cleanedText = choice.text.trim();
           if (cleanedText.length < 10) {
@@ -113,51 +120,16 @@ Do your best to keep it interesting and fun - use your ability to create choices
       return cleanedResponse;
     } catch (parseError) {
       console.error('Failed to parse or validate AI response:', parseError);
-      console.error('Raw response:', textContent);
-      
-      if (API_KEY === 'YOUR_API_KEY') {
-        return getMockResponse(context);
-      }
-      throw parseError; // Let the calling code handle the error
+      console.error('Raw response:', textContent);      
+      throw parseError;
     }
   } catch (error) {
     console.error('Error generating story node:', error);
     
-    // Only use mock response for development or API key issues
-    if (API_KEY === 'YOUR_API_KEY' || !API_KEY) {
-      console.warn('Using mock response due to API key issues');
-      return getMockResponse(context);
-    }
-
-    // For all other errors, throw with a meaningful message
     throw new Error(
       error instanceof Error
         ? `Story generation failed: ${error.message}`
         : 'Failed to generate story due to an unknown error'
     );
   }
-}
-
-// Mock response for development/testing
-function getMockResponse(context: string): StoryGenerationResponse {
-  return {
-    story: {
-      content: `As you continue your adventure... ${context.slice(0, 50)}...`,
-      summary: 'Starting Adventure',
-    },
-    choices: [
-      {
-        text: 'Investigate the mysterious sound',
-        nextNodeId: `story-${Date.now()}-1`,
-      },
-      {
-        text: 'Continue on your current path',
-        nextNodeId: `story-${Date.now()}-2`,
-      },
-      {
-        text: 'Take a moment to rest',
-        nextNodeId: `story-${Date.now()}-3`,
-      },
-    ],
-  };
 }

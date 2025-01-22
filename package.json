@@ -33,6 +33,7 @@
     "@google/generative-ai": "^0.21.0",
     "@reactflow/background": "^11.3.14",
     "nanoid": "^5.0.9",
+    "react-markdown": "^9.0.3",
     "reactflow": "^11.11.4"
   }
 }

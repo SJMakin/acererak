@@ -2,12 +2,14 @@ import React, { createContext, useState, useCallback, useContext, useEffect } fr
 import { nanoid } from 'nanoid';
 import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
 import { generateStoryNode } from '../services/aiService';
+import { generateCharacterSheet } from '../services/characterGenerator';
 
 interface GameState {
   graphData: GraphData;
   currentStoryNode: StoryNode | null;
   isLoading: boolean;
   error: string | null;
+  characterSheet: string;
 }
 
 interface GameContextProps extends GameState {
@@ -15,16 +17,27 @@ interface GameContextProps extends GameState {
   chooseOption: (choiceNodeId: string) => Promise<void>;
   resetError: () => void;
   restartGame: () => Promise<void>;
+  updateCharacterSheet: (updates: Array<{oldText: string, newText: string}>) => void;
 }
 
 const GameContext = createContext<GameContextProps | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const updateCharacterSheet = useCallback((updates: Array<{oldText: string, newText: string}>) => {
+    setState(prev => {
+      let newSheet = prev.characterSheet;
+      updates.forEach(update => {
+        newSheet = newSheet.replace(update.oldText, update.newText);
+      });
+      return { ...prev, characterSheet: newSheet };
+    });
+  }, []);
   const [state, setState] = useState<GameState>({
     graphData: { nodes: [], edges: [] },
     currentStoryNode: null,
     isLoading: true,
-    error: null
+    error: null,
+    characterSheet: generateCharacterSheet()
   });
 
   const setGraphData = useCallback((newData: GraphData) => {
@@ -51,7 +64,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       setError(null);
-      setState(prev => ({ ...prev, graphData: { nodes: [], edges: [] }, currentStoryNode: null }));
+      setState(prev => ({ ...prev, graphData: { nodes: [], edges: [] }, currentStoryNode: null, characterSheet: prev.characterSheet }));
       
       const initialPrompt = `You find yourself in a medieval fantasy world. As a lone adventurer, you're about to embark on a quest. Your journey begins in a small village tavern, where rumors of adventure and danger circulate among the patrons.`;
       
@@ -60,7 +73,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       while (retryCount < maxRetries) {
         try {
-          const response = await generateStoryNode(initialPrompt);
+          const response = await generateStoryNode(initialPrompt, state.characterSheet);
           
           // Validate response structure using type guard
           if (!isValidStoryResponse(response)) {
@@ -138,7 +151,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...prev,
         graphData: { nodes: [], edges: [] },
         currentStoryNode: null,
-        isLoading: false
+        isLoading: false,
+        characterSheet: prev.characterSheet
       }));
     } finally {
       setLoading(false);
@@ -211,7 +225,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const context = `Previous events: ${storyPath.join(' Then ')}\n\nCurrent choice: ${(choiceNode as ChoiceNode).text}\n\nContinue the story in a D&D style, considering previous events and the chosen action. Include potential consequences and maintain narrative consistency.`;
 
       // Generate new story node based on the enhanced context
-      const newStoryData = await generateStoryNode(context);
+      const newStoryData = await generateStoryNode(context, state.characterSheet);
+
+      // Handle any character sheet updates
+      if (newStoryData.characterUpdates && newStoryData.characterUpdates.length > 0) {
+        updateCharacterSheet(newStoryData.characterUpdates);
+      }
 
       // Calculate new node positions based on current graph layout
       const calculateNewNodePosition = () => {
@@ -327,7 +346,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       graphData: { nodes: [], edges: [] },
       currentStoryNode: null,
       isLoading: true,
-      error: null
+      error: null,
+      characterSheet: generateCharacterSheet()
     });
     await createInitialStory();
   };
@@ -341,7 +361,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadStoryNode,
     chooseOption,
     resetError,
-    restartGame
+    restartGame,
+    updateCharacterSheet
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

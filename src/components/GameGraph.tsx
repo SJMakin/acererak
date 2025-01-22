@@ -33,11 +33,8 @@ const StoryNode: React.FC<NodeProps<StoryNodeType>> = ({ data, selected }) => (
     }}
   >
     <Handle type="target" position={Position.Top} />
-    <div style={{ fontSize: '0.8em', marginBottom: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-      {data.summary || 'Story Continues...'}
-    </div>
-    <div style={{ fontSize: '0.7em', textAlign: 'left', opacity: 0.9 }}>
-      {data.content?.slice(0, 100)}...
+    <div style={{ fontSize: '0.8em', textAlign: 'left', opacity: 0.9 }}>
+      {data.summary || data.content?.slice(0, 100) + '...'}
     </div>
     <Handle type="source" position={Position.Bottom} />
   </div>
@@ -86,7 +83,8 @@ const GameGraph: React.FC = () => {
           ...baseNode,
           data: {
             ...baseNode.data,
-            content: node.content
+            content: node.content,
+            summary: node.summary
           }
         };
       } else if (isChoiceNode(node)) {
@@ -104,20 +102,30 @@ const GameGraph: React.FC = () => {
   }), [graphData]);
 
   useEffect(() => {
-    // Initial delay for node layout to settle
+    // Center view whenever nodes change
     const timer = setTimeout(() => {
       if (reactFlowInstance.current) {
         reactFlowInstance.current.fitView({
-          padding: 0.5,
-          duration: 1000,
-          minZoom: 0.5,
-          maxZoom: 1.5
+          padding: 0.2,
+          duration: 800,
+          minZoom: 0.4,
+          maxZoom: 1.2
         });
+        
+        // Scroll to the most recent node
+        if (nodes.length > 0) {
+          const lastNode = nodes[nodes.length - 1];
+          reactFlowInstance.current.setCenter(
+            lastNode.position.x,
+            lastNode.position.y,
+            { duration: 1000, zoom: 0.8 }
+          );
+        }
       }
-    }, 300);
+    }, 100);
 
     return () => clearTimeout(timer);
-  }, [nodes.length]);
+  }, [nodes.length, currentStoryNode]);
 
   return (
     <div style={{ width: '100%', height: '700px' }}>
