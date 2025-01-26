@@ -5,6 +5,7 @@ export interface StoryNode {
   summary?: string; // Short summary for graph display
   position: { x: number; y: number };
   data: { label: string };
+  characterUpdateDescription?: string; // Description of character sheet changes
 }
 
 export interface ChoiceNode {
@@ -104,5 +105,6 @@ export interface StoryGenerationResponse {
   characterUpdates?: Array<{
     oldText: string;
     newText: string;
+    description: string;
   }>;
 }

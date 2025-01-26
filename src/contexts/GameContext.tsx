@@ -206,29 +206,40 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storyPath = [];
       let currentNode = state.currentStoryNode;
       
-      // Get last 2 story nodes for context
-      while (currentNode && storyPath.length < 2) {
+      // Get story nodes for context
+      while (currentNode) {
         storyPath.unshift(currentNode.content);
+        // Find edge leading to current node
         const previousEdge = state.graphData.edges.find(e => e.target === currentNode?.id);
-        const previousChoice = previousEdge ? state.graphData.nodes.find(n => n.id === previousEdge.source) : null;
-        if (previousChoice && previousChoice.type === 'choice') {
-          storyPath.unshift((previousChoice as ChoiceNode).text);
-          const previousStory = state.graphData.nodes.find(n => 
-            state.graphData.edges.some(e => e.source === n.id && e.target === previousChoice.id)
-          );
-          currentNode = previousStory as StoryNode;
-        } else {
-          break;
-        }
+        if (!previousEdge) break;
+        
+        // Find the choice that led here
+        const previousChoice = state.graphData.nodes.find(n => n.id === previousEdge.source);
+        if (!previousChoice || !isChoiceNode(previousChoice)) break;
+        
+        // Include the choice text
+        storyPath.unshift(previousChoice.text);
+        
+        // Find the story node before the choice
+        const prevToChoiceEdge = state.graphData.edges.find(e => e.target === previousChoice.id);
+        if (!prevToChoiceEdge) break;
+        
+        const previousStory = state.graphData.nodes.find(n => n.id === prevToChoiceEdge.source);
+        if (!previousStory || !isStoryNode(previousStory)) break;
+        
+        currentNode = previousStory;
       }
 
       const context = `Previous events: ${storyPath.join(' Then ')}\n\nCurrent choice: ${(choiceNode as ChoiceNode).text}\n\nContinue the story in a D&D style, considering previous events and the chosen action. Include potential consequences and maintain narrative consistency.`;
+
+      console.log(context);
 
       // Generate new story node based on the enhanced context
       const newStoryData = await generateStoryNode(context, state.characterSheet);
 
       // Handle any character sheet updates
       if (newStoryData.characterUpdates && newStoryData.characterUpdates.length > 0) {
+        console.log(newStoryData.characterUpdates);
         updateCharacterSheet(newStoryData.characterUpdates);
       }
 
@@ -265,7 +276,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         content: newStoryData.story.content,
         summary: newStoryData.story.summary,
         position: newPosition,
-        data: { label: newStoryData.story.summary || 'Continue' }
+        data: { label: newStoryData.story.summary || 'Continue' },
+        characterUpdateDescription: newStoryData.characterUpdates?.map(update => update.description).join('\n')
       };
 
       const newChoiceNodes: ChoiceNode[] = newStoryData.choices.map((choice, index) => {

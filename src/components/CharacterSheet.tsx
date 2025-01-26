@@ -15,30 +15,6 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
     setIsExpanded(prev => !prev);
   }, []);
 
-  // Format stats text with icons and better layout
-  const formatStatsText = (text: string) => {
-    if (text.includes('HP:') || text.includes('AC:') || text.includes('Str:')) {
-      const stats = text.split(' ');
-      return (
-        <div className="stats-grid">
-          {stats.map((stat, index) => {
-            if (stat.includes(':')) {
-              const [label, value] = stat.split(':');
-              return (
-                <div key={index} className="stat-item">
-                  <span className="stat-label">{label}:</span>
-                  <span className="stat-value">{value}</span>
-                </div>
-              );
-            }
-            return null;
-          })}
-        </div>
-      );
-    }
-    return text;
-  };
-
   // Custom components for ReactMarkdown
   const components: Components = {
     h1: (props: ComponentPropsWithoutRef<'h1'>) => (
@@ -59,7 +35,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
     p: (props: ComponentPropsWithoutRef<'p'>) => {
       const children = props.children;
       if (typeof children === 'string') {
-        return <p className="character-sheet-text" {...props}>{formatStatsText(children)}</p>;
+        return <p className="character-sheet-text" {...props}>{children}</p>;
       }
       return <p className="character-sheet-text" {...props}>{children}</p>;
     },

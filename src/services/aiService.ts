@@ -29,7 +29,7 @@ Based on this context: "${context}", generate the next story segment and 2-5 pos
 
 Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events.
 
-When events affect the character (damage, healing, items, etc), include characterUpdates in your response to modify the character sheet using exact text replacements.
+When the player choice or events affect the character (damage, healing, items, notes etc), include characterUpdates in your response to modify the character sheet using exact text replacements. You should update the character sheet as the player would.
 
 Do your best to keep it interesting and fun - use your ability to create choices to create a game. Move the plot quickly, and make it like if Quentin Tarantino and Michael Bay made a DND film together..`
         }]
@@ -63,9 +63,10 @@ Do your best to keep it interesting and fun - use your ability to create choices
                 type: SchemaType.OBJECT,
                 properties: {
                   oldText: { type: SchemaType.STRING },
-                  newText: { type: SchemaType.STRING }
+                  newText: { type: SchemaType.STRING },
+                  description: { type: SchemaType.STRING }
                 },
-                required: ['oldText', 'newText']
+                required: ['oldText', 'newText', 'description']
               }
             }
           },

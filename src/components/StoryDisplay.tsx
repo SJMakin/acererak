@@ -94,6 +94,20 @@ const StoryDisplay: React.FC = () => {
         lineHeight: '1.6',
       }}>
         {currentStoryNode.content}
+        {currentStoryNode.characterUpdateDescription && (
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: '#2d374810',
+            borderLeft: '4px solid #4a5568',
+            borderRadius: '4px',
+          }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#4a5568' }}>Character Updates:</h4>
+            <div style={{ whiteSpace: 'pre-line' }}>
+              {currentStoryNode.characterUpdateDescription}
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="story-choices" style={{
