@@ -1,6 +1,7 @@
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 import { nanoid } from 'nanoid';
-import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
+import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse, RollResult } from '../types';
+import { performRolls, formatRollResults } from '../services/diceService';
 import { generateStoryNode } from '../services/aiService';
 import { generateCharacterSheet } from '../services/characterGenerator';
 
@@ -230,7 +231,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentNode = previousStory;
       }
 
-      const context = `Previous events: ${storyPath.join(' Then ')}\n\nCurrent choice: ${(choiceNode as ChoiceNode).text}\n\nContinue the story in a D&D style, considering previous events and the chosen action. Include potential consequences and maintain narrative consistency.`;
+      // Perform any required dice rolls
+      let rollResults: RollResult[] | undefined;
+      const typedChoiceNode = choiceNode as ChoiceNode;
+      const rolls = typedChoiceNode.requiredRolls;
+      
+      if (rolls && rolls.length > 0) {
+        rollResults = performRolls(rolls);
+        console.log("roll results: ", rollResults);
+        // Roll results will be stored with the story node
+      }
+
+      const context = `Previous events: ${storyPath.join(' Then ')}
+
+      Current choice: ${(choiceNode as ChoiceNode).text}
+      ${rollResults ? `\nDice rolls:\n${formatRollResults(rollResults)}` : ''}
+
+      Continue the story in a D&D style, considering previous events${rollResults ? ', dice roll results,' : ''} and the chosen action. Include potential consequences and maintain narrative consistency.`;
 
       console.log(context);
 
@@ -239,9 +256,16 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Handle any character sheet updates
       if (newStoryData.characterUpdates && newStoryData.characterUpdates.length > 0) {
-        console.log(newStoryData.characterUpdates);
+        console.log("Character updates:", newStoryData.characterUpdates);
         updateCharacterSheet(newStoryData.characterUpdates);
       }
+
+      // Ensure roll results persist in state after story generation
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        currentRollResults: rollResults || prev.currentRollResults
+      }));
 
       // Calculate new node positions based on current graph layout
       const calculateNewNodePosition = () => {
@@ -277,7 +301,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         summary: newStoryData.story.summary,
         position: newPosition,
         data: { label: newStoryData.story.summary || 'Continue' },
-        characterUpdateDescription: newStoryData.characterUpdates?.map(update => update.description).join('\n')
+        characterUpdateDescription: newStoryData.characterUpdates?.map(update => update.description).join('\n'),
+        rollResults: rollResults
       };
 
       const newChoiceNodes: ChoiceNode[] = newStoryData.choices.map((choice, index) => {
@@ -295,7 +320,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             x: startX + (index * spacing),
             y: newPosition.y + 100
           },
-          data: { label: choice.text }
+          data: { label: choice.text },
+          requiredRolls: choice.requiredRolls
         };
       });
 
@@ -337,8 +363,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       
       setGraphData(newGraphData);
-      // Directly set the current story node instead of loading it
-      setCurrentStoryNode(newStoryNode);
+      // Update state with new story node
+      setState(prev => ({
+        ...prev,
+        currentStoryNode: newStoryNode
+      }));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process choice';
       console.error('Error processing choice:', error);

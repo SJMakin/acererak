@@ -6,6 +6,16 @@ export interface StoryNode {
   position: { x: number; y: number };
   data: { label: string };
   characterUpdateDescription?: string; // Description of character sheet changes
+  rollResults?: RollResult[]; // Results of dice rolls that led to this node
+}
+
+export interface DiceRoll {
+  type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
+  count: number;
+  modifier?: number;
+  difficulty?: number; // DC for skill checks
+  skill?: string; // The skill being checked
+  description: string; // What this roll is for
 }
 
 export interface ChoiceNode {
@@ -15,6 +25,7 @@ export interface ChoiceNode {
   target: string; // ID of the next StoryNode this choice leads to
   position: { x: number; y: number };
   data: { label: string };
+  requiredRolls?: DiceRoll[]; // Array of dice rolls required for this choice
 }
 
 export type Node = StoryNode | ChoiceNode;
@@ -93,6 +104,14 @@ export interface GraphData {
   edges: Edge[];
 }
 
+export interface RollResult {
+  roll: DiceRoll;
+  results: number[];
+  total: number;
+  success?: boolean; // For skill checks  
+  formatted: string;
+}
+
 export interface StoryGenerationResponse {
   story: {
     content: string;
@@ -101,10 +120,12 @@ export interface StoryGenerationResponse {
   choices: Array<{
     text: string;
     nextNodeId: string;
+    requiredRolls?: DiceRoll[];
   }>;
   characterUpdates?: Array<{
     oldText: string;
     newText: string;
     description: string;
   }>;
+  rollResults?: RollResult[];
 }

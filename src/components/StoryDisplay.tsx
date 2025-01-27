@@ -57,7 +57,6 @@ const StoryDisplay: React.FC = () => {
       </div>
     );
   }
-
   if (!currentStoryNode || !isStoryNode(currentStoryNode)) {
     return (
       <div className="story-display" style={{
@@ -88,6 +87,24 @@ const StoryDisplay: React.FC = () => {
       maxWidth: '600px',
       margin: '0 auto',
     }}>
+     
+      {currentStoryNode?.rollResults && currentStoryNode.rollResults.length > 0 && (
+        <div className="roll-results" style={{
+          marginBottom: '20px',
+          padding: '10px',
+          backgroundColor: '#edf2f7',
+          border: '1px solid #e2e8f0',
+          borderRadius: '4px',
+        }}>
+          <h4 style={{ margin: '0 0 10px 0', color: '#4a5568' }}>Dice Roll Results:</h4>
+          <ul style={{ listStyleType: 'none', padding: '0', margin: '0' }}>
+            {currentStoryNode.rollResults.map((result, index) => (
+              <li key={index} style={{ marginBottom: '5px' }}>{result.formatted}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="story-content" style={{
         marginBottom: '20px',
         fontSize: '1.1em',

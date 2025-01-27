@@ -31,6 +31,16 @@ Ensure the story includes fantasy elements and RPG-appropriate descriptions. Mak
 
 When the player choice or events affect the character (damage, healing, items, notes etc), include characterUpdates in your response to modify the character sheet using exact text replacements. You should update the character sheet as the player would.
 
+For choices that require skill checks, combat rolls, or other chance-based outcomes, include requiredRolls in your response. Each roll should specify:
+- type: 'd4', 'd6', 'd8', 'd10', 'd12', 'd20', or 'd100'
+- count: number of dice to roll
+- modifier: bonus/penalty to add (optional)
+- difficulty: DC for skill checks (optional)
+- skill: relevant skill being checked (optional)
+- description: what this roll represents
+
+Example roll for a stealth check: { type: 'd20', count: 1, modifier: 2, difficulty: 15, skill: 'Stealth', description: 'Stealth check to sneak past guards' }
+
 Do your best to keep it interesting and fun - use your ability to create choices to create a game. Move the plot quickly, and make it like if Quentin Tarantino and Michael Bay made a DND film together..`
         }]
       }],
@@ -52,9 +62,24 @@ Do your best to keep it interesting and fun - use your ability to create choices
                 type: SchemaType.OBJECT,
                 properties: {
                   text: { type: SchemaType.STRING },
-                  nextNodeId: { type: SchemaType.STRING }
+                  nextNodeId: { type: SchemaType.STRING },
+                  requiredRolls: {
+                    type: SchemaType.ARRAY,
+                    items: {
+                      type: SchemaType.OBJECT,
+                      properties: {
+                        type: { type: SchemaType.STRING },
+                        count: { type: SchemaType.NUMBER },
+                        modifier: { type: SchemaType.NUMBER },
+                        difficulty: { type: SchemaType.NUMBER },
+                        skill: { type: SchemaType.STRING },
+                        description: { type: SchemaType.STRING }
+                      },
+                      required: ['type', 'count', 'description', 'difficulty']
+                    }
+                  }
                 },
-                required: ['text', 'nextNodeId']
+                required: ['text', 'nextNodeId', 'requiredRolls']
               }
             },
             characterUpdates: {
@@ -70,7 +95,7 @@ Do your best to keep it interesting and fun - use your ability to create choices
               }
             }
           },
-          required: ['story', 'choices']
+          required: ['story', 'choices', 'characterUpdates']
         },
         temperature: 0.7,
         topK: 40,
@@ -87,6 +112,8 @@ Do your best to keep it interesting and fun - use your ability to create choices
       // Response should already be JSON due to response_mime_type
       const parsedContent = JSON.parse(textContent);
       
+      console.log(parsedContent);
+
       // Validate response structure using type guard
       if (!isValidStoryResponse(parsedContent)) {
         console.error('Invalid AI response structure:', parsedContent);
@@ -107,7 +134,8 @@ Do your best to keep it interesting and fun - use your ability to create choices
           }
           return {
             text: cleanedText,
-            nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            requiredRolls: choice.requiredRolls || [{ type: 'd20', count: 1, description: 'Basic check' }] // Ensure requiredRolls is always present
           };
         })
       };
