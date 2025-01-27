@@ -260,13 +260,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateCharacterSheet(newStoryData.characterUpdates);
       }
 
-      // Ensure roll results persist in state after story generation
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        currentRollResults: rollResults || prev.currentRollResults
-      }));
-
       // Calculate new node positions based on current graph layout
       const calculateNewNodePosition = () => {
         const choiceNode = state.graphData.nodes.find(n => n.id === choiceNodeId);
