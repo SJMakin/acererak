@@ -20,16 +20,24 @@ export async function generateStoryNode(
       contents: [{
         role: 'user',
         parts: [{
-          text: `You are a creative dungeon master crafting an RPG adventure.
+          text: `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure.
 
 Current Character:
 ${characterSheet || 'No character sheet available'}
 
-Based on this context: "${context}", generate the next story segment and 2-5 possible choices.
+Based on this context: 
 
-Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events.
+===
 
-When the player choice or events affect the character (damage, healing, items, notes etc), include characterUpdates in your response to modify the character sheet using exact text replacements. You should update the character sheet as the player would.
+${context}
+
+===
+
+Generate the next story segment and 1-5 possible choices.
+
+Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events. 
+
+When the player choice or events affect the character (damage, healing, items, notes etc), include characterUpdates in your response to modify the character sheet using exact text replacements. 
 
 For choices that require skill checks, combat rolls, or other chance-based outcomes, include requiredRolls in your response. Each roll should specify:
 - type: 'd4', 'd6', 'd8', 'd10', 'd12', 'd20', or 'd100'
@@ -41,7 +49,11 @@ For choices that require skill checks, combat rolls, or other chance-based outco
 
 Example roll for a stealth check: { type: 'd20', count: 1, modifier: 2, difficulty: 15, skill: 'Stealth', description: 'Stealth check to sneak past guards' }
 
-Do your best to keep it interesting and fun - use your ability to create choices to create a game. Move the plot quickly, and make it like if Quentin Tarantino and Michael Bay made a DND film together..`
+Do your best to keep it interesting and fun - not for kids - use your ability to create choices to create a game. Move the plot quickly! The user needs to feel thier choices *did something*. 
+
+In combat update the character sheet when the plater gets attacked. Use the dice for all the things an advanced DM would. One of your goals should be to level the player up, and put them in touch and go situations where a dice roll might decide thier life. 
+
+Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together..  assume the consumer likes all sorts of cool wierd stuff.`
         }]
       }],
       generationConfig: {
