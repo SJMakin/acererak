@@ -12,7 +12,8 @@ export async function generateStoryNode(
   characterSheet?: string
 ): Promise<StoryGenerationResponse> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-exp-1206' });
+    // 'gemini-2.0-flash-exp' 
 
     // Enhanced prompt to ensure structured story generation
     const result = await model.generateContent({
@@ -53,7 +54,9 @@ Do your best to keep it interesting and fun - not for kids - use your ability to
 
 In combat update the character sheet when the plater gets attacked. Use the dice for all the things an advanced DM would. One of your goals should be to level the player up, and put them in touch and go situations where a dice roll might decide thier life. 
 
-Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together..  assume the consumer likes all sorts of cool wierd stuff.`
+Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together..  assume the consumer likes all sorts of cool wierd stuff.
+
+Generate the JSON response in the order of: story, choices, character sheet updates.`
         }]
       }],
       generationConfig: {
@@ -109,7 +112,7 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
           },
           required: ['story', 'choices', 'characterUpdates']
         },
-        temperature: 0.7,
+        temperature: 0.8,
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 1024,
