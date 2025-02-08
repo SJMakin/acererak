@@ -11,7 +11,11 @@
 }
 
 .character-sheet-content {
-  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Roboto',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .character-sheet-title {
@@ -95,32 +99,35 @@
 }
 
 .character-sheet-item:before {
-  content: "•";
+  content: '•';
   color: #9fa8da;
   position: absolute;
   left: -1rem;
 }
 
 /* Empty state styling */
-.character-sheet-item:only-child:has(span:contains("None")) {
+.character-sheet-item:only-child:has(span:contains('None')) {
   color: #666;
   font-style: italic;
 }
 
 /* Status effects */
-.character-sheet h2:has(span:contains("Status")) + ul .character-sheet-item:not(:has(span:contains("None"))) {
+.character-sheet
+  h2:has(span:contains('Status'))
+  + ul
+  .character-sheet-item:not(:has(span:contains('None'))) {
   color: #ff9800;
   font-weight: 500;
 }
 
 /* Equipment and Inventory sections */
-.character-sheet h2:has(span:contains("Equipment")),
-.character-sheet h2:has(span:contains("Inventory")) {
+.character-sheet h2:has(span:contains('Equipment')),
+.character-sheet h2:has(span:contains('Inventory')) {
   margin-top: 1.75rem;
 }
 
 /* Notes section */
-.character-sheet h2:has(span:contains("Notes")) {
+.character-sheet h2:has(span:contains('Notes')) {
   margin-top: 2rem;
 }
 

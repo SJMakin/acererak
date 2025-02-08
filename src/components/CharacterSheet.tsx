@@ -25,7 +25,9 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
       return (
         <h2 className="character-sheet-section" {...props}>
           {typeof children === 'string' && children === 'Stats' ? '⚔️ ' : ''}
-          {typeof children === 'string' && children === 'Equipment' ? '🎒 ' : ''}
+          {typeof children === 'string' && children === 'Equipment'
+            ? '🎒 '
+            : ''}
           {typeof children === 'string' && children === 'Status' ? '✨ ' : ''}
           {typeof children === 'string' && children === 'Notes' ? '📝 ' : ''}
           {children}
@@ -35,9 +37,17 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
     p: (props: ComponentPropsWithoutRef<'p'>) => {
       const children = props.children;
       if (typeof children === 'string') {
-        return <p className="character-sheet-text" {...props}>{children}</p>;
+        return (
+          <p className="character-sheet-text" {...props}>
+            {children}
+          </p>
+        );
       }
-      return <p className="character-sheet-text" {...props}>{children}</p>;
+      return (
+        <p className="character-sheet-text" {...props}>
+          {children}
+        </p>
+      );
     },
     ul: (props: ComponentPropsWithoutRef<'ul'>) => (
       <ul className="character-sheet-list" {...props} />
@@ -49,16 +59,18 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
 
   return (
     <>
-      <button 
+      <button
         className="character-sheet-toggle"
         onClick={toggleSheet}
-        aria-label={isExpanded ? 'Hide character sheet' : 'Show character sheet'}
+        aria-label={
+          isExpanded ? 'Hide character sheet' : 'Show character sheet'
+        }
         aria-expanded={isExpanded}
       >
         {isExpanded ? '✕' : '📝'}
       </button>
-      
-      <div 
+
+      <div
         className={`character-sheet ${isExpanded ? 'expanded' : ''} ${className}`}
         role="complementary"
         aria-label="Character Sheet"

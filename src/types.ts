@@ -21,7 +21,7 @@ export interface DiceRoll {
 export interface ChoiceNode {
   id: string;
   type: 'choice';
-  text: string;   // The choice presented to the user
+  text: string; // The choice presented to the user
   target: string; // ID of the next StoryNode this choice leads to
   position: { x: number; y: number };
   data: { label: string };
@@ -39,46 +39,56 @@ export function isChoiceNode(node: Node): node is ChoiceNode {
   return node.type === 'choice';
 }
 
-export function isValidStoryResponse(response: unknown): response is StoryGenerationResponse {
+export function isValidStoryResponse(
+  response: unknown
+): response is StoryGenerationResponse {
   try {
     if (!response || typeof response !== 'object') {
       console.error('Invalid response structure');
       return false;
     }
-    
+
     const typedResponse = response as Record<string, unknown>;
-    
+
     if (!typedResponse.story || typeof typedResponse.story !== 'object') {
       console.error('Invalid or missing story object');
       return false;
     }
-    
+
     const story = typedResponse.story as Record<string, unknown>;
-    
+
     if (typeof story.content !== 'string') {
       console.error('Invalid or missing story content');
       return false;
     }
-    
+
     if (typeof story.summary !== 'string') {
       console.error('Invalid or missing story summary');
       return false;
     }
-    
-    if (!Array.isArray(typedResponse.choices) || typedResponse.choices.length < 2) {
+
+    if (
+      !Array.isArray(typedResponse.choices) ||
+      typedResponse.choices.length < 2
+    ) {
       console.error('Invalid or insufficient choices');
       return false;
     }
-    
-    if (!typedResponse.choices.every((choice: unknown) => {
-      if (!choice || typeof choice !== 'object') return false;
-      const typedChoice = choice as Record<string, unknown>;
-      return typeof typedChoice.text === 'string' && typeof typedChoice.nextNodeId === 'string';
-    })) {
+
+    if (
+      !typedResponse.choices.every((choice: unknown) => {
+        if (!choice || typeof choice !== 'object') return false;
+        const typedChoice = choice as Record<string, unknown>;
+        return (
+          typeof typedChoice.text === 'string' &&
+          typeof typedChoice.nextNodeId === 'string'
+        );
+      })
+    ) {
       console.error('Invalid choice structure');
       return false;
     }
-    
+
     return true;
   } catch (error) {
     console.error('Error validating story response:', error);
@@ -90,7 +100,7 @@ export interface Edge {
   id: string;
   source: string; // ID of the source StoryNode
   target: string; // ID of the target ChoiceNode
-  type: "smoothstep";
+  type: 'smoothstep';
   animated?: boolean;
   style?: {
     stroke?: string;
@@ -108,9 +118,18 @@ export interface RollResult {
   roll: DiceRoll;
   results: number[];
   total: number;
-  success?: boolean; // For skill checks  
+  success?: boolean; // For skill checks
   formatted: string;
 }
+
+export interface Dice3DAnimationState {
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  velocity: { x: number; y: number; z: number };
+  angularVelocity: { x: number; y: number; z: number };
+}
+
+export type DiceGeometryType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
 
 export interface StoryGenerationResponse {
   story: {

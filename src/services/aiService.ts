@@ -3,7 +3,9 @@ import { StoryGenerationResponse, isValidStoryResponse } from '../types';
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY;
 if (!API_KEY) {
-  console.warn('GEMINI_KEY environment variable not found, using mock responses');
+  console.warn(
+    'GEMINI_KEY environment variable not found, using mock responses'
+  );
 }
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
 
@@ -13,15 +15,17 @@ export async function generateStoryNode(
 ): Promise<StoryGenerationResponse> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-exp-1206' });
-    // 'gemini-2.0-flash-exp' 
+    // 'gemini-2.0-flash-exp'
 
     // Enhanced prompt to ensure structured story generation
     const result = await model.generateContent({
       // Properly typed content structure for Gemini API
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure.
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure.
 
 Current Character:
 ${characterSheet || 'No character sheet available'}
@@ -56,9 +60,11 @@ In combat update the character sheet when the plater gets attacked. Use the dice
 
 Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together..  assume the consumer likes all sorts of cool wierd stuff.
 
-Generate the JSON response in the order of: story, choices, character sheet updates.`
-        }]
-      }],
+Generate the JSON response in the order of: story, choices, character sheet updates.`,
+            },
+          ],
+        },
+      ],
       generationConfig: {
         responseSchema: {
           type: SchemaType.OBJECT,
@@ -67,9 +73,9 @@ Generate the JSON response in the order of: story, choices, character sheet upda
               type: SchemaType.OBJECT,
               properties: {
                 content: { type: SchemaType.STRING },
-                summary: { type: SchemaType.STRING }
+                summary: { type: SchemaType.STRING },
               },
-              required: ['content', 'summary']
+              required: ['content', 'summary'],
             },
             choices: {
               type: SchemaType.ARRAY,
@@ -88,14 +94,14 @@ Generate the JSON response in the order of: story, choices, character sheet upda
                         modifier: { type: SchemaType.NUMBER },
                         difficulty: { type: SchemaType.NUMBER },
                         skill: { type: SchemaType.STRING },
-                        description: { type: SchemaType.STRING }
+                        description: { type: SchemaType.STRING },
                       },
-                      required: ['type', 'count', 'description', 'difficulty']
-                    }
-                  }
+                      required: ['type', 'count', 'description', 'difficulty'],
+                    },
+                  },
                 },
-                required: ['text', 'nextNodeId', 'requiredRolls']
-              }
+                required: ['text', 'nextNodeId', 'requiredRolls'],
+              },
             },
             characterUpdates: {
               type: SchemaType.ARRAY,
@@ -104,29 +110,29 @@ Generate the JSON response in the order of: story, choices, character sheet upda
                 properties: {
                   oldText: { type: SchemaType.STRING },
                   newText: { type: SchemaType.STRING },
-                  description: { type: SchemaType.STRING }
+                  description: { type: SchemaType.STRING },
                 },
-                required: ['oldText', 'newText', 'description']
-              }
-            }
+                required: ['oldText', 'newText', 'description'],
+              },
+            },
           },
-          required: ['story', 'choices', 'characterUpdates']
+          required: ['story', 'choices', 'characterUpdates'],
         },
         temperature: 0.8,
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 1024,
-        responseMimeType: "application/json"
+        responseMimeType: 'application/json',
       },
     });
 
     const response = await result.response;
     const textContent = response.text();
-    
+
     try {
       // Response should already be JSON due to response_mime_type
       const parsedContent = JSON.parse(textContent);
-      
+
       console.log(parsedContent);
 
       // Validate response structure using type guard
@@ -139,7 +145,7 @@ Generate the JSON response in the order of: story, choices, character sheet upda
       const cleanedResponse = {
         story: {
           content: parsedContent.story.content.trim(),
-          summary: parsedContent.story.summary.trim()
+          summary: parsedContent.story.summary.trim(),
         },
         characterUpdates: parsedContent.characterUpdates || [],
         choices: parsedContent.choices.map(choice => {
@@ -149,14 +155,20 @@ Generate the JSON response in the order of: story, choices, character sheet upda
           }
           return {
             text: cleanedText,
-            nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            requiredRolls: choice.requiredRolls || [{ type: 'd20', count: 1, description: 'Basic check' }] // Ensure requiredRolls is always present
+            nextNodeId:
+              choice.nextNodeId ||
+              `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            requiredRolls: choice.requiredRolls || [
+              { type: 'd20', count: 1, description: 'Basic check' },
+            ], // Ensure requiredRolls is always present
           };
-        })
+        }),
       };
 
       // Validate choices are unique
-      const choiceTexts = new Set(cleanedResponse.choices.map(c => c.text.toLowerCase()));
+      const choiceTexts = new Set(
+        cleanedResponse.choices.map(c => c.text.toLowerCase())
+      );
       if (choiceTexts.size !== cleanedResponse.choices.length) {
         throw new Error('Duplicate choices detected');
       }
@@ -164,12 +176,12 @@ Generate the JSON response in the order of: story, choices, character sheet upda
       return cleanedResponse;
     } catch (parseError) {
       console.error('Failed to parse or validate AI response:', parseError);
-      console.error('Raw response:', textContent);      
+      console.error('Raw response:', textContent);
       throw parseError;
     }
   } catch (error) {
     console.error('Error generating story node:', error);
-    
+
     throw new Error(
       error instanceof Error
         ? `Story generation failed: ${error.message}`

@@ -20,23 +20,27 @@ Acererak transforms the D&D storytelling experience by combining the power of AI
 ## Getting Started
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/username/acererak.git
 cd acererak
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Configure your AI:
-Create a `.env` file in the root directory:
+   Create a `.env` file in the root directory:
+
 ```env
 VITE_GEMINI_KEY=your_gemini_api_key
 ```
 
 4. Start your adventure:
+
 ```bash
 npm run dev
 ```
@@ -74,6 +78,7 @@ npm run preview
 ## Contributing
 
 Contributions are welcome! Feel free to:
+
 - 🐛 Report bugs
 - 💡 Suggest features
 - 🛠️ Submit pull requests
@@ -84,4 +89,4 @@ MIT © [Your Name]
 
 ---
 
-*"Life is short. Undeath is eternal." - Acererak*
+_"Life is short. Undeath is eternal." - Acererak_

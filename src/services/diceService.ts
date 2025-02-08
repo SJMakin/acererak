@@ -11,25 +11,25 @@ const rollDie = (sides: number): number => {
 export const performRoll = (roll: DiceRoll): RollResult => {
   const sides = getDiceSides(roll.type);
   const results: number[] = [];
-  
+
   // Perform the dice rolls
   for (let i = 0; i < roll.count; i++) {
     results.push(rollDie(sides));
   }
-  
+
   // Calculate total with modifier
   const subtotal = results.reduce((sum, result) => sum + result, 0);
   const total = roll.modifier ? subtotal + roll.modifier : subtotal;
-  
+
   // Determine success if this is a skill check
   const success = roll.difficulty ? total >= roll.difficulty : undefined;
-  
+
   return {
     roll,
     results,
     total,
     success,
-    formatted: `${roll.description}: Rolled ${results.join(', ')}${roll.modifier ? ` with modifier ${roll.modifier}` : ''}. Total: ${total}${roll.difficulty ? ` against DC ${roll.difficulty}` : ''}. ${success !== undefined ? (success ? 'Success' : 'Failure') : ''}`
+    formatted: `${roll.description}: Rolled ${results.join(', ')}${roll.modifier ? ` with modifier ${roll.modifier}` : ''}. Total: ${total}${roll.difficulty ? ` against DC ${roll.difficulty}` : ''}. ${success !== undefined ? (success ? 'Success' : 'Failure') : ''}`,
   };
 };
 
@@ -44,8 +44,9 @@ export const formatRollResult = (result: RollResult): string => {
   const modifierText = roll.modifier ? ` + ${roll.modifier}` : '';
   const skillText = roll.skill ? ` (${roll.skill})` : '';
   const dcText = roll.difficulty ? ` vs DC ${roll.difficulty}` : '';
-  const successText = success !== undefined ? ` [${success ? 'SUCCESS' : 'FAILURE'}]` : '';
-  
+  const successText =
+    success !== undefined ? ` [${success ? 'SUCCESS' : 'FAILURE'}]` : '';
+
   return `${roll.description}${skillText}: [${rollText}]${modifierText} = ${total}${dcText}${successText}`;
 };
 
