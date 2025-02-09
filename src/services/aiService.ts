@@ -14,7 +14,7 @@ export async function generateStoryNode(
   characterSheet?: string
 ): Promise<StoryGenerationResponse> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-exp-1206' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     // 'gemini-2.0-flash-exp'
 
     // Enhanced prompt to ensure structured story generation
