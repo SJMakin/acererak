@@ -26,6 +26,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
 
     // Scene setup
     const scene = new THREE.Scene();
+    scene.background = null;
     sceneRef.current = scene;
 
     // Camera setup
@@ -180,7 +181,8 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
         width: '100%', 
         height: '100%',
         position: 'relative',
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
+        pointerEvents: 'none'
       }} 
     />
   );
@@ -212,7 +214,7 @@ export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1) 
     container.style.transform = 'translate(-50%, -50%)';
     container.style.width = '100vw';
     container.style.height = '100vh';
-    container.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    container.style.backgroundColor = 'transparent';
     container.style.zIndex = '1000';
     document.body.appendChild(container);
   }
