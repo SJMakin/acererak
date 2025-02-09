@@ -43,6 +43,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     // Renderer setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     containerRef.current.appendChild(renderer.domElement);
@@ -66,13 +67,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     scene.add(spotLight);
 
     // Floor
-    const floorMaterial = new THREE.MeshPhongMaterial({ 
-      color: '#2c2c2c',
-      side: THREE.DoubleSide 
+    // Invisible floor for physics only
+    const floorGeometry = new THREE.PlaneGeometry(30, 30, 1, 1);
+    const floorMaterial = new THREE.MeshBasicMaterial({ 
+      visible: false
     });
-    const floorGeometry = new THREE.PlaneGeometry(30, 30, 10, 10);
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.receiveShadow = true;
     floor.rotation.x = Math.PI / 2;
     scene.add(floor);
 
@@ -181,7 +181,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
         width: '100%', 
         height: '100%',
         position: 'relative',
-        backgroundColor: 'rgba(0, 0, 0, 0.8)'
+        backgroundColor: 'transparent'
       }} 
     />
   );
