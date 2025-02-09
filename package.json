@@ -24,7 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "@vitejs/plugin-react": "^4.3.4",
-    "cannon-es": "^0.20.0",
+    "cannon": "^0.6.2",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.3",
@@ -37,6 +37,7 @@
     "vite": "^6.0.7"
   },
   "dependencies": {
+    "@3d-dice/dice-box": "^1.1.4",
     "@google/generative-ai": "^0.21.0",
     "@reactflow/background": "^11.3.14",
     "nanoid": "^5.0.9",
