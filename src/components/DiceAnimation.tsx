@@ -49,7 +49,8 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
-    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.alpha = true;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
@@ -60,7 +61,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
 
     // Simple directional lighting
     const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(0, 1, 0);
+    light.position.set(10, 20, 10);
+    light.castShadow = true;
+    light.shadow.mapSize.width = 512;
+    light.shadow.mapSize.height = 512;
+    light.shadow.camera.near = 0.5;
+    light.shadow.camera.far = 100;
     scene.add(light);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -69,8 +75,11 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     // Floor
     // Invisible floor for physics only
     const floorGeometry = new THREE.PlaneGeometry(30, 30, 1, 1);
-    const floorMaterial = new THREE.MeshBasicMaterial({ 
-      visible: false
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+      transparent: true,
+      opacity: 0.1,
+      roughness: 0.7,
+      metalness: 0.1
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
@@ -78,7 +87,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
 
     // Physics world setup
     const world = new CANNON.World();
-    world.gravity.set(0, -9.82 * 20, 0);
+    world.gravity.set(0, -9.82 * 25, 0);
     world.broadphase = new CANNON.NaiveBroadphase();
     world.solver.iterations = 16;
     worldRef.current = world;
@@ -99,12 +108,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     for (let i = 0; i < roll.results.length; i++) {
       let die;
       switch (roll.roll.type) {
-        case 'd4': die = new DiceD4({ size: 1.5, fontColor: '#ffffff', backColor: '#ff0000' }) as any; break;
-        case 'd6': die = new DiceD6({ size: 1.5, fontColor: '#aaaaaa', backColor: '#ff0000' }) as any; break;
-        case 'd8': die = new DiceD8({ size: 1.5, fontColor: '#ffffff', backColor: '#0000ff' }) as any; break;
-        case 'd10': die = new DiceD10({ size: 1.5, fontColor: '#ffffff', backColor: '#00ff00' }) as any; break;
-        case 'd12': die = new DiceD12({ size: 1.5, fontColor: '#ffffff', backColor: '#ff00ff' }) as any; break;
-        default: die = new DiceD20({ size: 1.5, fontColor: '#ffffff', backColor: '#ffff00' }) as any;
+        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
+        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
+        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
+        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
+        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
+        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any;
       }
 
       const diceObject = die.getObject() as THREE.Mesh & { body: CANNON.Body };
