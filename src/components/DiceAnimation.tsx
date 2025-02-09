@@ -41,11 +41,15 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     cameraRef.current = camera;
 
     // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: false
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = false;
+    renderer.alpha = true;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -53,18 +57,13 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     const controls = new OrbitControls(camera, renderer.domElement);
     controlsRef.current = controls;
 
-    // Lighting
-    const ambient = new THREE.AmbientLight('#ffffff', 0.3);
-    scene.add(ambient);
+    // Simple directional lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(0, 1, 0);
+    scene.add(light);
 
-    const spotLight = new THREE.SpotLight(0xefdfd5, 1.3);
-    spotLight.position.y = 100;
-    spotLight.castShadow = true;
-    spotLight.shadow.camera.near = 50;
-    spotLight.shadow.camera.far = 110;
-    spotLight.shadow.mapSize.width = 1024;
-    spotLight.shadow.mapSize.height = 1024;
-    scene.add(spotLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
 
     // Floor
     // Invisible floor for physics only
