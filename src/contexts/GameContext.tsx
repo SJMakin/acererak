@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useRef,
 } from 'react';
+import { createRoot } from 'react-dom/client';
 import { nanoid } from 'nanoid';
 import DiceAnimation from '../components/DiceAnimation';
 import {
@@ -513,14 +514,36 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <GameContext.Provider value={value}>
       {children}
-      {state.showDiceAnimation && state.currentRollResult && (
-        <DiceAnimation
-          roll={state.currentRollResult}
-          onAnimationComplete={() => {
-            setState(prev => ({ ...prev, showDiceAnimation: false }));
-          }}
-        />
-      )}
+      {state.showDiceAnimation && state.currentRollResult && (() => {
+        let container = document.getElementById('dice-animation-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'dice-animation-container';
+          container.style.position = 'fixed';
+          container.style.top = '50%';
+          container.style.left = '50%';
+          container.style.transform = 'translate(-50%, -50%)';
+          container.style.width = '100vw';
+          container.style.height = '100vh';
+          container.style.backgroundColor = 'transparent';
+          container.style.zIndex = '1000';
+          document.body.appendChild(container);
+        }
+        const root = createRoot(container);
+        root.render(
+          <DiceAnimation 
+            roll={state.currentRollResult}
+            onAnimationComplete={() => {
+              setState(prev => ({ ...prev, showDiceAnimation: false }));
+              setTimeout(() => {
+                root.unmount();
+                container?.remove();
+              }, 100);
+            }}
+          />
+        );
+        return null;
+      })()}
     </GameContext.Provider>
   );
 };

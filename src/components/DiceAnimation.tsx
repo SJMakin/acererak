@@ -116,12 +116,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     for (let i = 0; i < roll.results.length; i++) {
       let die;
       switch (roll.roll.type) {
-        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
-        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
-        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
-        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
-        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any; break;
-        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#2b0000' }) as any;
+        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; break;
+        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; break;
+        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; break;
+        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; break;
+        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; break;
+        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any;
       }
 
       const diceObject = die.getObject() as THREE.Mesh & { body: CANNON.Body };
@@ -206,7 +206,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
 };
 
 // Debug function to test dice rolls from console
-export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1) => {
+export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1, predeterminedResults?: number[]) => {
   const roll: RollResult = {
     roll: {
       type: diceType,
@@ -214,7 +214,7 @@ export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1) 
       description: `Rolling ${count}${diceType}`,
       modifier: 0
     },
-    results: Array(count).fill(0).map(() => Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1),
+    results: predeterminedResults || Array(count).fill(0).map(() => Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1),
     total: 0,
     formatted: ''
   };
