@@ -50,6 +50,8 @@ const GameContext = createContext<GameContextProps | undefined>(undefined);
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const rootRef = useRef<ReturnType<typeof createRoot> | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const updateCharacterSheet = useCallback(
     (updates: Array<{ oldText: string; newText: string }>) => {
       setState(prev => {
@@ -515,33 +517,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     <GameContext.Provider value={value}>
       {children}
       {state.showDiceAnimation && state.currentRollResult && (() => {
-        let container = document.getElementById('dice-animation-container');
-        if (!container) {
-          container = document.createElement('div');
-          container.id = 'dice-animation-container';
-          container.style.position = 'fixed';
-          container.style.top = '50%';
-          container.style.left = '50%';
-          container.style.transform = 'translate(-50%, -50%)';
-          container.style.width = '100vw';
-          container.style.height = '100vh';
-          container.style.backgroundColor = 'transparent';
-          container.style.zIndex = '1000';
-          document.body.appendChild(container);
+        if (!containerRef.current) {
+          containerRef.current = document.createElement('div');
+          containerRef.current.id = 'dice-animation-container';
+          containerRef.current.style.position = 'fixed';
+          containerRef.current.style.top = '50%';
+          containerRef.current.style.left = '50%';
+          containerRef.current.style.transform = 'translate(-50%, -50%)';
+          containerRef.current.style.width = '100vw';
+          containerRef.current.style.height = '100vh';
+          containerRef.current.style.backgroundColor = 'transparent';
+          containerRef.current.style.zIndex = '1000';
+          document.body.appendChild(containerRef.current);
+          rootRef.current = createRoot(containerRef.current);
         }
-        const root = createRoot(container);
-        root.render(
-          <DiceAnimation 
-            roll={state.currentRollResult}
-            onAnimationComplete={() => {
-              setState(prev => ({ ...prev, showDiceAnimation: false }));
-              setTimeout(() => {
-                root.unmount();
-                container?.remove();
-              }, 100);
-            }}
-          />
-        );
+
+        if (rootRef.current) {
+          rootRef.current.render(
+            <DiceAnimation 
+              roll={state.currentRollResult}
+              onAnimationComplete={() => {
+                setState(prev => ({ ...prev, showDiceAnimation: false }));
+                setTimeout(() => {
+                  rootRef.current?.unmount();
+                  containerRef.current?.remove();
+                  rootRef.current = null;
+                  containerRef.current = null;
+                }, 100);
+              }}
+            />
+          );
+        }
         return null;
       })()}
     </GameContext.Provider>
