@@ -11,27 +11,6 @@ const backgrounds = [
   'Merchant',
 ];
 
-const skills = [
-  'Acrobatics',
-  'Animal Handling',
-  'Arcana',
-  'Athletics',
-  'Deception',
-  'History',
-  'Insight',
-  'Intimidation',
-  'Investigation',
-  'Medicine',
-  'Nature',
-  'Perception',
-  'Performance',
-  'Persuasion',
-  'Religion',
-  'Sleight of Hand',
-  'Stealth',
-  'Survival',
-];
-
 const feats = [
   'Alert',
   'Athlete',
@@ -435,10 +414,6 @@ Level: 1
 Race: ${race}
 Background: ${background}
 
-## Skills
-${getRandomSkills().join(', ')}
-
-
 ## Stats
 HP: ${hp}/${hp}
 AC: ${10 + Math.floor((stats.Dex - 10) / 2)}
@@ -488,17 +463,4 @@ ${
 
 ## Notes
 - Character created on ${new Date().toISOString().split('T')[0]}`;
-};
-
-// New function to utilize the 'skills' array
-export const getRandomSkills = (): string[] => {
-  const numSkills = 2; // For example, assign 2 random skills
-  const selectedSkills: string[] = [];
-  const availableSkills = [...skills]; // using the 'skills' constant
-  for (let i = 0; i < numSkills && availableSkills.length; i++) {
-    const index = Math.floor(Math.random() * availableSkills.length);
-    selectedSkills.push(availableSkills[index]);
-    availableSkills.splice(index, 1);
-  }
-  return selectedSkills;
 };

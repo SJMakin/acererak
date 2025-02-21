@@ -22,22 +22,42 @@ const themeCategories = [environments, emotions, objects, concepts, creatures, r
 let storyPlan: string | null = null;
 
 async function generateStoryPlan(): Promise<string> {
-  const selectedThemes = themeCategories
+  console.log('🎲 Generating new story themes...');
+  
+  const selectedCategories = themeCategories
     .sort(() => Math.random() - 0.5)
-    .slice(0, 3)
-    .map(category => category[Math.floor(Math.random() * category.length)]);
+    .slice(0, 3);
+    
+  const selectedThemes = selectedCategories.map((category, i) => {
+    const word = category[Math.floor(Math.random() * category.length)];
+    const categoryName = 
+      category === environments ? 'Environment' :
+      category === emotions ? 'Emotion' :
+      category === objects ? 'Object' :
+      category === concepts ? 'Concept' :
+      category === creatures ? 'Creature' :
+      category === rituals ? 'Ritual' :
+      category === factions ? 'Faction' : 'Unknown';
+    
+    console.log(`🎯 Theme ${i + 1}: ${word} (${categoryName})`);
+    return word;
+  });
+  
+  console.log('📖 Story seed:', selectedThemes.join(' + '));
   
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
   const result = await model.generateContent({
     contents: [{
       role: 'user',
       parts: [{
-        text: `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict, key locations, and potential major events. Keep it under 200 words.`
+        text: `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict with some idea of how to end the game, key locations, and potential major events. Keep it under 300 words.`
       }]
     }]
   });
 
-  return result.response.text();
+  const storyText = result.response.text();
+  console.log(`\n📜 Generated Story Plan:\n${storyText}\n`);
+  return storyText;
 }
 
 export async function generateStoryNode(
@@ -207,6 +227,14 @@ Generate the JSON response in the order of: story, choices, character sheet upda
         throw new Error('Duplicate choices detected');
       }
 
+      console.log(`\n📰 Generated Story Node:`);
+      console.log(`📖 Content: ${cleanedResponse.story.content}`);
+      console.log(`📋 Summary: ${cleanedResponse.story.summary}`);
+      console.log(`🕹️ Choices:${cleanedResponse.choices.map(c => '\n - ' + c.text).join('')}`);
+      if (cleanedResponse.characterUpdates.length > 0) {
+        console.log(`👤 Character Updates:${cleanedResponse.characterUpdates.map(u => '\n - ' + u.description).join('')}`);
+      }
+      console.log('\n');
       return cleanedResponse;
     } catch (parseError) {
       console.error('Failed to parse or validate AI response:', parseError);
