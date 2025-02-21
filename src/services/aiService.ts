@@ -9,10 +9,44 @@ if (!API_KEY) {
 }
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
 
+const environments = ['desert', 'jungle', 'mountain', 'underwater', 'space', 'volcano', 'city', 'forest', 'underdark', 'abyss', 'hell', 'shadowfell', 'necropolis', 'void', 'astral-plane', 'blood-marsh', 'crystal-cavern', 'bone-wastes'];
+const emotions = ['revenge', 'love', 'greed', 'fear', 'pride', 'betrayal', 'hatred', 'madness', 'despair', 'ecstasy', 'paranoia', 'bloodlust'];
+const objects = ['crystal', 'sword', 'book', 'crown', 'portal', 'artifact', 'phylactery', 'grimoire', 'relic', 'altar', 'throne', 'sacrifice-dagger', 'soul-gem', 'demon-chain', 'void-shard'];
+const concepts = ['time', 'death', 'life', 'chaos', 'order', 'magic', 'corruption', 'sacrifice', 'destiny', 'damnation', 'ascension', 'immortality', 'torment', 'transformation'];
+const creatures = ['dragon', 'demon', 'angel', 'undead', 'elemental', 'beast', 'lich', 'mindflayer', 'aboleth', 'elder-brain', 'nightwalker', 'death-knight', 'vampire-lord', 'pit-fiend'];
+const rituals = ['blood-sacrifice', 'soul-binding', 'flesh-warping', 'mind-breaking', 'void-calling', 'demon-pact', 'lichdom', 'ascension'];
+const factions = ['cult', 'cabal', 'inquisition', 'dark-council', 'blood-court', 'shadow-conclave', 'void-seekers', 'flesh-shapers'];
+
+const themeCategories = [environments, emotions, objects, concepts, creatures, rituals, factions];
+
+let storyPlan: string | null = null;
+
+async function generateStoryPlan(): Promise<string> {
+  const selectedThemes = themeCategories
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3)
+    .map(category => category[Math.floor(Math.random() * category.length)]);
+  
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  const result = await model.generateContent({
+    contents: [{
+      role: 'user',
+      parts: [{
+        text: `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict, key locations, and potential major events. Keep it under 200 words.`
+      }]
+    }]
+  });
+
+  return result.response.text();
+}
+
 export async function generateStoryNode(
   context: string,
   characterSheet?: string
 ): Promise<StoryGenerationResponse> {
+  if (!storyPlan) {
+    storyPlan = await generateStoryPlan();
+  }
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
     // 'gemini-2.0-flash-exp'
@@ -30,15 +64,15 @@ export async function generateStoryNode(
 Current Character:
 ${characterSheet || 'No character sheet available'}
 
-Based on this context: 
+Story Plan:
+${storyPlan}
 
+Current Context:
 ===
-
 ${context}
-
 ===
 
-Generate the next story segment and 1-5 possible choices.
+Follow the story plan loosly. Use the current context to generate the next story segment and 2-5 possible choices.
 
 Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events. 
 
@@ -58,9 +92,9 @@ Do your best to keep it interesting and fun - not for kids - use your ability to
 
 In combat update the character sheet when the plater gets attacked. Use the dice for all the things an advanced DM would. One of your goals should be to level the player up, and put them in touch and go situations where a dice roll might decide thier life. 
 
-Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together..  assume the consumer likes all sorts of cool wierd stuff.
+Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together, targetted at a consumer that likes all sorts of cool wierd stuff.
 
-Generate the JSON response in the order of: story, choices, character sheet updates.`,
+Generate the JSON response in the order of: story, choices, character sheet updates. Be careful to use these wisely.`,
             },
           ],
         },

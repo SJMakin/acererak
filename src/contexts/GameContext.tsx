@@ -120,7 +120,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         characterSheet: prev.characterSheet,
       }));
 
-      const initialPrompt = `You find yourself in a medieval fantasy world. As a lone adventurer, you're about to embark on a quest. Your journey begins in a small village tavern, where rumors of adventure and danger circulate among the patrons.`;
+      const initialPrompt = `Begin the story from the first major story beat. Introduce the character to the world and the main conflict naturally. Make it punchy and engaging from the first moment.`;
 
       let retryCount = 0;
       const maxRetries = 3;
