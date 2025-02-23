@@ -180,6 +180,7 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
       },
     });
 
