@@ -46,11 +46,9 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setState(prev => ({ ...prev, currentStoryNode: node }));
     } catch (error) {
-      console.error('Error loading story node:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to load story node'
-      }));
+      const message = error instanceof Error ? error.message : 'Failed to load story node';
+      console.error('Story node error:', message);
+      setState(prev => ({ ...prev, error: message }));
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
@@ -127,11 +125,9 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentStoryNode: newStoryNode
       }));
     } catch (error) {
-      console.error('Error processing choice:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process choice'
-      }));
+      const message = error instanceof Error ? error.message : 'Failed to process choice';
+      console.error('Choice processing error:', message);
+      setState(prev => ({ ...prev, error: message }));
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
@@ -197,12 +193,9 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         error: null
       });
     } catch (error) {
-      console.error('Error starting game:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to start game',
-        isLoading: false
-      }));
+      const message = error instanceof Error ? error.message : 'Failed to start game';
+      console.error('Game start error:', message);
+      setState(prev => ({ ...prev, error: message, isLoading: false }));
     }
   };
 
