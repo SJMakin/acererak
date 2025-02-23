@@ -410,7 +410,7 @@ export const generateCharacterSheet = (): string => {
 ## Basic Info
 Name: ${name}
 Class: ${characterClass}
-Level: 1
+Level: 1 (XP:0/300)
 Race: ${race}
 Background: ${background}
 

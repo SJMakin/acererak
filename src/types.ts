@@ -21,11 +21,17 @@ export interface DiceRoll {
 export interface ChoiceNode {
   id: string;
   type: 'choice';
+  choiceType: 'story' | 'combat';
   text: string; // The choice presented to the user
   target: string; // ID of the next StoryNode this choice leads to
   position: { x: number; y: number };
   data: { label: string };
   requiredRolls?: DiceRoll[]; // Array of dice rolls required for this choice
+  combatData?: {
+    enemies: string[];
+    difficulty: 'easy' | 'medium' | 'hard';
+    environment?: string;
+  };
 }
 
 export type Node = StoryNode | ChoiceNode;
@@ -131,6 +137,32 @@ export interface Dice3DAnimationState {
 
 export type DiceGeometryType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
 
+export interface Entity {
+  id: string;
+  type: 'player' | 'npc' | 'enemy';
+  sheet: string; // Markdown format
+}
+
+export interface CombatState {
+  active: boolean;
+  participants: Entity[];
+  initiative: Array<{
+    entity: Entity;
+    score: number;
+  }>;
+  currentTurn: number;
+  round: number;
+  log: CombatAction[];
+}
+
+export interface CombatAction {
+  actor: Entity;
+  type: 'attack' | 'spell' | 'ability' | 'item';
+  target: Entity;
+  roll: RollResult;
+  description: string;
+}
+
 export interface StoryGenerationResponse {
   story: {
     content: string;
@@ -140,6 +172,12 @@ export interface StoryGenerationResponse {
     text: string;
     nextNodeId: string;
     requiredRolls?: DiceRoll[];
+    type: 'story' | 'combat';
+    combatData?: {
+      enemies: string[];
+      difficulty: 'easy' | 'medium' | 'hard';
+      environment?: string;
+    };
   }>;
   characterUpdates?: Array<{
     oldText: string;
