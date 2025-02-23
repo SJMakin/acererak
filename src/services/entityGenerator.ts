@@ -16,11 +16,7 @@ export async function generateEntity(params: EntityGenerationParams): Promise<En
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: `Generate a ${params.type === 'npc' ? 'non-player character' : 'enemy'} for a D&D game.
+    const prompt = `Generate a ${params.type === 'npc' ? 'non-player character' : 'enemy'} for a D&D game.
 
 Parameters:
 ${params.role ? `Role: ${params.role}` : ''}
@@ -76,8 +72,20 @@ Initiative: {modifier}
 Make it interesting and thematic. For enemies, scale stats and abilities based on difficulty:
 - Easy: ~30-50 HP, AC 12-14, 1-2 basic attacks
 - Medium: ~60-100 HP, AC 14-16, 2-3 attacks + 1 special ability
-- Hard: ~120-200 HP, AC 16-18, 3-4 attacks + 2-3 special abilities`
-        }]
+- Hard: ~120-200 HP, AC 16-18, 3-4 attacks + 2-3 special abilities`;
+
+    console.log('Entity generation prompt:', {
+      type: params.type,
+      role: params.role,
+      level: params.level,
+      difficulty: params.difficulty,
+      context: params.context
+    });
+
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
       }],
       generationConfig: {
         temperature: 0.7,
@@ -88,19 +96,23 @@ Make it interesting and thematic. For enemies, scale stats and abilities based o
     });
 
     const sheet = result.response.text();
+    console.log('Entity generation response:', sheet);
 
     // Validate the generated sheet has the required sections
     if (!sheet.includes('HP:') || !sheet.includes('AC:')) {
+      console.error('Invalid entity sheet:', sheet);
       throw new Error('Generated sheet missing required stats');
     }
 
     const id = `${params.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    return {
+    const entity: Entity = {
       id,
-      type: params.type === 'npc' ? 'npc' : 'enemy',
+      type: params.type,  // params.type is already correctly typed as 'npc' | 'enemy'
       sheet,
     };
+
+    console.log('Generated entity:', entity);
+    return entity;
   } catch (error) {
     console.error('Error generating entity:', error);
     throw new Error(

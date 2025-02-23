@@ -18,11 +18,7 @@ export async function generateCharacterUpdates(
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: `You are updating a character sheet based on recent events in a D&D game.
+    const prompt = `You are updating a character sheet based on recent events in a D&D game.
 
 Current Character Sheet:
 ${entity.sheet}
@@ -57,8 +53,18 @@ Example:
   }
 ]
 
-Only include changes that are directly supported by the events. Ensure oldText matches the character sheet exactly.`
-        }]
+Only include changes that are directly supported by the events. Ensure oldText matches the character sheet exactly.`;
+
+    console.log('Character update prompt:', {
+      entityType: entity.type,
+      events,
+      context
+    });
+
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
       }],
       generationConfig: {
         temperature: 0.7,
@@ -72,34 +78,34 @@ Only include changes that are directly supported by the events. Ensure oldText m
     const textContent = response.text();
 
     try {
+      console.log('Character update raw response:', textContent);
+      
       const updates = JSON.parse(textContent);
 
-      // Validate update structure
       if (!Array.isArray(updates)) {
         throw new Error('Updates must be an array');
       }
 
-      updates.forEach((update, i) => {
+      const validUpdates = updates.map((update, i) => {
         if (!update.oldText || !update.newText || !update.description) {
-          throw new Error(`Update at index ${i} missing required fields`);
+          throw new Error('Missing required fields in update');
         }
         if (!entity.sheet.includes(update.oldText)) {
-          throw new Error(`Update at index ${i} contains oldText that doesn't match sheet exactly`);
+          throw new Error('Update contains oldText that doesn\'t match sheet');
         }
+        return update;
       });
 
-      return updates;
-    } catch (parseError) {
-      console.error('Failed to parse character updates:', parseError);
-      console.error('Raw response:', textContent);
-      throw parseError;
+      console.log('Character updates:', validUpdates);
+      return validUpdates;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error processing updates';
+      console.error('Character update error:', { error: message, response: textContent });
+      throw new Error(message);
     }
   } catch (error) {
-    console.error('Error generating character updates:', error);
-    throw new Error(
-      error instanceof Error
-        ? `Character update generation failed: ${error.message}`
-        : 'Failed to generate character updates due to an unknown error'
-    );
+    const message = error instanceof Error ? error.message : 'Unknown error generating updates';
+    console.error('Character update failed:', message);
+    throw new Error(message);
   }
 }

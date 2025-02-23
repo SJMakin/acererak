@@ -16,42 +16,47 @@ const themeCategories = [environments, emotions, objects, concepts, creatures, r
 
 let storyPlan: string | null = null;
 
+const categoryNames = {
+  [environments.toString()]: 'Environment',
+  [emotions.toString()]: 'Emotion',
+  [objects.toString()]: 'Object',
+  [concepts.toString()]: 'Concept',
+  [creatures.toString()]: 'Creature',
+  [rituals.toString()]: 'Ritual',
+  [factions.toString()]: 'Faction'
+};
+
 async function generateStoryPlan(): Promise<string> {
-  console.log('🎲 Generating new story themes...');
-  
   const selectedCategories = themeCategories
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
     
-  const selectedThemes = selectedCategories.map((category, i) => {
+  const selectedThemes = selectedCategories.map(category => {
     const word = category[Math.floor(Math.random() * category.length)];
-    const categoryName = 
-      category === environments ? 'Environment' :
-      category === emotions ? 'Emotion' :
-      category === objects ? 'Object' :
-      category === concepts ? 'Concept' :
-      category === creatures ? 'Creature' :
-      category === rituals ? 'Ritual' :
-      category === factions ? 'Faction' : 'Unknown';
-    
-    console.log(`🎯 Theme ${i + 1}: ${word} (${categoryName})`);
     return word;
   });
-  
-  console.log('📖 Story seed:', selectedThemes.join(' + '));
+
+  console.log('Story themes:', {
+    themes: selectedThemes.map((word, i) => ({
+      theme: word,
+      category: categoryNames[selectedCategories[i].toString()] || 'Unknown'
+    }))
+  });
   
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  const prompt = `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict with some idea of how to end the game, key locations, and potential major events. Keep it under 300 words.`;
+  
+  console.log('Story plan prompt:', prompt);
+  
   const result = await model.generateContent({
     contents: [{
       role: 'user',
-      parts: [{
-        text: `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict with some idea of how to end the game, key locations, and potential major events. Keep it under 300 words.`
-      }]
+      parts: [{ text: prompt }]
     }]
   });
 
   const storyText = result.response.text();
-  console.log(`\n📜 Generated Story Plan:\n${storyText}\n`);
+  console.log('Story plan response:', storyText);
   return storyText;
 }
 
@@ -66,13 +71,7 @@ export async function generateStoryNode(
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure.
+    const prompt = `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure.
 
 Current Player Character:
 ${entities.player}
@@ -117,11 +116,12 @@ Example combat choice:
   }
 }
 
-Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together, targeted at someone that likes all sorts of cool weird stuff.`,
-            },
-          ],
-        },
-      ],
+Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together, targeted at someone that likes all sorts of cool weird stuff.`;
+
+    console.log('Story node prompt:', prompt);
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseSchema: {
           type: SchemaType.OBJECT,
@@ -188,57 +188,48 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
     const textContent = response.text();
 
     try {
+      console.log('Story node raw response:', textContent);
+      
       const parsedContent = JSON.parse(textContent);
 
       if (!isValidStoryResponse(parsedContent)) {
-        console.error('Invalid AI response structure:', parsedContent);
-        throw new Error('AI response does not match expected structure');
+        throw new Error('Invalid AI response structure');
       }
 
-      // Clean and validate the response
       const cleanedResponse = {
         story: {
           content: parsedContent.story.content.trim(),
           summary: parsedContent.story.summary.trim(),
         },
-        choices: parsedContent.choices.map(choice => {
-          const cleanedText = choice.text.trim();
-          if (cleanedText.length < 10) {
-            throw new Error('Choice text too short (minimum 10 characters)');
-          }
-          return {
-            text: cleanedText,
-            nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            type: choice.type || 'story',
-            requiredRolls: choice.requiredRolls || [],
-            combatData: choice.type === 'combat' ? choice.combatData : undefined,
-          };
-        }),
+        choices: parsedContent.choices.map(choice => ({
+          text: choice.text.trim(),
+          nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: choice.type || 'story',
+          requiredRolls: choice.requiredRolls || [],
+          combatData: choice.type === 'combat' ? choice.combatData : undefined,
+        })),
       };
 
-      // Validate choices are unique
+      // Validate response
+      if (cleanedResponse.choices.some(c => c.text.length < 10)) {
+        throw new Error('Choice text too short (minimum 10 characters)');
+      }
+      
       const choiceTexts = new Set(cleanedResponse.choices.map(c => c.text.toLowerCase()));
       if (choiceTexts.size !== cleanedResponse.choices.length) {
         throw new Error('Duplicate choices detected');
       }
 
-      console.log(`\n📰 Generated Story Node:`);
-      console.log(`📖 Content: ${cleanedResponse.story.content}`);
-      console.log(`📋 Summary: ${cleanedResponse.story.summary}`);
-      console.log(`🕹️ Choices:${cleanedResponse.choices.map(c => '\n - ' + c.text).join('')}`);
-
+      console.log('Generated story node:', cleanedResponse);
       return cleanedResponse;
-    } catch (parseError) {
-      console.error('Failed to parse or validate AI response:', parseError);
-      console.error('Raw response:', textContent);
-      throw parseError;
+    } catch (error) {
+      const parseError = error as Error;
+      console.error('Story generation error:', { error: parseError.message, response: textContent });
+      throw error;
     }
   } catch (error) {
-    console.error('Error generating story node:', error);
-    throw new Error(
-      error instanceof Error
-        ? `Story generation failed: ${error.message}`
-        : 'Failed to generate story due to an unknown error'
-    );
+    const message = error instanceof Error ? error.message : 'Unknown error during story generation';
+    console.error('Story generation failed:', message);
+    throw new Error(message);
   }
 }
