@@ -1,8 +1,10 @@
+
 import React, { createContext, useState, useCallback, useContext } from 'react';
 import { nanoid } from 'nanoid';
 import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
 import { generateStoryNode } from '../services/storyGenerationService';
 import { generateCharacterUpdates } from '../services/characterUpdateService';
+import { useDice } from './DiceContext';
 
 export interface StoryState {
   graphData: GraphData;
@@ -54,6 +56,8 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const { performDiceRoll } = useDice();
+
   const chooseOption = async (choiceNodeId: string, characterSheet: string) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -63,7 +67,19 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error(`Choice node not found or invalid type: ${choiceNodeId}`);
       }
 
-      const context = `Current choice: ${choiceNode.text}\nCharacter Sheet:\n${characterSheet}`;
+      let context = `Current choice: ${choiceNode.text}\nCharacter Sheet:\n${characterSheet}`;
+
+      // Handle dice rolls if required
+      if (choiceNode.requiredRolls && choiceNode.requiredRolls.length > 0) {
+        // Start dice rolls and get their results
+        const rollPromises = choiceNode.requiredRolls.map(roll => performDiceRoll(roll));
+        
+        // Get results for story generation, but don't wait for animations
+        const rollResults = await Promise.all(rollPromises);
+        
+        // Add roll results to story generation context
+        context += `\nDice Rolls:\n${rollResults.map(r => r.formatted).join('\n')}`;
+      }
       
       const newStoryData = await generateStoryNode(context, {
         player: characterSheet

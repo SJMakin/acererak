@@ -9,7 +9,11 @@
     "lint": "eslint ./src/**/*.{ts,tsx}",
     "lint:fix": "eslint ./src/**/*.{ts,tsx} --fix",
     "format": "prettier --write './**/*.{js,jsx,ts,tsx,json,css,md}'",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +21,11 @@
   "type": "commonjs",
   "description": "AI-powered D&D storytelling with dynamic graph visualization",
   "devDependencies": {
+    "@playwright/test": "^1.50.1",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
@@ -30,11 +39,13 @@
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.1.0",
+    "jsdom": "^26.0.0",
     "prettier": "^3.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.3",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^3.0.6"
   },
   "dependencies": {
     "@3d-dice/dice-box": "^1.1.4",

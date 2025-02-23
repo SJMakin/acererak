@@ -131,7 +131,32 @@ React/TypeScript game implementing an AI-driven narrative system with D&D-style 
 - Local: `C:/Users/Sam/Documents/node/acererak/`
 - Repository: github.com:SJMakin/acererak.git
 
+## Testing
+1. Unit Tests (Vitest):
+   - Located in `src/services/__tests__/`
+   - Focus on core game mechanics
+   - Run with: `npm test`
+   - Key test suites:
+     - `diceService.test.ts`: Dice roll mechanics, modifiers, skill checks
+
+2. E2E Tests (Playwright):
+   - Located in `tests-e2e/`
+   - Tests complete game flows
+   - Run with: `npm run test:e2e`
+   - Key test suites:
+     - `gameFlow.spec.ts`: Story progression, combat transitions, hook error detection
+   - Tests verify:
+     - Story mode navigation
+     - Combat mode transitions
+     - Dice roll animations
+     - Hook usage compliance
+     - Error handling
+
 ## Recent Updates
+- Added comprehensive test suite with Vitest and Playwright
+- Fixed invalid hook usage in StoryContext
+- Added E2E tests for complete game flow
+- Added unit tests for dice mechanics
 - Split AI services into separate modules for better separation of concerns
 - Added combat system with turn-based mechanics
 - Implemented NPC and enemy generation
