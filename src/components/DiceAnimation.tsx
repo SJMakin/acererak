@@ -29,14 +29,14 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     scene.background = null;
     sceneRef.current = scene;
 
-    // Camera setup
+    // Camera setup - adjusted for better dice visibility
     const camera = new THREE.PerspectiveCamera(
-      45,
+      40, // Reduced FOV for less distortion
       window.innerWidth / window.innerHeight,
       0.01,
       20000
     );
-    camera.position.set(0, 30, 30);
+    camera.position.set(0, 35, 25); // Adjusted position for better viewing angle
     camera.lookAt(0, 0, 0);
     scene.add(camera);
     cameraRef.current = camera;
@@ -58,25 +58,25 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     const controls = new OrbitControls(camera, renderer.domElement);
     controlsRef.current = controls;
 
-    // Enhanced directional lighting
-    const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
-    mainLight.position.set(10, 20, 10);
+    // Enhanced directional lighting - improved for better dice readability
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.5); // Increased intensity
+    mainLight.position.set(15, 25, 15); // Adjusted position
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 512;
-    mainLight.shadow.mapSize.height = 512;
+    mainLight.shadow.mapSize.width = 1024; // Increased shadow resolution
+    mainLight.shadow.mapSize.height = 1024;
     mainLight.shadow.camera.near = 0.5;
     mainLight.shadow.camera.far = 100;
     scene.add(mainLight);
 
-    const fillLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    fillLight.position.set(-10, 15, -10);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 2.0); // Increased intensity
+    fillLight.position.set(-15, 20, -15); // Adjusted position
     scene.add(fillLight);
 
-    const topLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    topLight.position.set(0, 25, 0);
+    const topLight = new THREE.DirectionalLight(0xffffff, 1.5); // Increased intensity
+    topLight.position.set(0, 30, 0); // Raised position
     scene.add(topLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // Increased intensity
     scene.add(ambientLight);
 
     // Floor
@@ -115,12 +115,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     for (let i = 0; i < roll.results.length; i++) {
       let die;
       switch (roll.roll.type) {
-        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 4; break;
-        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 6; break;
-        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 8; break;
-        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 10; break;
-        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 12; break;
-        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#3d0000' }) as any; die.values = 20;
+        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 4; break;
+        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 6; break;
+        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 8; break;
+        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 10; break;
+        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 12; break;
+        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 20;
       }
 
       const diceObject = die.getObject() as THREE.Mesh & { body: CANNON.Body };
@@ -169,7 +169,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
           if (onAnimationComplete) {
             onAnimationComplete();
           }
-        }, 1000);
+        }, 3000);  // Increased from 1000ms to 3000ms to give more time to read dice
         return;
       }
 
@@ -243,7 +243,7 @@ export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1, 
         setTimeout(() => {
           root.unmount();
           container?.remove();
-        }, 2000);
+        }, 4000);  // Increased from 2000ms to 4000ms to give more time to read dice
       }} 
     />
   );
