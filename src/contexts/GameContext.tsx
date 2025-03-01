@@ -4,7 +4,7 @@ import { DiceProvider, useDice } from './DiceContext';
 import { CharacterProvider, useCharacter } from './CharacterContext';
 import { CombatProvider, useCombat } from './CombatContext';
 
-export type GameMode = 'story' | 'combat';
+export type GameMode = 'system-select' | 'story' | 'combat';
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -22,22 +22,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { restartGame } = useStory();
-  const { characterSheet } = useCharacter();
+  const { characterSheet, isGenerating } = useCharacter();
   const { isActive: isCombatActive } = useCombat();
-  const [gameMode, setGameMode] = useState<GameMode>('story');
+  const [gameMode, setGameMode] = useState<GameMode>('system-select'); // Start with system selection
   const initialLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!initialLoadedRef.current) {
       initialLoadedRef.current = true;
-      restartGame(characterSheet);
+      // We'll start with system selection instead of immediately starting the game
     }
-  }, [restartGame, characterSheet]);
+  }, []);
 
   // Update game mode based on combat state
   useEffect(() => {
-    setGameMode(isCombatActive ? 'combat' : 'story');
-  }, [isCombatActive]);
+    if (gameMode !== 'system-select') {
+      setGameMode(isCombatActive ? 'combat' : 'story');
+    }
+  }, [isCombatActive, gameMode]);
 
   return <>{children}</>;
 };
@@ -47,38 +49,84 @@ export const useGame = () => {
   const dice = useDice();
   const character = useCharacter();
   const combat = useCombat();
-  const [gameMode, setGameMode] = useState<GameMode>('story');
+  const [gameMode, setGameMode] = useState<GameMode>('system-select');
 
   useEffect(() => {
-    setGameMode(combat.isActive ? 'combat' : 'story');
-  }, [combat.isActive]);
+    // If we're not in system selection mode, update based on combat state
+    if (gameMode !== 'system-select') {
+      setGameMode(combat.isActive ? 'combat' : 'story');
+    }
+    
+    // Check if combat just ended and we need to resume the story
+    if (!combat.isActive) {
+      const combatResult = localStorage.getItem('combatResult');
+      const pendingChoiceId = localStorage.getItem('pendingChoiceAfterCombat');
+      
+      if (combatResult && pendingChoiceId) {
+        // Only proceed with the story if combat ended in victory
+        if (combatResult === 'victory') {
+          story.chooseOption(pendingChoiceId, character.characterSheet);
+        }
+        
+        // Clear the stored values
+        localStorage.removeItem('combatResult');
+        localStorage.removeItem('pendingChoiceAfterCombat');
+      }
+    }
+  }, [combat.isActive, story, character.characterSheet]);
 
   const chooseOption = async (choiceNodeId: string) => {
-    const choice = story.graphData.nodes.find(node => node.id === choiceNodeId);
+    const choice = story.graphData.nodes.find((node: any) => node.id === choiceNodeId);
     if (!choice || choice.type !== 'choice') return;
 
-    // If this is a combat choice, initiate combat before proceeding
+    // If this is a combat choice, initiate combat and pause story progression
     if (choice.choiceType === 'combat' && choice.combatData) {
       await combat.initiateCombat(choice.combatData);
+      // Store the choice ID to resume story after combat ends
+      localStorage.setItem('pendingChoiceAfterCombat', choiceNodeId);
+      return; // Don't proceed with story generation during combat
     }
 
-    // Always proceed with the story choice
-    return story.chooseOption(choiceNodeId, character.characterSheet);
+    // Only proceed with the story choice if not in combat
+    if (!combat.isActive) {
+      return story.chooseOption(choiceNodeId, character.characterSheet);
+    }
+  };
+
+  // Function to handle system selection
+  const selectSystem = async (system: string, preferences?: string) => {
+    try {
+      // Generate character using AI
+      await character.generateCharacter({ system, preferences });
+      
+      // Move to story mode (which will show theme selection first)
+      setGameMode('story');
+    } catch (error) {
+      console.error('Error selecting system:', error);
+    }
   };
 
   return {
     // Game state
     gameMode,
+    setGameMode,
+    
+    // System selection
+    selectSystem,
+    isGeneratingCharacter: character.isGenerating,
     
     // Story state and functions
     graphData: story.graphData,
     currentStoryNode: story.currentStoryNode,
-    isLoading: story.isLoading,
+    isLoading: story.isLoading || character.isGenerating,
     error: story.error,
+    isThemeSelectionMode: story.isThemeSelectionMode,
+    selectThemes: story.selectThemes,
     loadStoryNode: story.loadStoryNode,
     chooseOption,
     resetError: story.resetError,
     restartGame: () => {
+      setGameMode('system-select'); // Go back to system selection
       character.resetCharacter();
       combat.endCombat();
       return story.restartGame(character.characterSheet);

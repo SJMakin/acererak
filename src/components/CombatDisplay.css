@@ -160,3 +160,149 @@
 .combat-log::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 68, 68, 0.7);
 }
+
+/* Turn message */
+.turn-message {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 12px 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 1.2em;
+  text-align: center;
+  color: #fff;
+  border-left: 4px solid #ff4444;
+}
+
+/* Entity status display */
+.entity-status-container {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entity-status {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.entity-status.current-turn {
+  background: rgba(255, 68, 68, 0.2);
+  border: 1px solid rgba(255, 68, 68, 0.5);
+}
+
+.entity-status.player {
+  border-left: 4px solid #4488ff;
+}
+
+.entity-status.enemy {
+  border-left: 4px solid #ff4444;
+}
+
+.entity-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.turn-indicator {
+  color: #ff4444;
+  font-size: 1.2em;
+}
+
+.hp-bar-container {
+  position: relative;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hp-bar {
+  height: 100%;
+  background: linear-gradient(to right, #ff4444, #ff8866);
+  transition: width 0.3s ease-out;
+}
+
+.entity-status.player .hp-bar {
+  background: linear-gradient(to right, #4488ff, #66aaff);
+}
+
+.hp-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9em;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Combat result display */
+.combat-result {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 30px;
+  border-radius: 6px;
+  text-align: center;
+  margin: 20px 0;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.combat-result.victory {
+  border: 2px solid #44ff44;
+}
+
+.combat-result.defeat {
+  border: 2px solid #ff4444;
+}
+
+.combat-result h2 {
+  font-size: 2em;
+  margin-bottom: 15px;
+}
+
+.combat-result.victory h2 {
+  color: #44ff44;
+}
+
+.combat-result.defeat h2 {
+  color: #ff4444;
+}
+
+.combat-result p {
+  margin-bottom: 20px;
+  font-size: 1.2em;
+}
+
+.combat-result .end-combat-button {
+  font-size: 1.1em;
+  padding: 10px 20px;
+}
+
+.combat-result.victory .end-combat-button {
+  background: #44ff44;
+  color: #000;
+}
+
+.combat-result.defeat .end-combat-button {
+  background: #ff4444;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

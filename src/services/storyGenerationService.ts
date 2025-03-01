@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { StoryGenerationResponse, isValidStoryResponse } from '../types';
+import { SelectedTheme } from '../components/ThemeSelector';
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
@@ -15,6 +16,7 @@ const factions = ['cult', 'cabal', 'inquisition', 'dark-council', 'blood-court',
 const themeCategories = [environments, emotions, objects, concepts, creatures, rituals, factions];
 
 let storyPlan: string | null = null;
+let userSelectedThemes: SelectedTheme[] | null = null;
 
 const categoryNames = {
   [environments.toString()]: 'Environment',
@@ -26,22 +28,43 @@ const categoryNames = {
   [factions.toString()]: 'Faction'
 };
 
-async function generateStoryPlan(): Promise<string> {
-  const selectedCategories = themeCategories
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3);
-    
-  const selectedThemes = selectedCategories.map(category => {
-    const word = category[Math.floor(Math.random() * category.length)];
-    return word;
-  });
+// Function to set user-selected themes
+export function setSelectedThemes(themes: SelectedTheme[] | null): void {
+  userSelectedThemes = themes;
+  // Reset story plan when themes change
+  storyPlan = null;
+}
 
-  console.log('Story themes:', {
-    themes: selectedThemes.map((word, i) => ({
-      theme: word,
-      category: categoryNames[selectedCategories[i].toString()] || 'Unknown'
-    }))
-  });
+async function generateStoryPlan(): Promise<string> {
+  let selectedThemes: string[];
+  
+  if (userSelectedThemes) {
+    // Use user-selected themes
+    selectedThemes = userSelectedThemes.map(theme => theme.theme);
+    
+    if (userSelectedThemes[0].category === 'Custom') {
+      console.log('Using custom free-text themes:', selectedThemes);
+    } else {
+      console.log('Using user-selected story themes:', userSelectedThemes);
+    }
+  } else {
+    // Use random themes
+    const selectedCategories = themeCategories
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+      
+    selectedThemes = selectedCategories.map(category => {
+      const word = category[Math.floor(Math.random() * category.length)];
+      return word;
+    });
+
+    console.log('Using random story themes:', {
+      themes: selectedThemes.map((word, i) => ({
+        theme: word,
+        category: categoryNames[selectedCategories[i].toString()] || 'Unknown'
+      }))
+    });
+  }
   
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
   const prompt = `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict with some idea of how to end the game, key locations, and potential major events. Keep it under 300 words.`;

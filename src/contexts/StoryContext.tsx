@@ -1,16 +1,18 @@
-
 import React, { createContext, useState, useCallback, useContext } from 'react';
 import { nanoid } from 'nanoid';
 import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
-import { generateStoryNode } from '../services/storyGenerationService';
+import { generateStoryNode, setSelectedThemes } from '../services/storyGenerationService';
 import { generateCharacterUpdates } from '../services/characterUpdateService';
 import { useDice } from './DiceContext';
+import { useCharacter } from './CharacterContext';
+import { SelectedTheme } from '../components/ThemeSelector';
 
 export interface StoryState {
   graphData: GraphData;
   currentStoryNode: StoryNode | null;
   isLoading: boolean;
   error: string | null;
+  isThemeSelectionMode: boolean;
 }
 
 export interface StoryContextProps extends StoryState {
@@ -18,6 +20,7 @@ export interface StoryContextProps extends StoryState {
   chooseOption: (choiceNodeId: string, characterSheet: string) => Promise<void>;
   resetError: () => void;
   restartGame: (characterSheet: string) => Promise<void>;
+  selectThemes: (themes: SelectedTheme[] | null) => void;
 }
 
 const StoryContext = createContext<StoryContextProps | undefined>(undefined);
@@ -27,11 +30,9 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     graphData: { nodes: [], edges: [] },
     currentStoryNode: null,
     isLoading: true,
-    error: null
+    error: null,
+    isThemeSelectionMode: true // Start with theme selection mode active
   });
-
-  // Core story state management functions here
-  // ... (copy relevant functions from GameContext)
 
   const loadStoryNode = async (nodeId: string) => {
     try {
@@ -153,10 +154,23 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(prev => ({ ...prev, error: null }));
   };
 
-  const restartGame = async (characterSheet: string) => {
+  const { characterSheet } = useCharacter();
+
+  // Function to handle theme selection
+  const selectThemes = useCallback((themes: SelectedTheme[] | null) => {
+    // Set the selected themes in the story generation service
+    setSelectedThemes(themes);
+    
+    // Exit theme selection mode and start the game
+    setState(prev => ({ ...prev, isThemeSelectionMode: false, isLoading: true }));
+    
+    // Start the game with the selected themes and character sheet
+    startGameWithThemes(characterSheet);
+  }, [characterSheet]);
+  
+  // This function starts the actual game after themes are selected
+  const startGameWithThemes = async (characterSheet: string) => {
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
       const initialPrompt = 'Begin the story. Introduce the character to the world.';
       const newStoryData = await generateStoryNode(initialPrompt, {
         player: characterSheet
@@ -206,11 +220,30 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         },
         currentStoryNode: storyNode,
         isLoading: false,
-        error: null
+        error: null,
+        isThemeSelectionMode: false
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start game';
       console.error('Game start error:', message);
+      setState(prev => ({ ...prev, error: message, isLoading: false }));
+    }
+  };
+
+  const restartGame = async (characterSheet: string) => {
+    try {
+      // Reset to theme selection mode
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: null,
+        isThemeSelectionMode: true, // Show theme selection at the start
+        graphData: { nodes: [], edges: [] }, // Clear the graph
+        currentStoryNode: null // Clear current node
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to restart game';
+      console.error('Game restart error:', message);
       setState(prev => ({ ...prev, error: message, isLoading: false }));
     }
   };
@@ -220,7 +253,8 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadStoryNode,
     chooseOption,
     resetError,
-    restartGame
+    restartGame,
+    selectThemes
   };
 
   return <StoryContext.Provider value={value}>{children}</StoryContext.Provider>;

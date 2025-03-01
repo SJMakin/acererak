@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CombatSystem } from '../services/combatSystem';
 import { Entity, CombatState, CombatAction } from '../types';
 import { generateEnemyGroup } from '../services/entityGenerator';
@@ -36,6 +36,7 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const { characterSheet, updateCharacterSheet } = useCharacter();
   const [combatSystem, setCombatSystem] = useState<CombatSystem | null>(null);
+  const [combatResult, setCombatResult] = useState<'victory' | 'defeat' | null>(null);
 
   const initiateCombat = useCallback(
     async (params: {
@@ -152,6 +153,10 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endCombat = useCallback(() => {
     if (combatSystem) {
+      // Check if all enemies are defeated
+      const allEnemiesDefeated = combatSystem.checkCombatEnd();
+      setCombatResult(allEnemiesDefeated ? 'victory' : 'defeat');
+      
       combatSystem.endCombat();
       setState({
         isActive: false,
@@ -160,6 +165,19 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
       setCombatSystem(null);
     }
   }, [combatSystem]);
+
+  // When combat ends, we'll set a flag in localStorage that GameContext can check
+  useEffect(() => {
+    if (!state.isActive && combatResult) {
+      // Store the combat result in localStorage
+      localStorage.setItem('combatResult', combatResult);
+      
+      // Reset the combat result
+      setTimeout(() => {
+        setCombatResult(null);
+      }, 500);
+    }
+  }, [state.isActive, combatResult]);
 
   const value = {
     ...state,

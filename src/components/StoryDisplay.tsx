@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGame } from '../contexts/GameContext';
 import { isStoryNode, isChoiceNode } from '../types';
+import ThemeSelector from './ThemeSelector';
 
 const StoryDisplay: React.FC = () => {
   const {
@@ -11,7 +12,18 @@ const StoryDisplay: React.FC = () => {
     chooseOption,
     resetError,
     restartGame,
+    isThemeSelectionMode,
+    selectThemes,
   } = useGame();
+
+  // Show theme selector if in theme selection mode
+  if (isThemeSelectionMode) {
+    return (
+      <div className="story-display">
+        <ThemeSelector onThemesSelected={selectThemes} />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -171,15 +183,15 @@ const StoryDisplay: React.FC = () => {
       >
         {graphData.nodes
           .filter(
-            node =>
+            (node: any) =>
               isChoiceNode(node) &&
               currentStoryNode &&
               graphData.edges.some(
-                edge =>
+                (edge: any) =>
                   edge.source === currentStoryNode.id && edge.target === node.id
               )
           )
-          .map(choice => (
+          .map((choice: any) => (
             <button
               key={choice.id}
               onClick={() => chooseOption(choice.id)}

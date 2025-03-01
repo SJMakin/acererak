@@ -3,13 +3,14 @@ import GameGraph from './GameGraph';
 import StoryDisplay from './StoryDisplay';
 import CharacterSheet from './CharacterSheet';
 import { CombatDisplay } from './CombatDisplay';
+import SystemSelector from './SystemSelector';
 import { useGame } from '../contexts/GameContext';
 import './Layout.css';
 import './CharacterSheet.css';
 
 const Layout: React.FC = () => {
   const [isCharSheetExpanded, setIsCharSheetExpanded] = useState(false);
-  const { gameMode } = useGame();
+  const { gameMode, selectSystem } = useGame();
 
   const toggleCharSheet = () => {
     setIsCharSheetExpanded(!isCharSheetExpanded);
@@ -25,7 +26,13 @@ const Layout: React.FC = () => {
         </section>
 
         <section className="story-display-container">
-          {gameMode === 'combat' ? <CombatDisplay /> : <StoryDisplay />}
+          {gameMode === 'system-select' ? (
+            <SystemSelector onSystemSelected={selectSystem} />
+          ) : gameMode === 'combat' ? (
+            <CombatDisplay />
+          ) : (
+            <StoryDisplay />
+          )}
         </section>
       </main>
 
