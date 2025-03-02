@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { Entity, CombatAction } from '../types';
+import { getEntityName, getEntityActions } from '../services/combatSystem';
 import './CombatDisplay.css';
 
 export const CombatDisplay: React.FC = () => {
@@ -12,10 +13,16 @@ export const CombatDisplay: React.FC = () => {
     executeAction,
     nextTurn,
     endCombat,
+    narrativeDescription,
+    processingRound,
+    pendingUpdates,
+    applyUpdate,
+    skipUpdate,
   } = useGame();
   
   const [combatResult, setCombatResult] = useState<'victory' | 'defeat' | null>(null);
   const [turnMessage, setTurnMessage] = useState<string>('');
+  const [showNarrative, setShowNarrative] = useState<boolean>(false);
   
   // Function to handle enemy AI turns
   const handleEnemyTurn = () => {
@@ -25,12 +32,30 @@ export const CombatDisplay: React.FC = () => {
     const playerTarget = combatState?.participants.find(p => p.type === 'player');
     if (!playerTarget) return;
     
+    // Get enemy actions
+    const enemyActions = getEntityActions(currentCombatEntity);
+    
+    // Choose an action - if none available, use default attack
+    let chosenAction: {name: string, details: string, type: CombatAction['type']} = { 
+      name: 'attack', 
+      details: 'Basic attack', 
+      type: 'attack' 
+    };
+    
+    if (enemyActions.length > 0) {
+      // Simple AI: randomly choose an action
+      chosenAction = enemyActions[Math.floor(Math.random() * enemyActions.length)];
+    }
+    
+    const enemyName = getEntityName(currentCombatEntity);
+    const playerName = getEntityName(playerTarget);
+    
     // Execute enemy action against player
     executeAction({
       actor: currentCombatEntity,
-      type: 'attack',
+      type: chosenAction.type,
       target: playerTarget,
-      description: `${currentCombatEntity.id} attacks ${playerTarget.id}`,
+      description: `${enemyName} uses ${chosenAction.name} on ${playerName}`,
     }).then(() => {
       nextTurn();
     }).catch(error => {
@@ -45,7 +70,8 @@ export const CombatDisplay: React.FC = () => {
     if (currentCombatEntity.type === 'player') {
       setTurnMessage('Your turn! Choose an action to perform.');
     } else {
-      setTurnMessage(`${currentCombatEntity.id}'s turn...`);
+      const entityName = getEntityName(currentCombatEntity);
+      setTurnMessage(`${entityName}'s turn...`);
       
       // Simulate enemy AI turn after a short delay
       const timer = setTimeout(() => {
@@ -57,6 +83,13 @@ export const CombatDisplay: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [currentCombatEntity, isCombatActive, executeAction, nextTurn]);
+  
+  // Effect to show narrative when it changes
+  useEffect(() => {
+    if (narrativeDescription && narrativeDescription.length > 0) {
+      setShowNarrative(true);
+    }
+  }, [narrativeDescription]);
   
   // Check for combat end conditions
   useEffect(() => {
@@ -86,30 +119,20 @@ export const CombatDisplay: React.FC = () => {
   const isPlayerTurn = currentCombatEntity?.type === 'player';
 
   const getAvailableActions = (entity: Entity) => {
-    // Parse actions from entity sheet
-    const actionMatches = entity.sheet.match(/## (Actions|Attacks)\n([\s\S]*?)(?=\n\n|$)/);
-    if (!actionMatches) return [];
-
-    const actionSection = actionMatches[2];
-    return actionSection
-      .split('\n')
-      .filter(line => line.startsWith('- '))
-      .map(line => {
-        const [name, ...details] = line.substring(2).split(':');
-        return {
-          name: name.trim(),
-          details: details.join(':').trim(),
-        };
-      });
+    // Use the helper function from combatSystem.ts
+    return getEntityActions(entity);
   };
 
-  const handleAction = async (type: CombatAction['type'], target: Entity) => {
+  const handleAction = async (action: {name: string, type: CombatAction['type']}, target: Entity) => {
     try {
+      const actorName = getEntityName(currentCombatEntity!);
+      const targetName = getEntityName(target);
+      
       await executeAction({
         actor: currentCombatEntity!,
-        type,
+        type: action.type,
         target,
-        description: `${currentCombatEntity!.id} used ${type} on ${target.id}`,
+        description: `${actorName} uses ${action.name} on ${targetName}`,
       });
       nextTurn();
     } catch (error) {
@@ -128,7 +151,7 @@ export const CombatDisplay: React.FC = () => {
           >
             <span className="initiative-score">{score}</span>
             <span className="initiative-name">
-              {entity.type === 'player' ? 'You' : entity.id}
+              {entity.type === 'player' ? 'You' : getEntityName(entity)}
             </span>
           </div>
         ))}
@@ -142,7 +165,7 @@ export const CombatDisplay: React.FC = () => {
       <div className="log-entries">
         {combatLog.map((action, index) => (
           <div key={index} className="log-entry">
-            {`${action.actor.id} ${action.type} ${action.target.id} for ${action.roll.total} damage`}
+            {action.description} for {action.roll.total} damage
           </div>
         ))}
       </div>
@@ -159,22 +182,40 @@ export const CombatDisplay: React.FC = () => {
       <div className="action-panel">
         <h3>Your Turn</h3>
         <div className="action-list">
-          {availableActions.map(action => (
-            <div key={action.name} className="action-group">
-              <h4>{action.name}</h4>
+          {availableActions.length > 0 ? (
+            availableActions.map(action => (
+              <div key={action.name} className="action-group">
+                <h4>{action.name}</h4>
+                <p className="action-details">{action.details}</p>
+                <div className="target-buttons">
+                  {targets.map(target => (
+                    <button
+                      key={target.id}
+                      onClick={() => handleAction(action, target)}
+                      className="target-button"
+                    >
+                      Target {getEntityName(target)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="action-group">
+              <h4>Basic Attack</h4>
               <div className="target-buttons">
                 {targets.map(target => (
                   <button
                     key={target.id}
-                    onClick={() => handleAction('attack', target)}
+                    onClick={() => handleAction({ name: 'Basic Attack', type: 'attack' }, target)}
                     className="target-button"
                   >
-                    Target {target.id}
+                    Target {getEntityName(target)}
                   </button>
                 ))}
               </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
     );
@@ -201,6 +242,7 @@ export const CombatDisplay: React.FC = () => {
           const hp = getEntityHP(entity);
           const hpPercentage = Math.max(0, Math.min(100, (hp.current / hp.max) * 100));
           const isCurrentTurn = entity.id === currentCombatEntity?.id;
+          const entityName = getEntityName(entity);
           
           return (
             <div 
@@ -208,7 +250,7 @@ export const CombatDisplay: React.FC = () => {
               className={`entity-status ${isCurrentTurn ? 'current-turn' : ''} ${entity.type === 'player' ? 'player' : 'enemy'}`}
             >
               <div className="entity-name">
-                {entity.type === 'player' ? 'You' : entity.id}
+                {entity.type === 'player' ? 'You' : entityName}
                 {isCurrentTurn && <span className="turn-indicator">▶</span>}
               </div>
               <div className="hp-bar-container">
@@ -221,6 +263,105 @@ export const CombatDisplay: React.FC = () => {
       </div>
     </div>
   );
+
+  // Render narrative description
+  const renderNarrative = () => {
+    if (!narrativeDescription || !showNarrative) return null;
+    
+    return (
+      <div className="narrative-panel">
+        <h3>Combat Narrative</h3>
+        <div className="narrative-content">
+          {narrativeDescription.split('\n').map((paragraph: string, index: number) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+        </div>
+        <button 
+          className="narrative-close-button"
+          onClick={() => setShowNarrative(false)}
+        >
+          Continue
+        </button>
+      </div>
+    );
+  };
+
+  // Render pending updates
+  const renderPendingUpdates = () => {
+    if (pendingUpdates.length === 0 || showNarrative) return null;
+    
+    // Group updates by entity
+    const updatesByEntity: Record<string, Array<{
+      entityId: string;
+      oldText: string;
+      newText: string;
+      description: string;
+      index: number;
+    }>> = {};
+    
+    pendingUpdates.forEach((update: {
+      entityId: string;
+      oldText: string;
+      newText: string;
+      description: string;
+    }, index: number) => {
+      if (!updatesByEntity[update.entityId]) {
+        updatesByEntity[update.entityId] = [];
+      }
+      updatesByEntity[update.entityId].push({
+        ...update,
+        index
+      });
+    });
+    
+    return (
+      <div className="pending-updates-panel">
+        <h3>Pending Updates</h3>
+        {Object.entries(updatesByEntity).map(([entityId, updates]) => {
+          const entity = combatState.participants.find(p => p.id === entityId);
+          if (!entity) return null;
+          
+          const entityName = getEntityName(entity);
+          
+          return (
+            <div key={entityId} className="entity-updates">
+              <h4>{entityName}</h4>
+              {updates.map((update: {
+                entityId: string;
+                oldText: string;
+                newText: string;
+                description: string;
+                index: number;
+              }, i: number) => (
+                <div key={i} className="update-item">
+                  <div className="update-description">{update.description}</div>
+                  <div className="update-diff">
+                    <div className="update-old">{update.oldText}</div>
+                    <div className="update-arrow">→</div>
+                    <div className="update-new">{update.newText}</div>
+                  </div>
+                  <div className="update-actions">
+                    <button 
+                      className="apply-update-button"
+                      onClick={() => applyUpdate(entityId, i)}
+                    >
+                      Apply
+                    </button>
+                    <button 
+                      className="skip-update-button"
+                      onClick={() => skipUpdate(entityId, i)}
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // Render combat result when combat ends
   const renderCombatResult = () => {
@@ -237,6 +378,20 @@ export const CombatDisplay: React.FC = () => {
         <button onClick={endCombat} className="end-combat-button">
           {combatResult === 'victory' ? 'Continue Adventure' : 'Try Again'}
         </button>
+      </div>
+    );
+  };
+
+  // Render loading indicator during round processing
+  const renderProcessingIndicator = () => {
+    if (!processingRound) return null;
+    
+    return (
+      <div className="processing-overlay">
+        <div className="processing-content">
+          <div className="processing-spinner"></div>
+          <div className="processing-text">Processing combat round...</div>
+        </div>
       </div>
     );
   };
@@ -259,6 +414,9 @@ export const CombatDisplay: React.FC = () => {
           {renderInitiativeOrder()}
           {renderActionButtons()}
           {renderCombatLog()}
+          {renderNarrative()}
+          {renderPendingUpdates()}
+          {renderProcessingIndicator()}
         </>
       )}
     </div>

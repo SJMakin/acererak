@@ -28,7 +28,7 @@ Create a character sheet in this markdown format:
 
 For NPCs:
 # NPC Sheet
-Name: {creative name}
+Name: {creative and descriptive name that reflects their role}
 Role: {role or occupation}
 Level: {1-20}
 
@@ -39,7 +39,7 @@ Initiative: {modifier}
 
 ## Actions
 - {action_name}: {dice_roll} {damage_type}
-(2-3 actions that make sense for their role)
+(2-3 actions that make sense for their role, with clear dice notation like "1d8+2")
 
 ## Personality
 - {key traits and motivations}
@@ -49,8 +49,8 @@ Initiative: {modifier}
 
 For Enemies:
 # Enemy Sheet
-Name: {creative name}
-Type: {creature type}
+Name: {descriptive and memorable name - NOT generic like "Goblin" but specific like "Razortooth the Goblin Chieftain"}
+Type: {creature type with specific variant}
 Challenge: {easy/medium/hard}
 
 ## Combat Stats
@@ -59,11 +59,11 @@ AC: {number}
 Initiative: {modifier}
 
 ## Attacks
-- {attack_name}: {dice_roll} {damage_type}
-(2-4 attacks depending on difficulty)
+- {specific attack name}: {dice_roll} {damage_type}
+(2-4 attacks depending on difficulty, with clear dice notation like "2d6+3")
 
 ## Special Abilities
-- {ability_name}: {description}
+- {specific ability name}: {detailed description of what it does}
 (1-3 special abilities)
 
 ## Status
@@ -72,7 +72,9 @@ Initiative: {modifier}
 Make it interesting and thematic. For enemies, scale stats and abilities based on difficulty:
 - Easy: ~30-50 HP, AC 12-14, 1-2 basic attacks
 - Medium: ~60-100 HP, AC 14-16, 2-3 attacks + 1 special ability
-- Hard: ~120-200 HP, AC 16-18, 3-4 attacks + 2-3 special abilities`;
+- Hard: ~120-200 HP, AC 16-18, 3-4 attacks + 2-3 special abilities
+
+IMPORTANT: Give enemies distinctive, memorable names that reflect their nature and role. Avoid generic names like "Goblin" or "Orc" - instead use specific names like "Grimfang the Orc Warlord" or "Zik'thar the Venomous Spider Queen".`;
 
     console.log('Entity generation prompt:', {
       type: params.type,

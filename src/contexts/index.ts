@@ -2,6 +2,8 @@ export { GameProvider, useGame } from './GameContext';
 export { StoryProvider, useStory } from './StoryContext';
 export { DiceProvider, useDice } from './DiceContext';
 export { CharacterProvider, useCharacter } from './CharacterContext';
+export { NPCProvider, useNPCs } from './NPCContext';
+export { RulesProvider, useRules } from './RulesContext';
 
 // Re-export types that components might need
 export type { StoryState, StoryContextProps } from './StoryContext';

@@ -4,6 +4,12 @@ import { isStoryNode, isChoiceNode } from '../types';
 import ThemeSelector from './ThemeSelector';
 
 const StoryDisplay: React.FC = () => {
+  const containerStyle = {
+    height: '100%',
+    overflow: 'auto',
+    backgroundColor: '#1e1e1e',
+    color: '#e0e0e0',
+  };
   const {
     currentStoryNode,
     graphData,
@@ -19,8 +25,10 @@ const StoryDisplay: React.FC = () => {
   // Show theme selector if in theme selection mode
   if (isThemeSelectionMode) {
     return (
-      <div className="story-display">
-        <ThemeSelector onThemesSelected={selectThemes} />
+      <div className="story-display" style={containerStyle}>
+        <div style={{ padding: '20px' }}>
+          <ThemeSelector onThemesSelected={selectThemes} />
+        </div>
       </div>
     );
   }
@@ -30,9 +38,8 @@ const StoryDisplay: React.FC = () => {
       <div
         className="story-display"
         style={{
+          ...containerStyle,
           padding: '20px',
-          maxWidth: '600px',
-          margin: '0 auto',
           textAlign: 'center',
         }}
       >
@@ -46,19 +53,18 @@ const StoryDisplay: React.FC = () => {
       <div
         className="story-display"
         style={{
+          ...containerStyle,
           padding: '20px',
-          maxWidth: '600px',
-          margin: '0 auto',
           textAlign: 'center',
         }}
       >
-        <p style={{ color: 'red' }}>{error}</p>
+        <p style={{ color: '#ff6b6b' }}>{error}</p>
         <button
           onClick={resetError}
           style={{
             padding: '10px 20px',
             marginRight: '10px',
-            backgroundColor: '#4a5568',
+            backgroundColor: '#4f46e5',
             color: 'white',
             border: 'none',
             borderRadius: '5px',
@@ -71,7 +77,7 @@ const StoryDisplay: React.FC = () => {
           onClick={restartGame}
           style={{
             padding: '10px 20px',
-            backgroundColor: '#4a5568',
+            backgroundColor: '#4f46e5',
             color: 'white',
             border: 'none',
             borderRadius: '5px',
@@ -88,9 +94,8 @@ const StoryDisplay: React.FC = () => {
       <div
         className="story-display"
         style={{
+          ...containerStyle,
           padding: '20px',
-          maxWidth: '600px',
-          margin: '0 auto',
           textAlign: 'center',
         }}
       >
@@ -98,7 +103,7 @@ const StoryDisplay: React.FC = () => {
           onClick={restartGame}
           style={{
             padding: '10px 20px',
-            backgroundColor: '#4a5568',
+            backgroundColor: '#4f46e5',
             color: 'white',
             border: 'none',
             borderRadius: '5px',
@@ -114,9 +119,8 @@ const StoryDisplay: React.FC = () => {
     <div
       className="story-display"
       style={{
+        ...containerStyle,
         padding: '20px',
-        maxWidth: '600px',
-        margin: '0 auto',
       }}
     >
       {currentStoryNode?.rollResults &&
@@ -126,17 +130,17 @@ const StoryDisplay: React.FC = () => {
             style={{
               marginBottom: '20px',
               padding: '10px',
-              backgroundColor: '#edf2f7',
-              border: '1px solid #e2e8f0',
+              backgroundColor: '#252525',
+              border: '1px solid #333',
               borderRadius: '4px',
             }}
           >
-            <h4 style={{ margin: '0 0 10px 0', color: '#4a5568' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#9fa8da' }}>
               Dice Roll Results:
             </h4>
             <ul style={{ listStyleType: 'none', padding: '0', margin: '0' }}>
               {currentStoryNode.rollResults.map((result, index) => (
-                <li key={index} style={{ marginBottom: '5px' }}>
+                <li key={index} style={{ marginBottom: '5px', color: '#e0e0e0' }}>
                   {result.formatted}
                 </li>
               ))}
@@ -150,6 +154,7 @@ const StoryDisplay: React.FC = () => {
           marginBottom: '20px',
           fontSize: '1.1em',
           lineHeight: '1.6',
+          color: '#e0e0e0',
         }}
       >
         {currentStoryNode.content}
@@ -158,15 +163,15 @@ const StoryDisplay: React.FC = () => {
             style={{
               marginTop: '20px',
               padding: '15px',
-              backgroundColor: '#2d374810',
-              borderLeft: '4px solid #4a5568',
+              backgroundColor: '#252525',
+              borderLeft: '4px solid #4f46e5',
               borderRadius: '4px',
             }}
           >
-            <h4 style={{ margin: '0 0 10px 0', color: '#4a5568' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#9fa8da' }}>
               Character Updates:
             </h4>
-            <div style={{ whiteSpace: 'pre-line' }}>
+            <div style={{ whiteSpace: 'pre-line', color: '#e0e0e0' }}>
               {currentStoryNode.characterUpdateDescription}
             </div>
           </div>
@@ -199,7 +204,7 @@ const StoryDisplay: React.FC = () => {
                 padding: '10px 20px',
                 fontSize: '1em',
                 cursor: 'pointer',
-                backgroundColor: '#4a5568',
+                backgroundColor: '#4f46e5',
                 color: 'white',
                 border: 'none',
                 borderRadius: '5px',
@@ -214,9 +219,9 @@ const StoryDisplay: React.FC = () => {
           style={{
             padding: '10px 20px',
             marginTop: '20px',
-            backgroundColor: '#4a5568',
+            backgroundColor: '#333',
             color: 'white',
-            border: 'none',
+            border: '1px solid #444',
             borderRadius: '5px',
             cursor: 'pointer',
             width: '100%',

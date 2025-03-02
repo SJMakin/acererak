@@ -13,12 +13,17 @@ export interface CharacterUpdate {
 export async function generateCharacterUpdates(
   entity: Entity,
   events: string[],
-  context: string
+  context: string,
+  combatDetails?: {
+    attacker?: Entity;
+    action?: string;
+    rollResult?: number;
+  }
 ): Promise<CharacterUpdate[]> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    const prompt = `You are updating a character sheet based on recent events in a D&D game.
+const prompt = `You are updating a character sheet based on recent events in a D&D game.
 
 Current Character Sheet:
 ${entity.sheet}
@@ -28,6 +33,11 @@ ${events.join('\n')}
 
 Context:
 ${context}
+
+${combatDetails ? `Combat Details:
+Attacker: ${combatDetails.attacker ? combatDetails.attacker.sheet.split('\n')[0] : 'Unknown'}
+Action Used: ${combatDetails.action || 'Unknown'}
+Roll Result: ${combatDetails.rollResult || 'Unknown'}` : ''}
 
 ===
 

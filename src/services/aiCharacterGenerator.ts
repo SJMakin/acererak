@@ -34,6 +34,12 @@ The character sheet should be in Markdown format with the following structure:
 ## Status
 [Current conditions, if any]
 
+## Actions
+[List 3-5 combat actions with clear dice notation]
+- [Action Name]: [Brief description with dice notation like "1d8+3 slashing damage"]
+- [Spell Name]: [Brief description with dice notation like "3d6 fire damage"]
+- [Special Ability]: [Brief description of what it does]
+
 ## Abilities & Features
 [List class features, racial traits, special abilities, etc.]
 
@@ -99,6 +105,11 @@ Charisma: 10
 
 ## Status
 - None
+
+## Actions
+- Sword Strike: Attack with sword (1d8+2 slashing damage)
+- Shield Bash: Bash with shield (1d4+2 bludgeoning damage)
+- Second Wind: Regain 1d10+1 hit points
 
 ## Abilities & Features
 - Basic Combat Training

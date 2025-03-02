@@ -1,88 +1,76 @@
 .game-layout {
-  display: grid;
-  grid-template-columns: 1fr 40px; /* Collapsed by default */
   height: calc(100vh - 40px);
-  gap: 0;
-  padding-right: 10px;
-  background-color: #f7fafc;
-  transition: grid-template-columns 0.3s ease;
   margin: 20px;
   overflow: hidden;
   position: relative;
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.game-layout.char-sheet-expanded {
-  grid-template-columns: 1fr 300px;
-}
-
-.toggle-char-sheet {
-  position: fixed;
-  right: 20px;
-  top: 20px;
-  transform: translateY(-50%);
-  width: 50px;
-  height: 40px;
-  background: #4f46e5;
-  border: 2px solid #6366f1;
-  color: #fff;
-  cursor: pointer;
+.loading {
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
-  border-radius: 8px;
-  z-index: 9999;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.4);
+  align-items: center;
+  height: 100%;
+  color: #e0e0e0;
+  font-size: 1.2rem;
 }
 
-.toggle-char-sheet:hover {
-  background: #6366f1;
-  border-color: #818cf8;
-  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.6);
-}
-
-.game-main {
-  grid-column: 1;
+.split-layout {
   display: flex;
-  gap: 10px;
-  min-height: 0;
-  position: relative;
-  padding: 0;
+  width: 100%;
+  height: 100%;
 }
 
-.game-graph-container {
-  flex: 2;
-  min-width: 0;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+/* Make sure react-split works correctly */
+.split {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+}
+
+/* Split.js gutter styling */
+.gutter {
+  background-color: #333;
+  background-repeat: no-repeat;
+  background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
+  cursor: col-resize;
+}
+
+.main-content {
+  height: 100%;
   overflow: hidden;
-  background-color: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #1e1e1e;
+  border-radius: 8px 0 0 8px;
 }
 
-.story-display-container {
-  flex: 1;
-  min-width: 250px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: auto;
-  background-color: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  max-height: calc(100vh - 20px);
-  position: relative;
-  transition: background-color 0.3s ease;
+.graph-panel {
+  height: 100%;
+  overflow: hidden;
+  background-color: #252525;
+  border-radius: 0 8px 8px 0;
+  border-left: 1px solid #333;
 }
 
 /* Combat mode styles */
-.story-display-container:has(.combat-display) {
+.combat-display {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   background-color: #1a1a1a;
   border-color: #444;
   box-shadow: 0 0 20px rgba(255, 68, 68, 0.2);
 }
 
 /* Mode transition animations */
-.story-display-container > * {
+.main-content > *,
+.graph-panel > * {
   animation: fadeIn 0.3s ease;
 }
 
@@ -97,112 +85,36 @@
   }
 }
 
-/* Adjust scrollbar for dark mode */
-.story-display-container:has(.combat-display)::-webkit-scrollbar {
-  width: 8px;
-}
-
-.story-display-container:has(.combat-display)::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-.story-display-container:has(.combat-display)::-webkit-scrollbar-thumb {
-  background: rgba(255, 68, 68, 0.5);
-  border-radius: 4px;
-}
-
-.story-display-container:has(.combat-display)::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 68, 68, 0.7);
-}
-
-/* Character sheet container */
-.character-sheet-container {
-  grid-column: 2;
-  position: relative;
-  height: 100%;
-  padding: 0;
-  overflow: hidden;
-  transition: transform 0.3s ease;
-}
-
-.game-layout:not(.char-sheet-expanded) .character-sheet-container {
-  transform: translateX(100%);
-}
-
-.game-layout.char-sheet-expanded .toggle-char-sheet {
-  right: 320px;
-  background: #047857;
-  border-color: #10b981;
-}
-
-/* Adjust character sheet positioning */
-.character-sheet {
-  position: sticky;
-  top: 10px;
-  right: 0;
-  width: 100%;
-  max-width: none;
-  height: calc(100vh - 20px);
-  margin: 0;
-  font-size: 0.9em;
-}
-
-/* Combat mode responsive adjustments */
-.combat-display {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
+/* Responsive adjustments */
 @media (max-width: 1200px) {
   .game-layout {
-    grid-template-columns: 1fr;
-    padding: 10px;
+    height: auto;
+    min-height: calc(100vh - 40px);
   }
-
-  .game-main {
+  
+  .split-layout {
     flex-direction: column;
-    padding: 10px;
   }
-
-  .game-graph-container,
-  .story-display-container {
-    flex: none;
+  
+  .gutter.gutter-horizontal {
+    height: 10px;
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFAQMAAABo7865AAAABlBMVEVHcEzMzMzyAv2sAAAAAXRSTlMAQObYZgAAABBJREFUeF5jOAMEEAIEEFwAn3kMwcB6I2AAAAAASUVORK5CYII=');
+    cursor: row-resize;
+  }
+  
+  .main-content,
+  .graph-panel {
+    width: 100% !important;
     height: 50vh;
   }
-
-  .story-display-container {
-    min-width: 0;
-    height: auto;
-    max-height: none;
+  
+  .main-content {
+    border-radius: 8px 8px 0 0;
   }
-
-  .combat-display {
-    height: auto;
-  }
-
-  .initiative-list {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 10px;
-  }
-
-  .action-list {
-    grid-template-columns: 1fr;
-  }
-
-  .character-sheet-container {
-    grid-column: 1;
-    height: auto;
-    padding: 0;
-  }
-
-  /* Mobile character sheet adjustments */
-  .character-sheet {
-    position: fixed;
-    max-width: 100%;
-    width: 100%;
-    height: 60vh;
+  
+  .graph-panel {
+    border-radius: 0 0 8px 8px;
+    border-left: none;
+    border-top: 1px solid #333;
   }
 }

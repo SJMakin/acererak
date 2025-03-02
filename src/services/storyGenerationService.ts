@@ -85,7 +85,7 @@ async function generateStoryPlan(): Promise<string> {
 
 export async function generateStoryNode(
   context: string,
-  entities: { player: string; npcs?: string[]; enemies?: string[] }
+  entities: { player: string; npcs?: string[]; enemies?: string[]; customRules?: string[] }
 ): Promise<StoryGenerationResponse> {
   if (!storyPlan) {
     storyPlan = await generateStoryPlan();
@@ -102,6 +102,8 @@ ${entities.player}
 ${entities.npcs ? `NPCs in Scene:\n${entities.npcs.join('\n')}` : ''}
 
 ${entities.enemies ? `Enemies in Scene:\n${entities.enemies.join('\n')}` : ''}
+
+${entities.customRules ? `Custom Rules:\n${entities.customRules.join('\n')}` : ''}
 
 Story Plan:
 ${storyPlan}

@@ -380,6 +380,106 @@ const getLanguages = (race: string): string[] => {
   return languages;
 };
 
+// Generate class-specific actions
+const generateClassActions = (characterClass: string): string[] => {
+  const actions: string[] = [];
+  
+  switch(characterClass) {
+    case 'Fighter':
+      actions.push(
+        'Sword Slash: Attack with sword (1d8+2 slashing damage)',
+        'Shield Bash: Bash with shield (1d4+2 bludgeoning damage)',
+        'Second Wind: Regain 1d10+1 hit points'
+      );
+      break;
+    case 'Wizard':
+      actions.push(
+        'Magic Missile: Cast Magic Missile spell (1d4+1 force damage)',
+        'Fire Bolt: Cast Fire Bolt cantrip (1d10 fire damage)',
+        'Staff Strike: Hit with quarterstaff (1d6 bludgeoning damage)'
+      );
+      break;
+    case 'Rogue':
+      actions.push(
+        'Sneak Attack: Attack with advantage (1d8+1d6+2 piercing damage)',
+        'Dagger Throw: Throw dagger (1d4+2 piercing damage)',
+        'Cunning Action: Bonus action to Dash, Disengage, or Hide'
+      );
+      break;
+    case 'Cleric':
+      actions.push(
+        'Mace Strike: Hit with mace (1d6+1 bludgeoning damage)',
+        'Healing Word: Cast Healing Word spell (1d4+3 healing)',
+        'Sacred Flame: Cast Sacred Flame cantrip (1d8 radiant damage)'
+      );
+      break;
+    case 'Ranger':
+      actions.push(
+        'Longbow Shot: Fire arrow (1d8+2 piercing damage)',
+        'Shortsword Strike: Attack with shortsword (1d6+2 piercing damage)',
+        'Hunter\'s Mark: Mark target for extra 1d6 damage on hits'
+      );
+      break;
+    case 'Paladin':
+      actions.push(
+        'Longsword Strike: Attack with longsword (1d8+2 slashing damage)',
+        'Divine Smite: Add 2d8 radiant damage to a successful attack',
+        'Lay on Hands: Heal for 5 hit points'
+      );
+      break;
+    case 'Barbarian':
+      actions.push(
+        'Greataxe Swing: Attack with greataxe (1d12+3 slashing damage)',
+        'Reckless Attack: Advantage on attack rolls, but attacks against you have advantage',
+        'Rage: +2 damage on melee attacks and resistance to physical damage'
+      );
+      break;
+    case 'Druid':
+      actions.push(
+        'Shillelagh: Enchanted staff attack (1d8+3 bludgeoning damage)',
+        'Produce Flame: Fiery ranged attack (1d8 fire damage)',
+        'Healing Word: Cast Healing Word spell (1d4+3 healing)'
+      );
+      break;
+    case 'Sorcerer':
+      actions.push(
+        'Chromatic Orb: Cast spell (3d8 elemental damage)',
+        'Fire Bolt: Cast Fire Bolt cantrip (1d10 fire damage)',
+        'Shield: Reaction to increase AC by 5 until next turn'
+      );
+      break;
+    case 'Warlock':
+      actions.push(
+        'Eldritch Blast: Cast cantrip (1d10 force damage)',
+        'Hex: Mark target to take extra 1d6 necrotic damage',
+        'Dagger Strike: Attack with dagger (1d4+2 piercing damage)'
+      );
+      break;
+    case 'Monk':
+      actions.push(
+        'Unarmed Strike: Martial arts attack (1d4+2 bludgeoning damage)',
+        'Flurry of Blows: Two bonus unarmed strikes (1d4+2 each)',
+        'Deflect Missiles: Reduce ranged attack damage by 1d10+5'
+      );
+      break;
+    case 'Artificer':
+      actions.push(
+        'Fire Bolt: Cast Fire Bolt cantrip (1d10 fire damage)',
+        'Thunderwave: Cast Thunderwave spell (2d8 thunder damage)',
+        'Warhammer Strike: Attack with warhammer (1d8+1 bludgeoning damage)'
+      );
+      break;
+    default:
+      actions.push(
+        'Basic Attack: Attack with weapon (1d8 damage)',
+        'Dodge: Take the Dodge action',
+        'Use Item: Use an item from inventory'
+      );
+  }
+  
+  return actions;
+};
+
 export const generateCharacterSheet = (): string => {
   const race = getRandomItem(races);
   const background = getRandomItem(backgrounds);
@@ -404,6 +504,9 @@ export const generateCharacterSheet = (): string => {
           ? 10
           : 8;
   const hp = baseHP + Math.floor((stats.Con - 10) / 2);
+  
+  // Generate actions based on class
+  const actions = generateClassActions(characterClass);
 
   return `# Character Sheet
 
@@ -432,6 +535,9 @@ ${equipment.map(item => `- ${item}`).join('\n')}
 
 ## Status
 - None
+
+## Actions
+${actions.map(action => `- ${action}`).join('\n')}
 
 ## Class Features
 ${classFeatures[characterClass]?.map(feature => `- ${feature}`).join('\n') || '- None'}

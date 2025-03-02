@@ -3,6 +3,7 @@ import { CombatSystem } from '../services/combatSystem';
 import { Entity, CombatState, CombatAction } from '../types';
 import { generateEnemyGroup } from '../services/entityGenerator';
 import { generateCharacterUpdates } from '../services/characterUpdateService';
+import { processCombatRound, CombatRoundResult } from '../services/combatNarrationService';
 import { useCharacter } from './CharacterContext';
 
 interface CombatContextState {
@@ -10,6 +11,16 @@ interface CombatContextState {
   combatState?: CombatState;
   currentEntity?: Entity;
   combatLog: CombatAction[];
+  roundActions: CombatAction[];
+  currentRound: number;
+  narrativeDescription: string;
+  processingRound: boolean;
+  pendingUpdates: Array<{
+    entityId: string;
+    oldText: string;
+    newText: string;
+    description: string;
+  }>;
 }
 
 interface CombatContextValue extends CombatContextState {
@@ -22,6 +33,9 @@ interface CombatContextValue extends CombatContextState {
   executeAction: (action: Omit<CombatAction, 'roll'>) => Promise<void>;
   endCombat: () => void;
   nextTurn: () => void;
+  processRound: () => Promise<void>;
+  applyUpdate: (entityId: string, updateIndex: number) => void;
+  skipUpdate: (entityId: string, updateIndex: number) => void;
 }
 
 const CombatContext = createContext<CombatContextValue | undefined>(undefined);
@@ -32,6 +46,11 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [state, setState] = useState<CombatContextState>({
     isActive: false,
     combatLog: [],
+    roundActions: [],
+    currentRound: 1,
+    narrativeDescription: '',
+    processingRound: false,
+    pendingUpdates: [],
   });
 
   const { characterSheet, updateCharacterSheet } = useCharacter();
@@ -61,12 +80,18 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
         await system.initiateCombat();
 
         setCombatSystem(system);
-        setState({
+        setState(prev => ({
+          ...prev,
           isActive: true,
           combatState: system.getCombatState(),
           currentEntity: system.getCurrentTurn().entity,
           combatLog: [],
-        });
+          roundActions: [],
+          currentRound: 1,
+          narrativeDescription: '',
+          processingRound: false,
+          pendingUpdates: [],
+        }));
       } catch (error) {
         console.error('Failed to initiate combat:', error);
         throw error;
@@ -82,65 +107,159 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       try {
+        // Execute the action in the combat system to get dice rolls
         const completedAction = await combatSystem.executeAction(action);
 
-        // Update combat log
+        // Add the action to the round actions instead of processing immediately
         setState(prev => ({
           ...prev,
+          roundActions: [...prev.roundActions, completedAction],
           combatLog: [...prev.combatLog, completedAction],
         }));
 
-        // Generate and apply character updates based on the action
-        const updates = await generateCharacterUpdates(
-          action.target,
-          [`Received ${completedAction.roll.total} damage from ${action.actor.id}'s ${action.type}`],
-          'In combat'
-        );
-
-        if (action.target.type === 'player') {
-          updateCharacterSheet(updates);
-        } else {
-          // Update enemy/NPC sheet
-          const updatedTarget = updates.reduce((entity, update) => ({
-            ...entity,
-            sheet: entity.sheet.replace(update.oldText, update.newText),
-          }), action.target);
-
-          // Update the combat system's state with the modified entity
-          const currentState = combatSystem.getCombatState();
-          const updatedParticipants = currentState.participants.map(p =>
-            p.id === updatedTarget.id ? updatedTarget : p
-          );
-
-          setState(prev => ({
-            ...prev,
-            combatState: {
-              ...currentState,
-              participants: updatedParticipants,
-            },
-          }));
-        }
-
-        // Check if combat should end
-        if (combatSystem.checkCombatEnd()) {
-          setState(prev => ({
-            ...prev,
-            isActive: false,
-          }));
-        }
+        // We'll process all actions at the end of the round
+        return;
       } catch (error) {
         console.error('Failed to execute combat action:', error);
         throw error;
       }
     },
-    [combatSystem, state.isActive, updateCharacterSheet]
+    [combatSystem, state.isActive]
   );
+
+  // Process all actions for the current round using AI
+  const processRound = useCallback(async () => {
+    if (!combatSystem || !state.isActive || state.roundActions.length === 0) {
+      return;
+    }
+
+    try {
+      setState(prev => ({ ...prev, processingRound: true }));
+
+      // Get the current state of all entities
+      const currentState = combatSystem.getCombatState();
+      
+      // Process the round with AI
+      const roundResult = await processCombatRound(
+        currentState.participants,
+        state.roundActions,
+        state.currentRound
+      );
+
+      // Update the narrative description
+      setState(prev => ({
+        ...prev,
+        narrativeDescription: roundResult.narrative.detailedDescription,
+      }));
+
+      // Prepare entity updates for display and confirmation
+      const allUpdates = roundResult.entityUpdates.flatMap(entityUpdate => 
+        entityUpdate.updates.map(update => ({
+          entityId: entityUpdate.entityId,
+          oldText: update.oldText,
+          newText: update.newText,
+          description: update.description,
+        }))
+      );
+
+      // Set the pending updates
+      setState(prev => ({
+        ...prev,
+        pendingUpdates: allUpdates,
+      }));
+
+      // Check if combat should end
+      if (roundResult.combatStatus.combatComplete) {
+        // Set the combat result
+        setCombatResult(roundResult.combatStatus.victor === 'player' ? 'victory' : 'defeat');
+        
+        // We'll let the user view the results before ending combat
+      }
+
+      // Prepare for the next round
+      setState(prev => ({
+        ...prev,
+        processingRound: false,
+        currentRound: prev.currentRound + 1,
+        roundActions: [], // Clear round actions for the next round
+      }));
+    } catch (error) {
+      console.error('Failed to process combat round:', error);
+      setState(prev => ({ 
+        ...prev, 
+        processingRound: false,
+        narrativeDescription: 'The battle continues with both sides exchanging blows...'
+      }));
+    }
+  }, [combatSystem, state.isActive, state.roundActions, state.currentRound]);
+
+  // Apply a specific update to an entity
+  const applyUpdate = useCallback((entityId: string, updateIndex: number) => {
+    const update = state.pendingUpdates.find((u, i) => u.entityId === entityId && i === updateIndex);
+    if (!update || !combatSystem) return;
+
+    // Find the entity to update
+    const currentState = combatSystem.getCombatState();
+    const entity = currentState.participants.find((p: Entity) => p.id === entityId);
+    if (!entity) return;
+
+    // Apply the update
+    const updatedEntity = {
+      ...entity,
+      sheet: entity.sheet.replace(update.oldText, update.newText),
+    };
+
+    // Update the combat system's state
+    const updatedParticipants = currentState.participants.map((p: Entity) =>
+      p.id === entityId ? updatedEntity : p
+    );
+
+    // If it's the player, also update the character sheet
+    if (entity.type === 'player') {
+      // Type cast to match the expected interface
+      updateCharacterSheet([{
+        oldText: update.oldText,
+        newText: update.newText,
+        description: update.description,
+      } as any]);
+    }
+
+    // Update the state
+    setState(prev => ({
+      ...prev,
+      combatState: {
+        ...currentState,
+        participants: updatedParticipants,
+      },
+      pendingUpdates: prev.pendingUpdates.filter((u, i) => !(u.entityId === entityId && i === updateIndex)),
+    }));
+  }, [state.pendingUpdates, combatSystem, updateCharacterSheet]);
+
+  // Skip a specific update
+  const skipUpdate = useCallback((entityId: string, updateIndex: number) => {
+    setState(prev => ({
+      ...prev,
+      pendingUpdates: prev.pendingUpdates.filter((u, i) => !(u.entityId === entityId && i === updateIndex)),
+    }));
+  }, []);
 
   const nextTurn = useCallback(() => {
     if (!combatSystem || !state.isActive) {
       throw new Error('No active combat');
     }
 
+    // Get the current state
+    const currentState = combatSystem.getCombatState();
+    
+    // Check if we've gone through all entities in this round
+    const isLastEntityInRound = currentState.currentTurn === currentState.participants.length - 1;
+    
+    if (isLastEntityInRound) {
+      // Process the round before moving to the next one
+      processRound();
+    }
+    
+    // Advance to the next turn
     combatSystem.nextTurn();
     const { entity } = combatSystem.getCurrentTurn();
 
@@ -149,7 +268,7 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
       currentEntity: entity,
       combatState: combatSystem.getCombatState(),
     }));
-  }, [combatSystem, state.isActive]);
+  }, [combatSystem, state.isActive, processRound]);
 
   const endCombat = useCallback(() => {
     if (combatSystem) {
@@ -158,10 +277,16 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
       setCombatResult(allEnemiesDefeated ? 'victory' : 'defeat');
       
       combatSystem.endCombat();
-      setState({
+      setState(prev => ({
+        ...prev,
         isActive: false,
         combatLog: [],
-      });
+        roundActions: [],
+        currentRound: 1,
+        narrativeDescription: '',
+        processingRound: false,
+        pendingUpdates: [],
+      }));
       setCombatSystem(null);
     }
   }, [combatSystem]);
@@ -185,6 +310,9 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
     executeAction,
     endCombat,
     nextTurn,
+    processRound,
+    applyUpdate,
+    skipUpdate,
   };
 
   return (

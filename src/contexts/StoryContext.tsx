@@ -5,6 +5,8 @@ import { generateStoryNode, setSelectedThemes } from '../services/storyGeneratio
 import { generateCharacterUpdates } from '../services/characterUpdateService';
 import { useDice } from './DiceContext';
 import { useCharacter } from './CharacterContext';
+import { useNPCs } from './NPCContext';
+import { useRules } from './RulesContext';
 import { SelectedTheme } from '../components/ThemeSelector';
 
 export interface StoryState {
@@ -82,8 +84,14 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         context += `\nDice Rolls:\n${rollResults.map(r => r.formatted).join('\n')}`;
       }
       
+      // Get NPCs and rules for story context
+      const npcs = getNPCsForStoryContext();
+      const rules = getEnabledRulesForStoryContext();
+      
       const newStoryData = await generateStoryNode(context, {
-        player: characterSheet
+        player: characterSheet,
+        npcs: npcs.length > 0 ? npcs : undefined,
+        customRules: rules.length > 0 ? rules : undefined
       });
       if (!isValidStoryResponse(newStoryData)) {
         throw new Error('Invalid story response structure');
@@ -155,6 +163,15 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const { characterSheet } = useCharacter();
+  const { getNPCsForStoryContext } = useNPCs();
+  const rules = useRules();
+  
+  // Helper function to format rules for story context
+  const getEnabledRulesForStoryContext = () => {
+    return rules.rules.map(rule => 
+      `${rule.title}: ${rule.description}`
+    );
+  };
 
   // Function to handle theme selection
   const selectThemes = useCallback((themes: SelectedTheme[] | null) => {
@@ -172,8 +189,15 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const startGameWithThemes = async (characterSheet: string) => {
     try {
       const initialPrompt = 'Begin the story. Introduce the character to the world.';
+      
+      // Get NPCs and rules for story context
+      const npcs = getNPCsForStoryContext();
+      const rules = getEnabledRulesForStoryContext();
+      
       const newStoryData = await generateStoryNode(initialPrompt, {
-        player: characterSheet
+        player: characterSheet,
+        npcs: npcs.length > 0 ? npcs : undefined,
+        customRules: rules.length > 0 ? rules : undefined
       });
       
       if (!isValidStoryResponse(newStoryData)) {

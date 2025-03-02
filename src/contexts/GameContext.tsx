@@ -3,6 +3,8 @@ import { StoryProvider, useStory } from './StoryContext';
 import { DiceProvider, useDice } from './DiceContext';
 import { CharacterProvider, useCharacter } from './CharacterContext';
 import { CombatProvider, useCombat } from './CombatContext';
+import { NPCProvider, useNPCs } from './NPCContext';
+import { RulesProvider, useRules } from './RulesContext';
 
 export type GameMode = 'system-select' | 'story' | 'combat';
 
@@ -11,9 +13,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <CharacterProvider>
       <DiceProvider>
         <CombatProvider>
-          <StoryProvider>
-            <GameCoordinator>{children}</GameCoordinator>
-          </StoryProvider>
+          <NPCProvider>
+            <RulesProvider>
+              <StoryProvider>
+                <GameCoordinator>{children}</GameCoordinator>
+              </StoryProvider>
+            </RulesProvider>
+          </NPCProvider>
         </CombatProvider>
       </DiceProvider>
     </CharacterProvider>
@@ -49,6 +55,8 @@ export const useGame = () => {
   const dice = useDice();
   const character = useCharacter();
   const combat = useCombat();
+  const npc = useNPCs();
+  const rules = useRules();
   const [gameMode, setGameMode] = useState<GameMode>('system-select');
 
   useEffect(() => {
@@ -144,10 +152,31 @@ export const useGame = () => {
     executeAction: combat.executeAction,
     nextTurn: combat.nextTurn,
     endCombat: combat.endCombat,
+    narrativeDescription: combat.narrativeDescription,
+    processingRound: combat.processingRound,
+    pendingUpdates: combat.pendingUpdates,
+    applyUpdate: combat.applyUpdate,
+    skipUpdate: combat.skipUpdate,
+    processRound: combat.processRound,
 
     // Dice state and functions
     currentRollResult: dice.currentRollResult,
     showDiceAnimation: dice.showDiceAnimation,
-    performDiceRoll: dice.performDiceRoll
+    performDiceRoll: dice.performDiceRoll,
+    
+    // NPC state and functions
+    npcs: npc.npcs,
+    addNPC: npc.addNPC,
+    updateNPC: npc.updateNPC,
+    deleteNPC: npc.deleteNPC,
+    getNPCsForStoryContext: npc.getNPCsForStoryContext,
+    
+    // Rules state and functions
+    rules: rules.rules,
+    addRule: rules.addRule,
+    updateRule: rules.updateRule,
+    deleteRule: rules.deleteRule,
+    toggleRule: rules.toggleRule,
+    getEnabledRulesForStoryContext: rules.getEnabledRulesForStoryContext
   };
 };
