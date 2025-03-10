@@ -204,7 +204,7 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
         temperature: 0.8,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
         responseMimeType: 'application/json',
       },
     });
@@ -215,7 +215,19 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
     try {
       console.log('Story node raw response:', textContent);
       
-      const parsedContent = JSON.parse(textContent);
+      // Try to parse the JSON, handling potential markdown code blocks
+      let jsonContent = textContent;
+      // Check if response is wrapped in markdown code block
+      if (jsonContent.startsWith('```') && jsonContent.includes('```')) {
+        // Extract content between first ``` and last ```
+        const startIndex = jsonContent.indexOf('\n') + 1;
+        const endIndex = jsonContent.lastIndexOf('```');
+        if (startIndex > 0 && endIndex > startIndex) {
+          jsonContent = jsonContent.substring(startIndex, endIndex).trim();
+        }
+      }
+      
+      const parsedContent = JSON.parse(jsonContent);
 
       if (!isValidStoryResponse(parsedContent)) {
         throw new Error('Invalid AI response structure');

@@ -128,7 +128,7 @@ Determine if combat should continue or end based on entity states. Combat ends w
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
         responseMimeType: 'application/json',
       },
     });
@@ -139,7 +139,19 @@ Determine if combat should continue or end based on entity states. Combat ends w
     try {
       console.log('Combat round raw response:', textContent);
       
-      const parsedContent = JSON.parse(textContent) as CombatRoundResult;
+      // Try to parse the JSON, handling potential markdown code blocks
+      let jsonContent = textContent;
+      // Check if response is wrapped in markdown code block
+      if (jsonContent.startsWith('```') && jsonContent.includes('```')) {
+        // Extract content between first ``` and last ```
+        const startIndex = jsonContent.indexOf('\n') + 1;
+        const endIndex = jsonContent.lastIndexOf('```');
+        if (startIndex > 0 && endIndex > startIndex) {
+          jsonContent = jsonContent.substring(startIndex, endIndex).trim();
+        }
+      }
+      
+      const parsedContent = JSON.parse(jsonContent) as CombatRoundResult;
       
       // Validate the response
       if (!parsedContent.narrative || !parsedContent.entityUpdates || !parsedContent.combatStatus) {

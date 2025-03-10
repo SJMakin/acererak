@@ -5,7 +5,9 @@
   padding: 20px;
   color: #fff;
   max-width: 800px;
+  max-height: 90vh;
   margin: 20px auto;
+  overflow-y: auto;
 }
 
 .combat-header {
@@ -152,20 +154,24 @@
 }
 
 /* Scrollbar styling */
+.combat-display::-webkit-scrollbar,
 .combat-log::-webkit-scrollbar {
   width: 8px;
 }
 
+.combat-display::-webkit-scrollbar-track,
 .combat-log::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
 
+.combat-display::-webkit-scrollbar-thumb,
 .combat-log::-webkit-scrollbar-thumb {
   background: rgba(255, 68, 68, 0.5);
   border-radius: 4px;
 }
 
+.combat-display::-webkit-scrollbar-thumb:hover,
 .combat-log::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 68, 68, 0.7);
 }

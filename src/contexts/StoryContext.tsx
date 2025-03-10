@@ -1,8 +1,8 @@
 import React, { createContext, useState, useCallback, useContext } from 'react';
 import { nanoid } from 'nanoid';
-import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
+import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse, RollResult, Entity } from '../types';
 import { generateStoryNode, setSelectedThemes } from '../services/storyGenerationService';
-import { generateCharacterUpdates } from '../services/characterUpdateService';
+import { generateCharacterUpdates, CharacterUpdate } from '../services/characterUpdateService';
 import { useDice } from './DiceContext';
 import { useCharacter } from './CharacterContext';
 import { useNPCs } from './NPCContext';
@@ -16,6 +16,8 @@ export interface StoryState {
   error: string | null;
   isThemeSelectionMode: boolean;
 }
+
+// Note: StoryNode already has characterUpdateDescription and rollResults properties in types.ts
 
 export interface StoryContextProps extends StoryState {
   loadStoryNode: (nodeId: string) => Promise<void>;
@@ -71,6 +73,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       let context = `Current choice: ${choiceNode.text}\nCharacter Sheet:\n${characterSheet}`;
+      let rollResults: RollResult[] = [];
 
       // Handle dice rolls if required
       if (choiceNode.requiredRolls && choiceNode.requiredRolls.length > 0) {
@@ -78,7 +81,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const rollPromises = choiceNode.requiredRolls.map(roll => performDiceRoll(roll));
         
         // Get results for story generation, but don't wait for animations
-        const rollResults = await Promise.all(rollPromises);
+        rollResults = await Promise.all(rollPromises);
         
         // Add roll results to story generation context
         context += `\nDice Rolls:\n${rollResults.map(r => r.formatted).join('\n')}`;
@@ -97,6 +100,34 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('Invalid story response structure');
       }
 
+      // Generate character updates based on the new story content
+      const playerEntity: Entity = {
+        id: 'player',
+        type: 'player',
+        sheet: characterSheet
+      };
+      
+      // Extract events from the story content
+      const events = [choiceNode.text, newStoryData.story.content];
+      
+      // Generate character updates
+      let characterUpdates: CharacterUpdate[] = [];
+      try {
+        characterUpdates = await generateCharacterUpdates(
+          playerEntity,
+          events,
+          context
+        );
+        
+        // Apply updates to character sheet if there are any
+        if (characterUpdates.length > 0) {
+          updateCharacterSheet(characterUpdates);
+        }
+      } catch (error) {
+        console.error('Failed to generate character updates:', error);
+        // Continue with story generation even if updates fail
+      }
+
       const newPosition = {
         x: choiceNode.position.x,
         y: choiceNode.position.y + 200
@@ -108,7 +139,11 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         content: newStoryData.story.content,
         summary: newStoryData.story.summary,
         position: newPosition,
-        data: { label: newStoryData.story.summary || 'Continue' }
+        data: { label: newStoryData.story.summary || 'Continue' },
+        rollResults: rollResults.length > 0 ? rollResults : undefined,
+        characterUpdateDescription: characterUpdates.length > 0 
+          ? characterUpdates.map(update => update.description).join('\n') 
+          : undefined
       };
 
       const newChoiceNodes: ChoiceNode[] = newStoryData.choices.map((choice, index) => ({
@@ -162,7 +197,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(prev => ({ ...prev, error: null }));
   };
 
-  const { characterSheet } = useCharacter();
+  const { characterSheet, updateCharacterSheet } = useCharacter();
   const { getNPCsForStoryContext } = useNPCs();
   const rules = useRules();
   
@@ -204,6 +239,35 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('Invalid story response structure');
       }
 
+      // Generate character updates for the initial story
+      const playerEntity: Entity = {
+        id: 'player',
+        type: 'player',
+        sheet: characterSheet
+      };
+      
+      // Extract events from the story content
+      const events = [newStoryData.story.content];
+      const context = `Initial story: ${newStoryData.story.content}`;
+      
+      // Generate character updates
+      let characterUpdates: CharacterUpdate[] = [];
+      try {
+        characterUpdates = await generateCharacterUpdates(
+          playerEntity,
+          events,
+          context
+        );
+        
+        // Apply updates to character sheet if there are any
+        if (characterUpdates.length > 0) {
+          updateCharacterSheet(characterUpdates);
+        }
+      } catch (error) {
+        console.error('Failed to generate initial character updates:', error);
+        // Continue with story generation even if updates fail
+      }
+
       const initialPosition = { x: window.innerWidth / 2, y: 50 };
       
       const storyNode: StoryNode = {
@@ -212,7 +276,10 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         content: newStoryData.story.content,
         summary: newStoryData.story.summary,
         position: initialPosition,
-        data: { label: newStoryData.story.summary || 'Start' }
+        data: { label: newStoryData.story.summary || 'Start' },
+        characterUpdateDescription: characterUpdates.length > 0 
+          ? characterUpdates.map(update => update.description).join('\n') 
+          : undefined
       };
 
       const choiceNodes: ChoiceNode[] = newStoryData.choices.map((choice, index) => ({

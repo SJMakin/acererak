@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { Entity } from '../types';
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY;
@@ -22,6 +22,20 @@ export async function generateCharacterUpdates(
 ): Promise<CharacterUpdate[]> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    
+    // Define schema for character updates
+    const characterUpdateSchema = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          oldText: { type: SchemaType.STRING },
+          newText: { type: SchemaType.STRING },
+          description: { type: SchemaType.STRING }
+        },
+        required: ['oldText', 'newText', 'description']
+      }
+    };
 
 const prompt = `You are updating a character sheet based on recent events in a D&D game.
 
@@ -77,10 +91,12 @@ Only include changes that are directly supported by the events. Ensure oldText m
         parts: [{ text: prompt }]
       }],
       generationConfig: {
+        responseSchema: characterUpdateSchema as any, // Type cast needed due to SDK limitations
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
       },
     });
 
@@ -90,7 +106,19 @@ Only include changes that are directly supported by the events. Ensure oldText m
     try {
       console.log('Character update raw response:', textContent);
       
-      const updates = JSON.parse(textContent);
+      // Try to parse the JSON, handling potential markdown code blocks
+      let jsonContent = textContent;
+      // Check if response is wrapped in markdown code block
+      if (jsonContent.startsWith('```') && jsonContent.includes('```')) {
+        // Extract content between first ``` and last ```
+        const startIndex = jsonContent.indexOf('\n') + 1;
+        const endIndex = jsonContent.lastIndexOf('```');
+        if (startIndex > 0 && endIndex > startIndex) {
+          jsonContent = jsonContent.substring(startIndex, endIndex).trim();
+        }
+      }
+      
+      const updates = JSON.parse(jsonContent);
 
       if (!Array.isArray(updates)) {
         throw new Error('Updates must be an array');
