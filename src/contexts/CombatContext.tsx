@@ -5,6 +5,8 @@ import { generateEnemyGroup } from '../services/entityGenerator';
 import { generateCharacterUpdates } from '../services/characterUpdateService';
 import { processCombatRound, CombatRoundResult } from '../services/combatNarrationService';
 import { useCharacter } from './CharacterContext';
+import { markdownTextExists, findAndReplaceMarkdownText } from '../services/markdownUtils';
+import { debugLog } from '../services/debugUtils';
 
 interface CombatContextState {
   isActive: boolean;
@@ -195,19 +197,87 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Apply a specific update to an entity
   const applyUpdate = useCallback((entityId: string, updateIndex: number) => {
+    console.log(`Applying update for entity ${entityId} at index ${updateIndex}`);
+    
     const update = state.pendingUpdates.find((u, i) => u.entityId === entityId && i === updateIndex);
-    if (!update || !combatSystem) return;
+    if (!update || !combatSystem) {
+      console.warn('Update not found or no combat system');
+      return;
+    }
+
+    console.log('Update to apply:', update);
 
     // Find the entity to update
     const currentState = combatSystem.getCombatState();
     const entity = currentState.participants.find((p: Entity) => p.id === entityId);
-    if (!entity) return;
+    if (!entity) {
+      console.warn(`Entity ${entityId} not found`);
+      return;
+    }
 
-    // Apply the update
+    console.log('Entity before update:', {
+      id: entity.id,
+      type: entity.type,
+      sheetExcerpt: entity.sheet.substring(0, 100) + '...'
+    });
+
+    // Log the entity sheet for debugging
+    debugLog('COMBAT_UPDATE', 'Entity sheet before update', {
+      entityId,
+      entityType: entity.type,
+      sheetLength: entity.sheet.length,
+      sheetExcerpt: entity.sheet.substring(0, 500) + '...'
+    });
+    
+    // Log the update for debugging
+    debugLog('COMBAT_UPDATE', 'Update to apply', {
+      oldText: update.oldText,
+      newText: update.newText,
+      description: update.description
+    });
+    
+    // Check if oldText exists in the sheet using markdown-aware matching
+    if (!markdownTextExists(entity.sheet, update.oldText)) {
+      console.error(`oldText "${update.oldText}" not found in entity sheet`);
+      debugLog('COMBAT_UPDATE', 'Update failed - text not found', {
+        oldText: update.oldText,
+        entityId,
+        entityType: entity.type
+      });
+      return;
+    }
+
+    // Apply the update using markdown-aware replacement
+    const result = findAndReplaceMarkdownText(entity.sheet, update.oldText, update.newText);
+    if (!result.found) {
+      console.error(`Failed to replace text in entity sheet`);
+      debugLog('COMBAT_UPDATE', 'Update failed - replacement failed', {
+        oldText: update.oldText,
+        newText: update.newText,
+        entityId,
+        entityType: entity.type
+      });
+      return;
+    }
+    
     const updatedEntity = {
       ...entity,
-      sheet: entity.sheet.replace(update.oldText, update.newText),
+      sheet: result.text,
     };
+    
+    // Log the updated entity sheet for debugging
+    debugLog('COMBAT_UPDATE', 'Entity sheet after update', {
+      entityId,
+      entityType: entity.type,
+      sheetLength: updatedEntity.sheet.length,
+      sheetExcerpt: updatedEntity.sheet.substring(0, 500) + '...'
+    });
+
+    console.log('Entity after update:', {
+      id: updatedEntity.id,
+      type: updatedEntity.type,
+      sheetExcerpt: updatedEntity.sheet.substring(0, 100) + '...'
+    });
 
     // Update the combat system's state
     const updatedParticipants = currentState.participants.map((p: Entity) =>
@@ -216,12 +286,17 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // If it's the player, also update the character sheet
     if (entity.type === 'player') {
-      // Type cast to match the expected interface
+      console.log('Updating player character sheet with:', {
+        oldText: update.oldText,
+        newText: update.newText,
+        description: update.description
+      });
+      
       updateCharacterSheet([{
         oldText: update.oldText,
         newText: update.newText,
         description: update.description,
-      } as any]);
+      }]);
     }
 
     // Update the state

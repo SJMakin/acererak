@@ -1,0 +1,302 @@
+/* Main container */
+.model-selector {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 100;
+  width: 250px;
+  font-size: 14px;
+  color: #fff;
+}
+
+/* Current model display - the button that shows when dropdown is closed */
+.model-current {
+  background-color: rgba(20, 20, 20, 0.8);
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 10px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.model-current:hover {
+  background-color: rgba(40, 40, 40, 0.9);
+  border-color: #666;
+}
+
+.model-current-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 10px;
+  font-weight: 500;
+}
+
+.model-dropdown-icon {
+  font-size: 10px;
+  color: #999;
+}
+
+/* Model feature badges */
+.model-feature {
+  font-size: 8px;
+  font-weight: bold;
+  padding: 1px 3px;
+  border-radius: 3px;
+  color: white;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.model-feature-json {
+  background-color: #3b82f6; /* blue */
+}
+
+.model-feature-free {
+  background-color: #10b981; /* green */
+}
+
+/* Description under selected model */
+.model-description {
+  margin-top: 5px;
+  width: 100%;
+  text-align: right;
+}
+
+.model-description-text {
+  font-size: 11px;
+  color: #aaa;
+  font-style: italic;
+}
+
+/* Dropdown container */
+.model-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 100%;
+  max-width: 300px;
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 4px;
+  margin-top: 5px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Search and filter section */
+.model-search-filters {
+  display: flex;
+  padding: 10px;
+  gap: 8px;
+  border-bottom: 1px solid #333;
+}
+
+.model-search {
+  flex: 1;
+  background-color: #333;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 6px 8px;
+  color: white;
+  font-size: 13px;
+}
+
+.model-search:focus {
+  outline: none;
+  border-color: #6e56cf;
+}
+
+.model-filters {
+  position: relative;
+}
+
+.filter-toggle {
+  background: none;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 0 8px;
+  height: 28px;
+  cursor: pointer;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-toggle:hover {
+  background-color: #333;
+}
+
+.filter-options {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 5px;
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 8px 10px;
+  width: 180px;
+  z-index: 10001;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-option input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #666;
+  background-color: #333;
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.filter-option input[type="checkbox"]:checked {
+  background-color: #6e56cf;
+  border-color: #6e56cf;
+}
+
+.filter-option input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  top: -1px;
+  left: 2px;
+}
+
+.filter-option span {
+  font-size: 13px;
+  color: #ddd;
+}
+
+/* Models list */
+.model-list {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.model-item {
+  border-bottom: 1px solid #333;
+  padding: 8px 10px;
+  transition: background-color 0.15s;
+}
+
+.model-item:hover {
+  background-color: #2a2a2a;
+}
+
+.model-item.selected {
+  background-color: rgba(110, 86, 207, 0.15);
+  border-left: 3px solid #6e56cf;
+}
+
+.model-item-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.model-item-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider-name {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 2px;
+}
+
+.model-name {
+  font-weight: 500;
+  color: white;
+}
+
+.model-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.model-item-description {
+  font-size: 12px;
+  color: #999;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.description-content {
+  cursor: pointer;
+}
+
+.description-toggle {
+  background: none;
+  border: none;
+  color: #6e56cf;
+  font-size: 11px;
+  padding: 2px 0;
+  margin-top: 3px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.model-loading, .model-no-results {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
+/* Scrollbar styling */
+.model-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.model-list::-webkit-scrollbar-track {
+  background: #222;
+}
+
+.model-list::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 3px;
+}
+
+/* Animation for dropdown */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.model-dropdown {
+  animation: fadeIn 0.2s ease-out;
+}

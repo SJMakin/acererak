@@ -1,7 +1,8 @@
-import React, { createContext, useState, useCallback, useContext } from 'react';
+import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse, RollResult, Entity } from '../types';
-import { generateStoryNode, setSelectedThemes } from '../services/storyGenerationService';
+import { generateStoryNode, setSelectedThemes, setCurrentModel } from '../services/openRouterService';
+import { useModel } from './ModelContext';
 import { generateCharacterUpdates, CharacterUpdate } from '../services/characterUpdateService';
 import { useDice } from './DiceContext';
 import { useCharacter } from './CharacterContext';
@@ -200,6 +201,12 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { characterSheet, updateCharacterSheet } = useCharacter();
   const { getNPCsForStoryContext } = useNPCs();
   const rules = useRules();
+  const { selectedModel } = useModel();
+  
+  // Set the current model from the ModelContext
+  useEffect(() => {
+    setCurrentModel(selectedModel);
+  }, [selectedModel]);
   
   // Helper function to format rules for story context
   const getEnabledRulesForStoryContext = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown, { Components } from 'react-markdown';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useGame } from '../contexts/GameContext';
@@ -10,6 +10,13 @@ interface CharacterSheetProps {
 const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
   const { characterSheet } = useGame();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [updateCounter, setUpdateCounter] = useState(0);
+
+  // Log when character sheet changes and force update
+  useEffect(() => {
+    console.log('CharacterSheet component received updated sheet');
+    setUpdateCounter(prev => prev + 1);
+  }, [characterSheet]);
 
   const toggleSheet = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -76,7 +83,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
         aria-label="Character Sheet"
       >
         <div className="character-sheet-content">
-          <ReactMarkdown components={components}>
+          <ReactMarkdown components={components} key={updateCounter}>
             {characterSheet}
           </ReactMarkdown>
         </div>

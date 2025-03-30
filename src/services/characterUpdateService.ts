@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { Entity } from '../types';
+import { markdownTextExists } from './markdownUtils';
+import { debugLog } from './debugUtils';
 
 const API_KEY = import.meta.env.VITE_GEMINI_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
@@ -64,7 +66,7 @@ Analyze the events and generate updates to the character sheet. Consider:
 6. Level ups if XP threshold reached
 
 Return a JSON array of updates, each with:
-- oldText: exact text to replace
+- oldText: text to replace (should match content but can have slight whitespace differences)
 - newText: new text to insert
 - description: explanation of the change
 
@@ -77,7 +79,12 @@ Example:
   }
 ]
 
-Only include changes that are directly supported by the events. Ensure oldText matches the character sheet exactly.`;
+Special handling for list items:
+- For list items (lines starting with *, -, +, or numbers), focus on matching the content after the list marker
+- The system can handle differences in whitespace after list markers (e.g., "* Item" vs "*   Item")
+- Keep the same list marker type in both oldText and newText (e.g., if it's "*" in oldText, use "*" in newText)
+
+Only include changes that are directly supported by the events. For oldText, focus on matching the content rather than exact whitespace - the system can handle differences in whitespace, especially in markdown formatting.`;
 
     console.log('Character update prompt:', {
       entityType: entity.type,
@@ -105,6 +112,7 @@ Only include changes that are directly supported by the events. Ensure oldText m
 
     try {
       console.log('Character update raw response:', textContent);
+      debugLog('CHARACTER_UPDATES', 'Raw AI response', textContent);
       
       // Try to parse the JSON, handling potential markdown code blocks
       let jsonContent = textContent;
@@ -126,11 +134,28 @@ Only include changes that are directly supported by the events. Ensure oldText m
 
       const validUpdates = updates.map((update, i) => {
         if (!update.oldText || !update.newText || !update.description) {
-          throw new Error('Missing required fields in update');
+          const error = 'Missing required fields in update';
+          debugLog('CHARACTER_UPDATES', error, update);
+          throw new Error(error);
         }
-        if (!entity.sheet.includes(update.oldText)) {
-          throw new Error('Update contains oldText that doesn\'t match sheet');
+        
+        const exists = markdownTextExists(entity.sheet, update.oldText);
+        if (!exists) {
+          const error = `Update contains oldText that doesn't match sheet: "${update.oldText}"`;
+          debugLog('CHARACTER_UPDATES', error, {
+            oldText: update.oldText,
+            newText: update.newText,
+            description: update.description
+          });
+          throw new Error(error);
         }
+        
+        debugLog('CHARACTER_UPDATES', 'Valid update found', {
+          oldText: update.oldText,
+          newText: update.newText,
+          description: update.description
+        });
+        
         return update;
       });
 

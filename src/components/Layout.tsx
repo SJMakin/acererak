@@ -4,6 +4,7 @@ import GameGraph from './GameGraph';
 import { CombatDisplay } from './CombatDisplay';
 import SystemSelector from './SystemSelector';
 import GameTabs from './GameTabs';
+import ModelSelector from './ModelSelector';
 import { useGame } from '../contexts/GameContext';
 import './Layout.css';
 
@@ -27,6 +28,7 @@ const Layout: React.FC = () => {
 
   return (
     <div className="game-layout">
+      <ModelSelector />
       <Split 
         sizes={sizes}
         minSize={300}

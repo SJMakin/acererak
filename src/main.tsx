@@ -2,6 +2,15 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import 'reactflow/dist/style.css';
+import { initDebugUtils, setDebugMode, DebugMode } from './services/debugUtils';
+
+// Initialize debug utilities for console access
+initDebugUtils();
+
+// Enable markdown debug mode by default for character sheet debugging
+setDebugMode(DebugMode.MARKDOWN, true);
+// To enable other debug modes, use the browser console:
+// window.debugUtils.enableDebug('character-updates') or window.debugUtils.enableDebug('all')
 
 // Add some basic global styles
 const style = document.createElement('style');

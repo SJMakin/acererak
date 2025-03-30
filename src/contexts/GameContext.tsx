@@ -58,6 +58,11 @@ export const useGame = () => {
   const npc = useNPCs();
   const rules = useRules();
   const [gameMode, setGameMode] = useState<GameMode>('system-select');
+  
+  // Log when character sheet changes in useGame
+  useEffect(() => {
+    console.log('GameContext detected character sheet change');
+  }, [character.characterSheet]);
 
   useEffect(() => {
     // If we're not in system selection mode, update based on combat state

@@ -1,6 +1,8 @@
 import React, { createContext, useState, useCallback, useContext } from 'react';
 import { generateCharacterSheet } from '../services/characterGenerator';
 import { generateAICharacterSheet, CharacterGenerationOptions } from '../services/aiCharacterGenerator';
+import { findAndReplaceMarkdownText, dumpSheetAndSearchText } from '../services/markdownUtils';
+import { debugLog } from '../services/debugUtils';
 
 export interface CharacterState {
   characterSheet: string;
@@ -10,7 +12,7 @@ export interface CharacterState {
 }
 
 export interface CharacterContextProps extends CharacterState {
-  updateCharacterSheet: (updates: Array<{ oldText: string; newText: string }>) => void;
+  updateCharacterSheet: (updates: Array<{ oldText: string; newText: string; description?: string }>) => void;
   resetCharacter: () => void;
   generateCharacter: (options: CharacterGenerationOptions) => Promise<void>;
 }
@@ -26,12 +28,34 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const updateCharacterSheet = useCallback(
-    (updates: Array<{ oldText: string; newText: string }>) => {
+    (updates: Array<{ oldText: string; newText: string; description?: string }>) => {
       setState(prev => {
         let newSheet = prev.characterSheet;
         updates.forEach(update => {
-          newSheet = newSheet.replace(update.oldText, update.newText);
+          debugLog('CHARACTER_CONTEXT', 'Attempting to update character sheet', {
+            oldText: update.oldText,
+            newText: update.newText,
+            description: update.description
+          });
+          
+          // Use markdown-aware text replacement
+          const result = findAndReplaceMarkdownText(newSheet, update.oldText, update.newText, "character-sheet");
+          if (result.found) {
+            newSheet = result.text;
+            console.log(`Character sheet updated: ${update.description || 'No description'}`);
+            debugLog('CHARACTER_CONTEXT', 'Character sheet updated successfully', {
+              description: update.description
+            });
+          } else {
+            console.warn(`Failed to update character sheet: oldText "${update.oldText}" not found`);
+            debugLog('CHARACTER_CONTEXT', 'Failed to update character sheet', {
+              oldText: update.oldText,
+              reason: 'Text not found in character sheet'
+            });
+          }
         });
+        // Dump the final character sheet for debugging
+        dumpSheetAndSearchText(newSheet, "final-character-sheet", "character-sheet-after-updates");
         return { ...prev, characterSheet: newSheet };
       });
     },
