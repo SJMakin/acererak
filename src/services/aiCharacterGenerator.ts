@@ -1,7 +1,23 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import OpenAI from 'openai';
+import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_GEMINI_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
+const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
+
+// Use the OpenAI client with OpenRouter base URL
+const openRouter = new OpenAI({
+  apiKey: API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  dangerouslyAllowBrowser: true // Allow client to run in browser environment
+});
+
+// Store the current model for character generation
+let currentModel: ModelOption | null = null;
+
+// Function to set the current model
+export function setCurrentModel(model: ModelOption): void {
+  currentModel = model;
+  console.log(`Character generation service using model: ${model.name} (${model.id})`);
+}
 
 export interface CharacterGenerationOptions {
   system: string;
@@ -10,7 +26,9 @@ export interface CharacterGenerationOptions {
 
 export async function generateAICharacterSheet(options: CharacterGenerationOptions): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    if (!currentModel) {
+      throw new Error('Model not set - please set a model before generating character');
+    }
 
     // Build the prompt based on the RPG system and any user preferences
     const prompt = `Create a detailed character sheet for a ${options.system} roleplaying game. 
@@ -57,11 +75,19 @@ Format everything in clean, readable Markdown that will display well when render
 
     console.log('Character generation prompt:', prompt);
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    // Using the OpenAI client with OpenRouter
+    const response = await openRouter.chat.completions.create({
+      model: currentModel.id,
+      messages: [
+        { role: 'system', content: 'You are creating a detailed character sheet for a roleplaying game.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      top_p: 0.95
     });
 
-    const characterSheet = result.response.text();
+    // Extract the text from the response
+    const characterSheet = response.choices[0].message.content || '';
     console.log('Generated character sheet');
     return characterSheet;
   } catch (error) {

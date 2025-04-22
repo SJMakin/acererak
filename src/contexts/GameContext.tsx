@@ -5,24 +5,38 @@ import { CharacterProvider, useCharacter } from './CharacterContext';
 import { CombatProvider, useCombat } from './CombatContext';
 import { NPCProvider, useNPCs } from './NPCContext';
 import { RulesProvider, useRules } from './RulesContext';
+import { SelectedTheme } from '../components/ThemeSelector';
 
-export type GameMode = 'system-select' | 'story' | 'combat';
+export type GameMode = 'setup' | 'system-select' | 'story' | 'combat';
+
+// Create a context for the game mode
+const GameModeContext = React.createContext<{
+  gameMode: GameMode;
+  setGameMode: (mode: GameMode) => void;
+}>({
+  gameMode: 'setup',
+  setGameMode: () => {}
+});
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [gameMode, setGameMode] = useState<GameMode>('setup');
+
   return (
-    <CharacterProvider>
-      <DiceProvider>
-        <CombatProvider>
-          <NPCProvider>
-            <RulesProvider>
-              <StoryProvider>
-                <GameCoordinator>{children}</GameCoordinator>
-              </StoryProvider>
-            </RulesProvider>
-          </NPCProvider>
-        </CombatProvider>
-      </DiceProvider>
-    </CharacterProvider>
+    <GameModeContext.Provider value={{ gameMode, setGameMode }}>
+      <CharacterProvider>
+        <DiceProvider>
+          <CombatProvider>
+            <NPCProvider>
+              <RulesProvider>
+                <StoryProvider>
+                  <GameCoordinator>{children}</GameCoordinator>
+                </StoryProvider>
+              </RulesProvider>
+            </NPCProvider>
+          </CombatProvider>
+        </DiceProvider>
+      </CharacterProvider>
+    </GameModeContext.Provider>
   );
 };
 
@@ -30,7 +44,7 @@ const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { restartGame } = useStory();
   const { characterSheet, isGenerating } = useCharacter();
   const { isActive: isCombatActive } = useCombat();
-  const [gameMode, setGameMode] = useState<GameMode>('system-select'); // Start with system selection
+  const { gameMode, setGameMode } = React.useContext(GameModeContext);
   const initialLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -42,22 +56,22 @@ const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   // Update game mode based on combat state
   useEffect(() => {
-    if (gameMode !== 'system-select') {
+    if (gameMode !== 'system-select' && gameMode !== 'setup') {
       setGameMode(isCombatActive ? 'combat' : 'story');
     }
-  }, [isCombatActive, gameMode]);
+  }, [isCombatActive, gameMode, setGameMode]);
 
   return <>{children}</>;
 };
 
 export const useGame = () => {
+  const { gameMode, setGameMode } = React.useContext(GameModeContext);
   const story = useStory();
   const dice = useDice();
   const character = useCharacter();
   const combat = useCombat();
   const npc = useNPCs();
   const rules = useRules();
-  const [gameMode, setGameMode] = useState<GameMode>('system-select');
   
   // Log when character sheet changes in useGame
   useEffect(() => {
@@ -65,8 +79,8 @@ export const useGame = () => {
   }, [character.characterSheet]);
 
   useEffect(() => {
-    // If we're not in system selection mode, update based on combat state
-    if (gameMode !== 'system-select') {
+    // If we're not in setup or system selection mode, update based on combat state
+    if (gameMode !== 'system-select' && gameMode !== 'setup') {
       setGameMode(combat.isActive ? 'combat' : 'story');
     }
     
@@ -106,17 +120,29 @@ export const useGame = () => {
     }
   };
 
-  // Function to handle system selection
+  // Function to handle system selection in the setup wizard
   const selectSystem = async (system: string, preferences?: string) => {
     try {
       // Generate character using AI
       await character.generateCharacter({ system, preferences });
       
-      // Move to story mode (which will show theme selection first)
-      setGameMode('story');
+      // In the new flow, we stay in setup mode until the entire setup is complete
+      // The UI will show the next step (theme selection) within the wizard
     } catch (error) {
       console.error('Error selecting system:', error);
     }
+  };
+
+  // Function to complete the setup process and start the game
+  const completeSetup = (themes: SelectedTheme[] | null) => {
+    // Select themes for the story
+    story.selectThemes(themes);
+    
+    // Move to story mode to start the game
+    setGameMode('story');
+    
+    // Log the transition for debugging
+    console.log('Completing setup and transitioning to story mode', themes);
   };
 
   return {
@@ -124,8 +150,9 @@ export const useGame = () => {
     gameMode,
     setGameMode,
     
-    // System selection
+    // Setup and system selection
     selectSystem,
+    completeSetup,
     isGeneratingCharacter: character.isGenerating,
     
     // Story state and functions
@@ -139,7 +166,7 @@ export const useGame = () => {
     chooseOption,
     resetError: story.resetError,
     restartGame: () => {
-      setGameMode('system-select'); // Go back to system selection
+      setGameMode('setup'); // Go back to setup wizard
       character.resetCharacter();
       combat.endCombat();
       return story.restartGame(character.characterSheet);

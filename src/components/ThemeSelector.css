@@ -1,31 +1,49 @@
 .theme-selector {
   background: rgba(0, 0, 0, 0.9);
   border: 2px solid #444;
-  border-radius: 8px;
-  padding: 30px;
+  border-radius: 6px;
+  padding: 12px;
   color: #fff;
-  max-width: 800px;
-  margin: 20px auto;
+  max-width: 100%;
+  margin: 0 auto;
   text-align: center;
 }
 
 .theme-selector h2 {
   color: #ff4444;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 30px;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
 }
 
 .free-text-input {
   background: rgba(0, 0, 0, 0.5);
-  padding: 20px;
+  padding: 10px;
   border-radius: 6px;
-  margin-bottom: 30px;
+  margin-bottom: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #444 #252525;
+}
+
+.free-text-input::-webkit-scrollbar {
+  width: 8px;
+}
+
+.free-text-input::-webkit-scrollbar-track {
+  background: #252525;
+}
+
+.free-text-input::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 4px;
+  border: 2px solid #252525;
 }
 
 .free-text-input p {
-  margin-bottom: 15px;
-  font-size: 1.1em;
+  margin-bottom: 6px;
+  font-size: 0.9em;
 }
 
 .free-text-input textarea {
@@ -34,9 +52,9 @@
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
-  padding: 12px;
-  font-size: 1.1em;
-  margin-bottom: 10px;
+  padding: 8px;
+  font-size: 0.9em;
+  margin-bottom: 6px;
   resize: vertical;
 }
 
@@ -53,21 +71,21 @@
 .hint {
   font-style: italic;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9em;
-  margin-bottom: 20px;
+  font-size: 0.85em;
+  margin-bottom: 10px;
 }
 
 .start-button, .random-button {
   background: #ff4444;
   color: white;
   border: none;
-  padding: 12px 24px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 3px;
   cursor: pointer;
   font-weight: bold;
-  font-size: 1.1em;
+  font-size: 0.9em;
   transition: background 0.2s;
-  margin: 5px;
+  margin: 3px;
 }
 
 .start-button:hover, .random-button:hover {
@@ -80,12 +98,95 @@
 }
 
 .random-option {
-  margin-top: 30px;
-  padding-top: 20px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid #444;
 }
 
 .random-option p {
-  margin-bottom: 15px;
+  margin-bottom: 6px;
   font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .theme-selector {
+    padding: 10px;
+  }
+  
+  .theme-selector h2 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+  }
+  
+  .free-text-input {
+    padding: 8px;
+    margin-bottom: 10px;
+    max-height: 45vh;
+  }
+  
+  .free-text-input p {
+    margin-bottom: 5px;
+    font-size: 0.9em;
+  }
+  
+  .free-text-input textarea {
+    padding: 6px;
+    font-size: 0.9em;
+  }
+  
+  .hint {
+    font-size: 0.8em;
+    margin-bottom: 8px;
+  }
+  
+  .start-button, .random-button {
+    padding: 6px 12px;
+    font-size: 0.9em;
+  }
+  
+  .random-option {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+  
+  .random-option p {
+    margin-bottom: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-selector {
+    padding: 6px;
+  }
+  
+  .theme-selector h2 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+  
+  .free-text-input {
+    padding: 6px;
+    margin-bottom: 8px;
+    max-height: 40vh;
+  }
+  
+  .free-text-input p {
+    font-size: 0.85em;
+  }
+  
+  .free-text-input textarea {
+    padding: 5px;
+    font-size: 0.85em;
+  }
+  
+  .hint {
+    font-size: 0.75em;
+    margin-bottom: 6px;
+  }
+  
+  .start-button, .random-button {
+    padding: 5px 10px;
+    font-size: 0.85em;
+  }
 }

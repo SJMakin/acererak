@@ -97,8 +97,7 @@ async function generateStoryPlan(model: ModelOption): Promise<string> {
         }
       ],
       temperature: 0.8,
-      top_p: 0.95,
-      max_tokens: 1000
+      top_p: 0.95
     });
 
     // Extract the text from the response
@@ -202,7 +201,6 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
         ],
         temperature: 0.8,
         top_p: 0.95,
-        max_tokens: 2048,
         response_format: { type: 'json_object' }
       });
 

@@ -52,7 +52,6 @@
     "@chakra-ui/react": "^3.8.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@google/generative-ai": "^0.21.0",
     "@openrouter/ai-sdk-provider": "^0.4.5",
     "@reactflow/background": "^11.3.14",
     "framer-motion": "^12.4.7",

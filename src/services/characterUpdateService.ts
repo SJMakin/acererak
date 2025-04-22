@@ -1,10 +1,26 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { Entity } from '../types';
 import { markdownTextExists } from './markdownUtils';
 import { debugLog } from './debugUtils';
+import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_GEMINI_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
+const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
+
+// Use the OpenAI client with OpenRouter base URL
+const openRouter = new OpenAI({
+  apiKey: API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  dangerouslyAllowBrowser: true // Allow client to run in browser environment
+});
+
+// Store the current model for character updates
+let currentModel: ModelOption | null = null;
+
+// Function to set the current model
+export function setCurrentModel(model: ModelOption): void {
+  currentModel = model;
+  console.log(`Character update service using model: ${model.name} (${model.id})`);
+}
 
 export interface CharacterUpdate {
   oldText: string;
@@ -23,21 +39,9 @@ export async function generateCharacterUpdates(
   }
 ): Promise<CharacterUpdate[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    
-    // Define schema for character updates
-    const characterUpdateSchema = {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.OBJECT,
-        properties: {
-          oldText: { type: SchemaType.STRING },
-          newText: { type: SchemaType.STRING },
-          description: { type: SchemaType.STRING }
-        },
-        required: ['oldText', 'newText', 'description']
-      }
-    };
+    if (!currentModel) {
+      throw new Error('Model not set - please set a model before generating character updates');
+    }
 
 const prompt = `You are updating a character sheet based on recent events in a D&D game.
 
@@ -92,41 +96,39 @@ Only include changes that are directly supported by the events. For oldText, foc
       context
     });
 
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        responseSchema: characterUpdateSchema as any, // Type cast needed due to SDK limitations
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
-      },
+    // Using the OpenAI client with OpenRouter
+    const response = await openRouter.chat.completions.create({
+      model: currentModel.id,
+      messages: [
+        { role: 'system', content: 'You are updating a character sheet based on recent events in a D&D game.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      top_p: 0.95,
+      response_format: { type: 'json_object' }
     });
 
-    const response = await result.response;
-    const textContent = response.text();
+    // Extract the text from the response
+    const textContent = response.choices[0].message.content || '';
 
     try {
       console.log('Character update raw response:', textContent);
       debugLog('CHARACTER_UPDATES', 'Raw AI response', textContent);
       
       // Try to parse the JSON, handling potential markdown code blocks
-      let jsonContent = textContent;
+      let processedContent = textContent;
+      
       // Check if response is wrapped in markdown code block
-      if (jsonContent.startsWith('```') && jsonContent.includes('```')) {
+      if (processedContent.startsWith('```') && processedContent.includes('```')) {
         // Extract content between first ``` and last ```
-        const startIndex = jsonContent.indexOf('\n') + 1;
-        const endIndex = jsonContent.lastIndexOf('```');
+        const startIndex = processedContent.indexOf('\n') + 1;
+        const endIndex = processedContent.lastIndexOf('```');
         if (startIndex > 0 && endIndex > startIndex) {
-          jsonContent = jsonContent.substring(startIndex, endIndex).trim();
+          processedContent = processedContent.substring(startIndex, endIndex).trim();
         }
       }
       
-      const updates = JSON.parse(jsonContent);
+      const updates = JSON.parse(processedContent);
 
       if (!Array.isArray(updates)) {
         throw new Error('Updates must be an array');
@@ -164,6 +166,13 @@ Only include changes that are directly supported by the events. For oldText, foc
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error processing updates';
       console.error('Character update error:', { error: message, response: textContent });
+      // If the error is related to JSON parsing, log more details
+      if (message.includes('JSON')) {
+        console.error('JSON parsing error details:', {
+          rawResponse: textContent,
+          responseType: typeof textContent
+        });
+      }
       throw new Error(message);
     }
   } catch (error) {

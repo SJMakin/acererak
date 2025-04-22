@@ -5,6 +5,7 @@ import { CombatDisplay } from './CombatDisplay';
 import SystemSelector from './SystemSelector';
 import GameTabs from './GameTabs';
 import ModelSelector from './ModelSelector';
+import GameSetupWizard from './GameSetupWizard';
 import { useGame } from '../contexts/GameContext';
 import './Layout.css';
 
@@ -18,6 +19,11 @@ const Layout: React.FC = () => {
     setIsMounted(true);
   }, []);
 
+  // Log game mode changes for debugging
+  useEffect(() => {
+    console.log('Layout: Game mode changed to', gameMode);
+  }, [gameMode]);
+
   if (!isMounted) {
     return (
       <div className="game-layout">
@@ -26,10 +32,23 @@ const Layout: React.FC = () => {
     );
   }
 
+  // If in setup mode, show the setup wizard
+  if (gameMode === 'setup') {
+    console.log('Layout: Rendering GameSetupWizard');
+    return (
+      <div className="game-layout">
+        <ModelSelector />
+        <GameSetupWizard />
+      </div>
+    );
+  }
+
+  // Otherwise show the regular split layout
+  console.log('Layout: Rendering game content for mode:', gameMode);
   return (
     <div className="game-layout">
       <ModelSelector />
-      <Split 
+      <Split
         sizes={sizes}
         minSize={300}
         gutterSize={10}

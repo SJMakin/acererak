@@ -1,8 +1,24 @@
 import { Entity } from '../types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
+import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_GEMINI_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
+const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
+
+// Use the OpenAI client with OpenRouter base URL
+const openRouter = new OpenAI({
+  apiKey: API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  dangerouslyAllowBrowser: true // Allow client to run in browser environment
+});
+
+// Store the current model for entity generation
+let currentModel: ModelOption | null = null;
+
+// Function to set the current model
+export function setCurrentModel(model: ModelOption): void {
+  currentModel = model;
+  console.log(`Entity generation service using model: ${model.name} (${model.id})`);
+}
 
 interface EntityGenerationParams {
   type: 'npc' | 'enemy';
@@ -14,7 +30,9 @@ interface EntityGenerationParams {
 
 export async function generateEntity(params: EntityGenerationParams): Promise<Entity> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    if (!currentModel) {
+      throw new Error('Model not set - please set a model before generating entity');
+    }
 
     const prompt = `Generate a ${params.type === 'npc' ? 'non-player character' : 'enemy'} for a D&D game.
 
@@ -84,20 +102,22 @@ IMPORTANT: Give enemies distinctive, memorable names that reflect their nature a
       context: params.context
     });
 
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      },
+    // Using the OpenAI client with OpenRouter
+    const response = await openRouter.chat.completions.create({
+      model: currentModel.id,
+      messages: [
+        {
+          role: 'system',
+          content: `You are generating a ${params.type === 'npc' ? 'non-player character' : 'enemy'} for a D&D game.`
+        },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      top_p: 0.95
     });
 
-    const sheet = result.response.text();
+    // Extract the text from the response
+    const sheet = response.choices[0].message.content || '';
     console.log('Entity generation response:', sheet);
 
     // Validate the generated sheet has the required sections

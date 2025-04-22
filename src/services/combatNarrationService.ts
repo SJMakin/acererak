@@ -1,59 +1,25 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { Entity, CombatAction } from '../types';
+import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_GEMINI_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || 'dummy-key');
+const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
 
-// Define the schema for combat round results
-const combatRoundSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    narrative: {
-      type: SchemaType.OBJECT,
-      properties: {
-        summary: { type: SchemaType.STRING },
-        detailedDescription: { type: SchemaType.STRING }
-      },
-      required: ['summary', 'detailedDescription']
-    },
-    entityUpdates: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.OBJECT,
-        properties: {
-          entityId: { type: SchemaType.STRING },
-          updates: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                oldText: { type: SchemaType.STRING },
-                newText: { type: SchemaType.STRING },
-                description: { type: SchemaType.STRING }
-              },
-              required: ['oldText', 'newText', 'description']
-            }
-          }
-        },
-        required: ['entityId', 'updates']
-      }
-    },
-    combatStatus: {
-      type: SchemaType.OBJECT,
-      properties: {
-        roundComplete: { type: SchemaType.BOOLEAN },
-        combatComplete: { type: SchemaType.BOOLEAN },
-        victor: { type: SchemaType.STRING },
-        specialEvents: {
-          type: SchemaType.ARRAY,
-          items: { type: SchemaType.STRING }
-        }
-      },
-      required: ['roundComplete', 'combatComplete']
-    }
-  },
-  required: ['narrative', 'entityUpdates', 'combatStatus']
-};
+// Use the OpenAI client with OpenRouter base URL
+const openRouter = new OpenAI({
+  apiKey: API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  dangerouslyAllowBrowser: true // Allow client to run in browser environment
+});
+
+// Store the current model for combat narration
+let currentModel: ModelOption | null = null;
+
+// Function to set the current model
+export function setCurrentModel(model: ModelOption): void {
+  currentModel = model;
+  console.log(`Combat narration service using model: ${model.name} (${model.id})`);
+}
+
 
 // Define the interface for combat round results
 export interface CombatRoundResult {
@@ -90,7 +56,9 @@ export async function processCombatRound(
   roundNumber: number
 ): Promise<CombatRoundResult> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    if (!currentModel) {
+      throw new Error('Model not set - please set a model before processing combat round');
+    }
     
     // Build prompt with all entity sheets and actions
     const prompt = `You are narrating a combat round in a D&D game.
@@ -121,20 +89,23 @@ Determine if combat should continue or end based on entity states. Combat ends w
 
     console.log('Combat round prompt:', prompt);
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: combatRoundSchema as any, // Type cast needed due to SDK limitations
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
-      },
+    // Using the OpenAI client with OpenRouter
+    const response = await openRouter.chat.completions.create({
+      model: currentModel.id,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are narrating a combat round in a D&D game. Provide a structured response with narrative description, entity updates, and combat status.'
+        },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      top_p: 0.95,
+      response_format: { type: 'json_object' }
     });
 
-    const response = await result.response;
-    const textContent = response.text();
+    // Extract the text from the response
+    const textContent = response.choices[0].message.content || '';
 
     try {
       console.log('Combat round raw response:', textContent);

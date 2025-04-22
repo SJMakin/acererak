@@ -34,48 +34,62 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({ onThemesSelected }) => {
       theme
     }));
     
+    console.log('Submitting custom themes:', selectedThemes);
+    
     // Submit the themes
     onThemesSelected(selectedThemes);
   };
 
   const handleRandomThemes = () => {
+    console.log('Submitting random themes');
+    setIsSubmitting(true);
     onThemesSelected(null); // null indicates to use random themes
   };
 
   return (
     <div className="theme-selector">
-      <h2>Choose Your Adventure Themes</h2>
-      
-      <div className="free-text-input">
-        <p>Enter up to 3 themes for your adventure (separated by commas):</p>
-        <textarea
-          value={freeTextThemes}
-          onChange={(e) => setFreeTextThemes(e.target.value)}
-          placeholder="e.g., ancient ruins, revenge, dragon"
-          rows={3}
-          disabled={isSubmitting}
-        />
-        <p className="hint">These themes will shape your adventure's story and encounters.</p>
-        
-        <button 
-          className="start-button" 
-          onClick={handleFreeTextSubmit}
-          disabled={!freeTextThemes.trim() || isSubmitting}
-        >
-          Begin Adventure
-        </button>
-      </div>
-      
-      <div className="random-option">
-        <p>Or let fate decide your destiny:</p>
-        <button 
-          className="random-button" 
-          onClick={handleRandomThemes}
-          disabled={isSubmitting}
-        >
-          Use Random Themes
-        </button>
-      </div>
+      {isSubmitting ? (
+        <div className="loading-state">
+          <h2>Generating Your Adventure</h2>
+          <p>Creating a world based on your chosen themes...</p>
+          {/* You could add a loading spinner or animation here */}
+        </div>
+      ) : (
+        <>
+          <h2>Choose Your Adventure Themes</h2>
+          
+          <div className="free-text-input">
+            <p>Enter up to 3 themes for your adventure (separated by commas):</p>
+            <textarea
+              value={freeTextThemes}
+              onChange={(e) => setFreeTextThemes(e.target.value)}
+              placeholder="e.g., ancient ruins, revenge, dragon"
+              rows={3}
+              disabled={isSubmitting}
+            />
+            <p className="hint">These themes will shape your adventure's story and encounters.</p>
+            
+            <button
+              className="start-button"
+              onClick={handleFreeTextSubmit}
+              disabled={!freeTextThemes.trim() || isSubmitting}
+            >
+              Begin Adventure
+            </button>
+          </div>
+          
+          <div className="random-option">
+            <p>Or let fate decide your destiny:</p>
+            <button
+              className="random-button"
+              onClick={handleRandomThemes}
+              disabled={isSubmitting}
+            >
+              Use Random Themes
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

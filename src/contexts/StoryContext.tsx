@@ -1,7 +1,8 @@
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { GraphData, Edge, StoryNode, ChoiceNode, isStoryNode, isChoiceNode, isValidStoryResponse, RollResult, Entity } from '../types';
-import { generateStoryNode, setSelectedThemes, setCurrentModel } from '../services/openRouterService';
+import { generateStoryNode, setSelectedThemes, setCurrentModel as setStoryModel } from '../services/openRouterService';
+import { setCurrentModel as setCharacterUpdateModel } from '../services/characterUpdateService';
 import { useModel } from './ModelContext';
 import { generateCharacterUpdates, CharacterUpdate } from '../services/characterUpdateService';
 import { useDice } from './DiceContext';
@@ -36,7 +37,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     currentStoryNode: null,
     isLoading: true,
     error: null,
-    isThemeSelectionMode: true // Start with theme selection mode active
+    isThemeSelectionMode: false // Theme selection is now handled in the GameSetupWizard
   });
 
   const loadStoryNode = async (nodeId: string) => {
@@ -205,7 +206,8 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Set the current model from the ModelContext
   useEffect(() => {
-    setCurrentModel(selectedModel);
+    setStoryModel(selectedModel);
+    setCharacterUpdateModel(selectedModel);
   }, [selectedModel]);
   
   // Helper function to format rules for story context
@@ -217,6 +219,8 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Function to handle theme selection
   const selectThemes = useCallback((themes: SelectedTheme[] | null) => {
+    console.log('StoryContext: Theme selection received', themes);
+    
     // Set the selected themes in the story generation service
     setSelectedThemes(themes);
     
@@ -230,12 +234,14 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // This function starts the actual game after themes are selected
   const startGameWithThemes = async (characterSheet: string) => {
     try {
+      console.log('StoryContext: Starting game with themes');
       const initialPrompt = 'Begin the story. Introduce the character to the world.';
       
       // Get NPCs and rules for story context
       const npcs = getNPCsForStoryContext();
       const rules = getEnabledRulesForStoryContext();
       
+      console.log('StoryContext: Generating initial story node');
       const newStoryData = await generateStoryNode(initialPrompt, {
         player: characterSheet,
         npcs: npcs.length > 0 ? npcs : undefined,
@@ -311,6 +317,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         type: 'smoothstep' as const
       }));
 
+      console.log('StoryContext: Story node generated successfully, updating state');
       setState({
         graphData: {
           nodes: [storyNode, ...choiceNodes],
@@ -330,12 +337,11 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const restartGame = async (characterSheet: string) => {
     try {
-      // Reset to theme selection mode
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
+      // Reset the game state
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
         error: null,
-        isThemeSelectionMode: true, // Show theme selection at the start
         graphData: { nodes: [], edges: [] }, // Clear the graph
         currentStoryNode: null // Clear current node
       }));

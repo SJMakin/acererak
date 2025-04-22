@@ -1,6 +1,7 @@
-import React, { createContext, useState, useCallback, useContext } from 'react';
+import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 import { generateCharacterSheet } from '../services/characterGenerator';
-import { generateAICharacterSheet, CharacterGenerationOptions } from '../services/aiCharacterGenerator';
+import { generateAICharacterSheet, CharacterGenerationOptions, setCurrentModel } from '../services/aiCharacterGenerator';
+import { useModel } from './ModelContext';
 import { findAndReplaceMarkdownText, dumpSheetAndSearchText } from '../services/markdownUtils';
 import { debugLog } from '../services/debugUtils';
 
@@ -26,6 +27,14 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     system: null,
     preferences: null
   });
+  
+  // Get the selected model from ModelContext
+  const { selectedModel } = useModel();
+  
+  // Set the current model for character generation
+  useEffect(() => {
+    setCurrentModel(selectedModel);
+  }, [selectedModel]);
 
   const updateCharacterSheet = useCallback(
     (updates: Array<{ oldText: string; newText: string; description?: string }>) => {

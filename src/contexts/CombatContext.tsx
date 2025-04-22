@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CombatSystem } from '../services/combatSystem';
 import { Entity, CombatState, CombatAction } from '../types';
-import { generateEnemyGroup } from '../services/entityGenerator';
+import { generateEnemyGroup, setCurrentModel as setEntityGeneratorModel } from '../services/entityGenerator';
 import { generateCharacterUpdates } from '../services/characterUpdateService';
-import { processCombatRound, CombatRoundResult } from '../services/combatNarrationService';
+import { processCombatRound, CombatRoundResult, setCurrentModel } from '../services/combatNarrationService';
+import { useModel } from './ModelContext';
 import { useCharacter } from './CharacterContext';
 import { markdownTextExists, findAndReplaceMarkdownText } from '../services/markdownUtils';
 import { debugLog } from '../services/debugUtils';
@@ -58,6 +59,15 @@ export const CombatProvider: React.FC<{ children: React.ReactNode }> = ({
   const { characterSheet, updateCharacterSheet } = useCharacter();
   const [combatSystem, setCombatSystem] = useState<CombatSystem | null>(null);
   const [combatResult, setCombatResult] = useState<'victory' | 'defeat' | null>(null);
+  
+  // Get the selected model from ModelContext
+  const { selectedModel } = useModel();
+  
+  // Set the current model for combat narration
+  useEffect(() => {
+    setCurrentModel(selectedModel);
+    setEntityGeneratorModel(selectedModel);
+  }, [selectedModel]);
 
   const initiateCombat = useCallback(
     async (params: {

@@ -22,16 +22,7 @@ const StoryDisplay: React.FC = () => {
     selectThemes,
   } = useGame();
 
-  // Show theme selector if in theme selection mode
-  if (isThemeSelectionMode) {
-    return (
-      <div className="story-display" style={containerStyle}>
-        <div style={{ padding: '20px' }}>
-          <ThemeSelector onThemesSelected={selectThemes} />
-        </div>
-      </div>
-    );
-  }
+  // Theme selection is now handled in the GameSetupWizard
 
   if (isLoading) {
     return (
