@@ -6,11 +6,14 @@ import SystemSelector from './SystemSelector';
 import GameTabs from './GameTabs';
 import ModelSelector from './ModelSelector';
 import GameSetupWizard from './GameSetupWizard';
+import ApiKeySettings from './ApiKeySettings';
 import { useGame } from '../contexts/GameContext';
+import { useApiKey } from '../contexts/ApiKeyContext';
 import './Layout.css';
 
 const Layout: React.FC = () => {
   const { gameMode, selectSystem } = useGame();
+  const { hasKey } = useApiKey();
   const [sizes, setSizes] = useState([60, 40]);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -37,7 +40,10 @@ const Layout: React.FC = () => {
     console.log('Layout: Rendering GameSetupWizard');
     return (
       <div className="game-layout">
-        <ModelSelector />
+        <div className="game-header">
+          <ModelSelector />
+          {!hasKey && <ApiKeySettings />}
+        </div>
         <GameSetupWizard />
       </div>
     );
@@ -47,7 +53,10 @@ const Layout: React.FC = () => {
   console.log('Layout: Rendering game content for mode:', gameMode);
   return (
     <div className="game-layout">
-      <ModelSelector />
+      <div className="game-header">
+        <ModelSelector />
+        {!hasKey && <ApiKeySettings />}
+      </div>
       <Split
         sizes={sizes}
         minSize={300}

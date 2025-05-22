@@ -35,3 +35,5 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+deploy.ps1
+deploy.sh

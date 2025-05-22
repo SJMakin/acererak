@@ -16,7 +16,13 @@
   margin-bottom: 12px;
 }
 
-.free-text-input {
+.theme-selector form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.theme-options {
   background: rgba(0, 0, 0, 0.5);
   padding: 10px;
   border-radius: 6px;
@@ -27,26 +33,45 @@
   scrollbar-color: #444 #252525;
 }
 
-.free-text-input::-webkit-scrollbar {
+.theme-options::-webkit-scrollbar {
   width: 8px;
 }
 
-.free-text-input::-webkit-scrollbar-track {
+.theme-options::-webkit-scrollbar-track {
   background: #252525;
 }
 
-.free-text-input::-webkit-scrollbar-thumb {
+.theme-options::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 4px;
   border: 2px solid #252525;
 }
 
-.free-text-input p {
-  margin-bottom: 6px;
-  font-size: 0.9em;
+.option {
+  margin-bottom: 12px;
+  text-align: left;
+  padding: 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
 }
 
-.free-text-input textarea {
+.option:last-child {
+  margin-bottom: 0;
+}
+
+.option input[type="radio"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.option label {
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.option textarea {
   width: 100%;
   background: rgba(255, 255, 255, 0.1);
   color: white;
@@ -54,17 +79,18 @@
   border-radius: 4px;
   padding: 8px;
   font-size: 0.9em;
+  margin-top: 8px;
   margin-bottom: 6px;
   resize: vertical;
 }
 
-.free-text-input textarea:focus {
+.option textarea:focus {
   outline: none;
   border-color: #ff4444;
   box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3);
 }
 
-.free-text-input textarea::placeholder {
+.option textarea::placeholder {
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -97,16 +123,7 @@
   cursor: not-allowed;
 }
 
-.random-option {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid #444;
-}
-
-.random-option p {
-  margin-bottom: 6px;
-  font-style: italic;
-}
+/* Remove the random option section as it's now integrated into the form */
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -119,18 +136,23 @@
     margin-bottom: 10px;
   }
   
-  .free-text-input {
+  .theme-options {
     padding: 8px;
     margin-bottom: 10px;
     max-height: 45vh;
   }
   
-  .free-text-input p {
-    margin-bottom: 5px;
-    font-size: 0.9em;
+  .option {
+    padding: 6px;
+    margin-bottom: 8px;
   }
   
-  .free-text-input textarea {
+  .option label {
+    font-size: 0.9em;
+    margin-bottom: 6px;
+  }
+  
+  .option textarea {
     padding: 6px;
     font-size: 0.9em;
   }
@@ -144,15 +166,6 @@
     padding: 6px 12px;
     font-size: 0.9em;
   }
-  
-  .random-option {
-    margin-top: 10px;
-    padding-top: 8px;
-  }
-  
-  .random-option p {
-    margin-bottom: 5px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -165,17 +178,23 @@
     margin-bottom: 8px;
   }
   
-  .free-text-input {
+  .theme-options {
     padding: 6px;
     margin-bottom: 8px;
     max-height: 40vh;
   }
   
-  .free-text-input p {
-    font-size: 0.85em;
+  .option {
+    padding: 5px;
+    margin-bottom: 6px;
   }
   
-  .free-text-input textarea {
+  .option label {
+    font-size: 0.85em;
+    margin-bottom: 5px;
+  }
+  
+  .option textarea {
     padding: 5px;
     font-size: 0.85em;
   }

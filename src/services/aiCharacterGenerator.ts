@@ -1,14 +1,25 @@
 import OpenAI from 'openai';
 import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
+// Get API key from localStorage
+const getApiKey = (): string => {
+  return localStorage.getItem('openRouterApiKey') || '';
+};
 
-// Use the OpenAI client with OpenRouter base URL
-const openRouter = new OpenAI({
-  apiKey: API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  dangerouslyAllowBrowser: true // Allow client to run in browser environment
-});
+// Create a function to get OpenAI client with current API key
+const getOpenRouterClient = (): OpenAI => {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is required. Please add your API key in settings.');
+  }
+  
+  return new OpenAI({
+    apiKey,
+    baseURL: 'https://openrouter.ai/api/v1',
+    dangerouslyAllowBrowser: true // Allow client to run in browser environment
+  });
+};
 
 // Store the current model for character generation
 let currentModel: ModelOption | null = null;
@@ -75,6 +86,7 @@ Format everything in clean, readable Markdown that will display well when render
 
     console.log('Character generation prompt:', prompt);
 
+    const openRouter = getOpenRouterClient();
     // Using the OpenAI client with OpenRouter
     const response = await openRouter.chat.completions.create({
       model: currentModel.id,

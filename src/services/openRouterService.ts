@@ -4,8 +4,6 @@ import { StoryGenerationResponse, isValidStoryResponse } from '../types';
 import { SelectedTheme } from '../components/ThemeSelector';
 import { ModelOption } from '../contexts/ModelContext';
 
-const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || 'missing-key';
-
 // Environments and other thematic categories
 const environments = ['desert', 'jungle', 'mountain', 'underwater', 'space', 'volcano', 'city', 'forest', 'underdark', 'abyss', 'hell', 'shadowfell', 'necropolis', 'void', 'astral-plane', 'blood-marsh', 'crystal-cavern', 'bone-wastes'];
 const emotions = ['revenge', 'love', 'greed', 'fear', 'pride', 'betrayal', 'hatred', 'madness', 'despair', 'ecstasy', 'paranoia', 'bloodlust'];
@@ -31,12 +29,25 @@ const categoryNames = {
   [factions.toString()]: 'Faction'
 };
 
-// Use the OpenAI client with OpenRouter base URL
-const openRouter = new OpenAI({
-  apiKey: API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  dangerouslyAllowBrowser: true // Allow client to run in browser environment
-});
+// Get API key from localStorage
+const getApiKey = (): string => {
+  return localStorage.getItem('openRouterApiKey') || '';
+};
+
+// Create a function to get OpenAI client with current API key
+const getOpenRouterClient = (): OpenAI => {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is required. Please add your API key in settings.');
+  }
+  
+  return new OpenAI({
+    apiKey,
+    baseURL: 'https://openrouter.ai/api/v1',
+    dangerouslyAllowBrowser: true // Allow client to run in browser environment
+  });
+};
 
 // Function to set user-selected themes
 export function setSelectedThemes(themes: SelectedTheme[] | null): void {
@@ -51,7 +62,13 @@ export function setCurrentModel(model: ModelOption): void {
   console.log(`Model set to: ${model.name} (${model.id})`);
 }
 
-async function generateStoryPlan(model: ModelOption): Promise<string> {
+// Export the generateStoryPlan function for use in other components
+export async function generateStoryPlan(model: ModelOption, customThemes: SelectedTheme[] | null = null): Promise<string> {
+  // Temporarily set themes for this generation if provided
+  const originalThemes = userSelectedThemes;
+  if (customThemes !== null) {
+    userSelectedThemes = customThemes;
+  }
   let selectedThemes: string[];
   
   if (userSelectedThemes) {
@@ -87,6 +104,7 @@ async function generateStoryPlan(model: ModelOption): Promise<string> {
   console.log('Story plan prompt:', prompt);
   
   try {
+    const openRouter = getOpenRouterClient();
     // Using the OpenAI client with OpenRouter
     const response = await openRouter.chat.completions.create({
       model: model.id,
@@ -103,8 +121,12 @@ async function generateStoryPlan(model: ModelOption): Promise<string> {
     // Extract the text from the response
     const storyText = response.choices[0].message.content || '';
     console.log('Story plan response:', storyText);
+    // Restore original themes
+    userSelectedThemes = originalThemes;
     return storyText;
   } catch (error) {
+    // Restore original themes even if there's an error
+    userSelectedThemes = originalThemes;
     console.error('Failed to generate story plan:', error);
     return 'Failed to generate a story plan. Please try again.';
   }
@@ -192,6 +214,7 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
     console.log('Story node prompt:', prompt);
 
     try {
+      const openRouter = getOpenRouterClient();
       // Using the OpenAI client with OpenRouter
       const response = await openRouter.chat.completions.create({
         model: currentModel.id,

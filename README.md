@@ -10,7 +10,7 @@ Acererak transforms the D&D storytelling experience by combining the power of AI
 
 ## Features
 
-- 🧙‍♂️ AI-powered Dungeon Master using Google's Gemini
+- 🧙‍♂️ AI-powered Dungeon Master using OpenRouter AI models
 - 📊 Dynamic graph visualization of story progression
 - 🌳 Branching narrative paths based on player choices
 - 🎭 Rich story generation with D&D theming
@@ -32,18 +32,31 @@ cd acererak
 npm install
 ```
 
-3. Configure your AI:
-   Create a `.env` file in the root directory:
-
-```env
-VITE_GEMINI_KEY=your_gemini_api_key
-```
-
-4. Start your adventure:
+3. Start your adventure:
 
 ```bash
 npm run dev
 ```
+
+## API Keys
+
+Acererak now uses OpenRouter for AI capabilities. Users need to:
+
+1. Create an account at [OpenRouter](https://openrouter.ai/)
+2. Generate an API key from the [OpenRouter Keys page](https://openrouter.ai/keys)
+
+The app will prompt users to enter their API key, which will be securely stored in their browser's local storage.
+
+### Why OpenRouter?
+
+OpenRouter provides access to multiple AI models, offering:
+- Higher quality storytelling
+- More consistent responses
+- Support for structured output
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on how to deploy Acererak on a VPS with nginx.
 
 ## Project Architecture
 
