@@ -8,11 +8,11 @@ describe('Dice Service', () => {
       const roll: DiceRoll = {
         type: 'd20',
         count: 1,
-        description: 'Test roll'
+        description: 'Test roll',
       };
-      
+
       const result = performRoll(roll);
-      
+
       expect(result.roll).toBe(roll);
       expect(result.results).toHaveLength(1);
       expect(result.results[0]).toBeGreaterThanOrEqual(1);
@@ -24,17 +24,19 @@ describe('Dice Service', () => {
       const roll: DiceRoll = {
         type: 'd6',
         count: 3,
-        description: 'Multiple dice'
+        description: 'Multiple dice',
       };
-      
+
       const result = performRoll(roll);
-      
+
       expect(result.results).toHaveLength(3);
       result.results.forEach(value => {
         expect(value).toBeGreaterThanOrEqual(1);
         expect(value).toBeLessThanOrEqual(6);
       });
-      expect(result.total).toBe(result.results.reduce((sum, val) => sum + val, 0));
+      expect(result.total).toBe(
+        result.results.reduce((sum, val) => sum + val, 0)
+      );
     });
 
     it('should apply modifiers correctly', () => {
@@ -42,11 +44,11 @@ describe('Dice Service', () => {
         type: 'd20',
         count: 1,
         modifier: 5,
-        description: 'Roll with modifier'
+        description: 'Roll with modifier',
       };
-      
+
       const result = performRoll(roll);
-      
+
       expect(result.total).toBe(result.results[0] + 5);
     });
 
@@ -56,11 +58,11 @@ describe('Dice Service', () => {
         count: 1,
         modifier: 5,
         difficulty: 15,
-        description: 'Skill check'
+        description: 'Skill check',
       };
-      
+
       const result = performRoll(roll);
-      
+
       expect(result.success).toBeDefined();
       expect(result.success).toBe(result.total >= 15);
     });
@@ -72,32 +74,34 @@ describe('Dice Service', () => {
         {
           type: 'd20',
           count: 1,
-          description: 'Attack roll'
+          description: 'Attack roll',
         },
         {
           type: 'd6',
           count: 2,
           modifier: 3,
-          description: 'Damage roll'
-        }
+          description: 'Damage roll',
+        },
       ];
-      
+
       const results = performRolls(rolls);
-      
+
       expect(results).toHaveLength(2);
-      
+
       // Attack roll checks
       expect(results[0].results).toHaveLength(1);
       expect(results[0].results[0]).toBeGreaterThanOrEqual(1);
       expect(results[0].results[0]).toBeLessThanOrEqual(20);
-      
+
       // Damage roll checks
       expect(results[1].results).toHaveLength(2);
       results[1].results.forEach(value => {
         expect(value).toBeGreaterThanOrEqual(1);
         expect(value).toBeLessThanOrEqual(6);
       });
-      expect(results[1].total).toBe(results[1].results.reduce((sum, val) => sum + val, 0) + 3);
+      expect(results[1].total).toBe(
+        results[1].results.reduce((sum, val) => sum + val, 0) + 3
+      );
     });
   });
 });

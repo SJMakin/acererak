@@ -3,7 +3,15 @@ import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import * as CANNON from 'cannon';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { DiceManager, DiceD20, DiceD4, DiceD6, DiceD8, DiceD10, DiceD12 } from '../services/dice-lib.js';
+import {
+  DiceManager,
+  DiceD20,
+  DiceD4,
+  DiceD6,
+  DiceD8,
+  DiceD10,
+  DiceD12,
+} from '../services/dice-lib.js';
 import { RollResult, DiceGeometryType } from '../types';
 
 interface DiceAnimationProps {
@@ -11,7 +19,10 @@ interface DiceAnimationProps {
   onAnimationComplete?: () => void;
 }
 
-const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete }) => {
+const DiceAnimation: React.FC<DiceAnimationProps> = ({
+  roll,
+  onAnimationComplete,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene>(null!);
   const cameraRef = useRef<THREE.PerspectiveCamera>(null!);
@@ -42,10 +53,10 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     cameraRef.current = camera;
 
     // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ 
+    const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
-      premultipliedAlpha: false
+      premultipliedAlpha: false,
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
@@ -82,11 +93,11 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     // Floor
     // Invisible floor for physics only
     const floorGeometry = new THREE.PlaneGeometry(30, 30, 1, 1);
-    const floorMaterial = new THREE.MeshStandardMaterial({ 
+    const floorMaterial = new THREE.MeshStandardMaterial({
       transparent: true,
       opacity: 0.1,
       roughness: 0.7,
-      metalness: 0.1
+      metalness: 0.1,
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
@@ -105,9 +116,12 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     const floorBody = new CANNON.Body({
       mass: 0,
       shape: new CANNON.Plane(),
-      material: DiceManager.floorBodyMaterial
+      material: DiceManager.floorBodyMaterial,
     });
-    floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+    floorBody.quaternion.setFromAxisAngle(
+      new CANNON.Vec3(1, 0, 0),
+      -Math.PI / 2
+    );
     world.addBody(floorBody);
 
     // Create and throw dice
@@ -115,12 +129,53 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
     for (let i = 0; i < roll.results.length; i++) {
       let die;
       switch (roll.roll.type) {
-        case 'd4': die = new DiceD4({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 4; break;
-        case 'd6': die = new DiceD6({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 6; break;
-        case 'd8': die = new DiceD8({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 8; break;
-        case 'd10': die = new DiceD10({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 10; break;
-        case 'd12': die = new DiceD12({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 12; break;
-        default: die = new DiceD20({ size: 2.5, fontColor: '#ffffff', backColor: '#5d0000' }) as any; die.values = 20;
+        case 'd4':
+          die = new DiceD4({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 4;
+          break;
+        case 'd6':
+          die = new DiceD6({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 6;
+          break;
+        case 'd8':
+          die = new DiceD8({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 8;
+          break;
+        case 'd10':
+          die = new DiceD10({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 10;
+          break;
+        case 'd12':
+          die = new DiceD12({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 12;
+          break;
+        default:
+          die = new DiceD20({
+            size: 2.5,
+            fontColor: '#ffffff',
+            backColor: '#5d0000',
+          }) as any;
+          die.values = 20;
       }
 
       const diceObject = die.getObject() as THREE.Mesh & { body: CANNON.Body };
@@ -132,8 +187,8 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
       diceObject.position.x = -15 - (i % 3) * 1.5;
       diceObject.position.y = 2 + Math.floor(i / 3) * 1.5;
       diceObject.position.z = -15 + (i % 3) * 1.5;
-      diceObject.quaternion.x = (Math.random() * 90 - 45) * Math.PI / 180;
-      diceObject.quaternion.z = (Math.random() * 90 - 45) * Math.PI / 180;
+      diceObject.quaternion.x = ((Math.random() * 90 - 45) * Math.PI) / 180;
+      diceObject.quaternion.z = ((Math.random() * 90 - 45) * Math.PI) / 180;
       die.updateBodyFromMesh();
 
       const yRand = Math.random() * 20;
@@ -169,7 +224,7 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
           if (onAnimationComplete) {
             onAnimationComplete();
           }
-        }, 3000);  // Increased from 1000ms to 3000ms to give more time to read dice
+        }, 3000); // Increased from 1000ms to 3000ms to give more time to read dice
         return;
       }
 
@@ -191,35 +246,43 @@ const DiceAnimation: React.FC<DiceAnimationProps> = ({ roll, onAnimationComplete
   }, [roll]);
 
   return (
-    <div 
-      ref={containerRef} 
-      style={{ 
-        width: '100%', 
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
         height: '100%',
         position: 'relative',
         backgroundColor: 'transparent',
-        pointerEvents: 'none'
-      }} 
+        pointerEvents: 'none',
+      }}
     />
   );
 };
 
 // Debug function to test dice rolls from console
-export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1, predeterminedResults?: number[]) => {
+export const testRoll = (
+  diceType: DiceGeometryType = 'd20',
+  count: number = 1,
+  predeterminedResults?: number[]
+) => {
   const roll: RollResult = {
     roll: {
       type: diceType,
       count: count,
       description: `Rolling ${count}${diceType}`,
-      modifier: 0
+      modifier: 0,
     },
-    results: predeterminedResults || Array(count).fill(0).map(() => Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1),
+    results:
+      predeterminedResults ||
+      Array(count)
+        .fill(0)
+        .map(() => Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1),
     total: 0,
-    formatted: ''
+    formatted: '',
   };
   roll.total = roll.results.reduce((a, b) => a + b, 0);
   roll.formatted = `${roll.roll.description}: [${roll.results.join(', ')}] = ${roll.total}`;
-  
+
   let container = document.getElementById('dice-animation-container');
   if (!container) {
     container = document.createElement('div');
@@ -237,14 +300,14 @@ export const testRoll = (diceType: DiceGeometryType = 'd20', count: number = 1, 
 
   const root = createRoot(container);
   root.render(
-    <DiceAnimation 
-      roll={roll} 
+    <DiceAnimation
+      roll={roll}
       onAnimationComplete={() => {
         setTimeout(() => {
           root.unmount();
           container?.remove();
-        }, 4000);  // Increased from 2000ms to 4000ms to give more time to read dice
-      }} 
+        }, 4000); // Increased from 2000ms to 4000ms to give more time to read dice
+      }}
     />
   );
 };

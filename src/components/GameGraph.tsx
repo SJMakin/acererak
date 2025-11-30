@@ -139,7 +139,7 @@ const GameGraph: React.FC = () => {
   }, [nodes, currentStoryNode]);
 
   return (
-    <div style={{ width: '100%', height: '700px' }}>
+    <div style={{ width: '100%', height: '100%', minHeight: '500px' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -1,0 +1,76 @@
+.adventure-themes h3 {
+  color: #f92672; /* Pink accent */
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 400;
+  text-align: center;
+}
+
+.adventure-themes .theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.adventure-themes .option {
+  padding: 12px;
+  background: #272822; /* Darker background */
+  border: 1px solid #75715e; /* Gray border */
+  display: flex;
+  flex-direction: column; /* Stack radio group and input group */
+  align-items: flex-start; /* Align items to the start */
+}
+
+.adventure-themes .radio-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px; /* Space between radio group and input group */
+}
+
+.adventure-themes .radio-group input[type="radio"] {
+  margin-right: 6px;
+  cursor: pointer;
+}
+
+.adventure-themes .option label {
+  font-weight: 400;
+  cursor: pointer;
+  /* Removed display: block; to allow inline alignment */
+  margin-bottom: 0; /* Remove bottom margin as it's now inline */
+  font-size: 0.95rem;
+  color: #f8f8f2;
+}
+
+.adventure-themes .input-group {
+  width: 100%; /* Ensure it takes full width */
+}
+
+.adventure-themes .input-group textarea {
+  width: 100%;
+  background: #272822;
+  color: #f8f8f2;
+  border: 1px solid #75715e;
+  padding: 12px;
+  font-size: 0.95rem;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+  margin-bottom: 8px;
+}
+
+.adventure-themes textarea:focus {
+  outline: none;
+  border-color: #a6e22e;
+}
+
+.adventure-themes textarea::placeholder {
+  color: #75715e;
+}
+
+.adventure-themes .hint {
+  color: #75715e;
+  font-size: 0.85rem;
+  margin-top: 6px;
+  line-height: 1.3;
+}

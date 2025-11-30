@@ -42,15 +42,15 @@ declare module 'cannon' {
 
   export class Shape {}
   export class Plane extends Shape {}
-  
+
   export class Material {
     constructor(options?: any);
   }
-  
+
   export class ContactMaterial {
     constructor(m1: Material, m2: Material, options: any);
   }
-  
+
   export class NaiveBroadphase {}
 
   export const BODY_TYPES: {

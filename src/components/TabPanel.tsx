@@ -10,33 +10,35 @@ interface TabPanelProps {
 }
 
 const TabPanel: React.FC<TabPanelProps> = ({ className = '' }) => {
-  const [activeTab, setActiveTab] = useState<'story' | 'character' | 'npcs' | 'rules'>('story');
-  
+  const [activeTab, setActiveTab] = useState<
+    'story' | 'character' | 'npcs' | 'rules'
+  >('story');
+
   return (
     <div className={`tab-panel ${className}`}>
       <div className="tab-buttons">
-        <button 
+        <button
           className={`tab-button ${activeTab === 'story' ? 'active' : ''}`}
           onClick={() => setActiveTab('story')}
           aria-label="Story tab"
         >
           Story
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'character' ? 'active' : ''}`}
           onClick={() => setActiveTab('character')}
           aria-label="Character sheet tab"
         >
           Character
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'npcs' ? 'active' : ''}`}
           onClick={() => setActiveTab('npcs')}
           aria-label="NPCs tab"
         >
           NPCs
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'rules' ? 'active' : ''}`}
           onClick={() => setActiveTab('rules')}
           aria-label="Custom rules tab"
@@ -44,7 +46,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ className = '' }) => {
           Rules
         </button>
       </div>
-      
+
       <div className="tab-content">
         {activeTab === 'story' && <StoryDisplay />}
         {activeTab === 'character' && <CharacterSheet />}

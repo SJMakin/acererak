@@ -11,6 +11,15 @@ const rollDie = (sides: number): number => {
 export const performRoll = (roll: DiceRoll): RollResult => {
   const sides = getDiceSides(roll.type);
   const results: number[] = [];
+  
+  console.log('performRoll:', {
+    description: roll.description,
+    type: roll.type,
+    count: roll.count,
+    modifier: roll.modifier,
+    difficulty: roll.difficulty,
+    sides
+  });
 
   // Perform the dice rolls
   for (let i = 0; i < roll.count; i++) {

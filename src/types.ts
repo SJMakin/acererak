@@ -1,3 +1,8 @@
+export interface SelectedTheme {
+  category: string;
+  theme: string;
+}
+
 export interface StoryNode {
   id: string;
   type: 'story';
@@ -7,6 +12,8 @@ export interface StoryNode {
   data: { label: string };
   characterUpdateDescription?: string; // Description of character sheet changes
   rollResults?: RollResult[]; // Results of dice rolls that led to this node
+  imageUrl?: string; // URL to generated image for this story node
+  fillerContent?: string; // Quick content to display while main story is loading
 }
 
 export interface DiceRoll {
@@ -27,11 +34,7 @@ export interface ChoiceNode {
   position: { x: number; y: number };
   data: { label: string };
   requiredRolls?: DiceRoll[]; // Array of dice rolls required for this choice
-  combatData?: {
-    enemies: string[];
-    difficulty: 'easy' | 'medium' | 'hard';
-    environment?: string;
-  };
+  combatData?: CombatData; // Combat data for combat choices
 }
 
 export type Node = StoryNode | ChoiceNode;
@@ -135,7 +138,14 @@ export interface Dice3DAnimationState {
   angularVelocity: { x: number; y: number; z: number };
 }
 
-export type DiceGeometryType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
+export type DiceGeometryType =
+  | 'd4'
+  | 'd6'
+  | 'd8'
+  | 'd10'
+  | 'd12'
+  | 'd20'
+  | 'd100';
 
 export interface Entity {
   id: string;
@@ -143,24 +153,10 @@ export interface Entity {
   sheet: string; // Markdown format
 }
 
-export interface CombatState {
-  active: boolean;
-  participants: Entity[];
-  initiative: Array<{
-    entity: Entity;
-    score: number;
-  }>;
-  currentTurn: number;
-  round: number;
-  log: CombatAction[];
-}
-
-export interface CombatAction {
-  actor: Entity;
-  type: 'attack' | 'spell' | 'ability' | 'item';
-  target: Entity;
-  roll: RollResult;
-  description: string;
+export interface CombatData {
+  enemies: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  environment?: string;
 }
 
 export interface StoryGenerationResponse {
@@ -173,11 +169,7 @@ export interface StoryGenerationResponse {
     nextNodeId: string;
     requiredRolls?: DiceRoll[];
     type: 'story' | 'combat';
-    combatData?: {
-      enemies: string[];
-      difficulty: 'easy' | 'medium' | 'hard';
-      environment?: string;
-    };
+    combatData?: CombatData;
   }>;
   characterUpdates?: Array<{
     oldText: string;

@@ -28,7 +28,7 @@ const ApiKeySettings: React.FC = () => {
         <input
           type={isVisible ? 'text' : 'password'}
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={e => setInputValue(e.target.value)}
           placeholder="Enter your OpenRouter API key"
         />
         <button
@@ -49,7 +49,11 @@ const ApiKeySettings: React.FC = () => {
       </div>
       <div className="api-key-info">
         <p>
-          <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">
+          <a
+            href="https://openrouter.ai/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Get an OpenRouter API key
           </a>
         </p>

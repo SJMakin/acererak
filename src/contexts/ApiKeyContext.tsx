@@ -8,9 +8,28 @@ interface ApiKeyContextType {
 
 const ApiKeyContext = createContext<ApiKeyContextType | undefined>(undefined);
 
-export const ApiKeyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ApiKeyProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem('openRouterApiKey') || '';
+    // 1) Prefer key stored in localStorage (set via Settings UI)
+    try {
+      const stored = localStorage.getItem('openRouterApiKey');
+      if (stored && stored.length > 0) {
+        return stored;
+      }
+    } catch {
+      // Ignore storage errors (e.g. SSR, disabled storage)
+    }
+
+    // 2) Fall back to Vite environment variable (for local/dev testing)
+    // This is expected to be defined in a gitignored .env.local file:
+    // VITE_OPENROUTER_API_KEY=sk-...
+    const envKey =
+      ((import.meta as any).env?.VITE_OPENROUTER_API_KEY as string | undefined) ||
+      '';
+
+    return envKey;
   });
 
   const hasKey = apiKey.length > 0;

@@ -1,35 +1,29 @@
 /* Main container */
 .model-selector {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  z-index: 100;
-  width: 250px;
+  width: 100%;
   font-size: 14px;
-  color: #fff;
+  color: #f8f8f2;
 }
 
 /* Current model display - the button that shows when dropdown is closed */
 .model-current {
-  background-color: rgba(20, 20, 20, 0.8);
-  border: 1px solid #444;
-  border-radius: 4px;
-  padding: 6px 10px;
+  background-color: #272822;
+  border: 1px solid #75715e;
+  padding: 12px 16px;
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  transition: background-color 0.2s;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
 .model-current:hover {
-  background-color: rgba(40, 40, 40, 0.9);
-  border-color: #666;
+  background-color: #3e3d32;
+  border-color: #a6e22e;
 }
 
 .model-current-name {
@@ -84,16 +78,13 @@
 .model-dropdown {
   position: absolute;
   top: 100%;
-  right: 0;
+  left: 0;
   width: 100%;
-  max-width: 300px;
-  background-color: #222;
-  border: 1px solid #444;
-  border-radius: 4px;
-  margin-top: 5px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  z-index: 10000;
-  max-height: 500px;
+  background-color: #272822;
+  border: 1px solid #75715e;
+  margin-top: 4px;
+  z-index: 1000;
+  max-height: 400px;
   display: flex;
   flex-direction: column;
 }
@@ -108,17 +99,16 @@
 
 .model-search {
   flex: 1;
-  background-color: #333;
-  border: 1px solid #444;
-  border-radius: 3px;
-  padding: 6px 8px;
-  color: white;
+  background-color: #1e1e1e;
+  border: 1px solid #75715e;
+  padding: 8px 12px;
+  color: #f8f8f2;
   font-size: 13px;
 }
 
 .model-search:focus {
   outline: none;
-  border-color: #6e56cf;
+  border-color: #a6e22e;
 }
 
 .model-filters {
@@ -127,19 +117,19 @@
 
 .filter-toggle {
   background: none;
-  border: 1px solid #444;
-  border-radius: 3px;
+  border: 1px solid #75715e;
   padding: 0 8px;
-  height: 28px;
+  height: 32px;
   cursor: pointer;
-  color: #ccc;
+  color: #f8f8f2;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .filter-toggle:hover {
-  background-color: #333;
+  background-color: #3e3d32;
+  border-color: #a6e22e;
 }
 
 .filter-options {

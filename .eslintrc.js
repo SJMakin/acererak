@@ -18,7 +18,7 @@ module.exports = {
     ecmaVersion: 'latest',
     sourceType: 'module',
   },
-  plugins: ['react', '@typescript-eslint', 'react-hooks'],
+  plugins: ['react', '@typescript-eslint', 'react-hooks', 'unused-imports'],
   settings: {
     react: {
       version: 'detect',
@@ -29,5 +29,12 @@ module.exports = {
     'react/prop-types': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
+    'no-unused-vars': 'error',
+    '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_' }],
+    'unused-imports/no-unused-imports': 'error',
+    'unused-imports/no-unused-vars': [
+      'error',
+      { 'vars': 'all', 'varsIgnorePattern': '^_', 'args': 'after-used', 'argsIgnorePattern': '^_' }
+    ],
   },
 };

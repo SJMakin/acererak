@@ -1,11 +1,8 @@
 .game-layout {
-  height: calc(100vh - 40px);
-  margin: 20px;
+  height: 100vh;
+  margin: 0;
   overflow: hidden;
-  position: relative;
   background-color: #1e1e1e;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
 }
@@ -23,8 +20,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px;
-  border-bottom: 1px solid #333;
+  padding: 16px;
+  background-color: #272822;
 }
 
 .split-layout {
@@ -68,15 +65,14 @@
   border-left: 1px solid #333;
 }
 
-/* Combat mode styles */
-.combat-display {
+.main-content-full {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: #1a1a1a;
-  border-color: #444;
-  box-shadow: 0 0 20px rgba(255, 68, 68, 0.2);
+  width: 100%;
+  overflow: hidden;
+  background-color: #1e1e1e;
+  flex: 1;
 }
+
 
 /* Mode transition animations */
 .main-content > *,
@@ -95,36 +91,9 @@
   }
 }
 
-/* Responsive adjustments */
-@media (max-width: 1200px) {
-  .game-layout {
-    height: auto;
-    min-height: calc(100vh - 40px);
-  }
-  
-  .split-layout {
-    flex-direction: column;
-  }
-  
-  .gutter.gutter-horizontal {
-    height: 10px;
-    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFAQMAAABo7865AAAABlBMVEVHcEzMzMzyAv2sAAAAAXRSTlMAQObYZgAAABBJREFUeF5jOAMEEAIEEFwAn3kMwcB6I2AAAAAASUVORK5CYII=');
-    cursor: row-resize;
-  }
-  
-  .main-content,
-  .graph-panel {
-    width: 100% !important;
-    height: 50vh;
-  }
-  
-  .main-content {
-    border-radius: 8px 8px 0 0;
-  }
-  
-  .graph-panel {
-    border-radius: 0 0 8px 8px;
-    border-left: none;
-    border-top: 1px solid #333;
+/* Clean responsive design */
+@media (max-width: 768px) {
+  .game-header {
+    padding: 12px;
   }
 }

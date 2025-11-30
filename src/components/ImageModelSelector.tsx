@@ -11,13 +11,12 @@ const truncateText = (text: string, maxLength: number): string => {
   return text.substring(0, maxLength) + '...';
 };
 
-const ModelSelector: React.FC = () => {
-  const { selectedModel, modelOptions, setSelectedModel, isLoading } =
+const ImageModelSelector: React.FC = () => {
+  const { selectedImageModel, imageModelOptions, setSelectedImageModel, isLoading } =
     useModel();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
-  const [showJsonOnly, setShowJsonOnly] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
 
@@ -25,23 +24,19 @@ const ModelSelector: React.FC = () => {
   const toggleDropdown = () => setShowDropdown(!showDropdown);
   const toggleFilters = () => setShowFilters(!showFilters);
   const toggleFreeOnly = () => setShowFreeOnly(!showFreeOnly);
-  const toggleJsonOnly = () => setShowJsonOnly(!showJsonOnly);
 
   // Handle model selection
   const selectModel = (model: ModelOption) => {
-    setSelectedModel(model);
+    setSelectedImageModel(model);
     setShowDropdown(false);
   };
 
   // Filter models based on search and filter options
   const filteredModels = React.useMemo(() => {
-    // Apply core filters (json and free)
     return (
-      modelOptions
+      imageModelOptions
         .filter(
           model =>
-            // Always apply JSON filter if enabled
-            (!showJsonOnly || model.supportsJson) &&
             // Apply free filter if enabled
             (!showFreeOnly || model.isFree) &&
             // Apply search filter if text is entered
@@ -52,7 +47,7 @@ const ModelSelector: React.FC = () => {
         // Sort by release rank (newest first)
         .sort((a, b) => b.releaseRank - a.releaseRank)
     );
-  }, [modelOptions, showFreeOnly, showJsonOnly, searchText]);
+  }, [imageModelOptions, showFreeOnly, searchText]);
 
   // Handle description expansion/collapse
   const toggleDescription = (modelId: string) => {
@@ -62,7 +57,7 @@ const ModelSelector: React.FC = () => {
   // Close dropdown when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const selector = document.querySelector('.model-selector');
+      const selector = document.querySelector('.image-model-selector');
       if (selector && !selector.contains(event.target as Node)) {
         setShowDropdown(false);
       }
@@ -72,20 +67,46 @@ const ModelSelector: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Show message if no image models available yet
+  if (imageModelOptions.length === 0 && !isLoading) {
+    return (
+      <div className="model-selector image-model-selector">
+        <div className="model-info-message">
+          <p>No image generation models available.</p>
+          <p style={{ fontSize: '0.9em', opacity: 0.7 }}>
+            Image models will appear here once loaded from OpenRouter.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state if no model selected yet
+  if (!selectedImageModel) {
+    return (
+      <div className="model-selector image-model-selector">
+        <div className="model-info-message">
+          {isLoading ? (
+            <p>Loading image models...</p>
+          ) : (
+            <p>Selecting default image model...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="model-selector">
+    <div className="model-selector image-model-selector">
       {/* Current model display/dropdown toggle */}
       <div
         className="model-current"
         onClick={toggleDropdown}
-        title={`Current model: ${selectedModel.name}`}
+        title={`Current image model: ${selectedImageModel.name}`}
       >
         <div className="model-current-name">
-          {selectedModel.name}
-          {selectedModel.supportsJson && (
-            <span className="model-feature model-feature-json">JSON</span>
-          )}
-          {selectedModel.isFree && (
+          {selectedImageModel.name}
+          {selectedImageModel.isFree && (
             <span className="model-feature model-feature-free">FREE</span>
           )}
         </div>
@@ -93,10 +114,10 @@ const ModelSelector: React.FC = () => {
       </div>
 
       {/* Selected model description */}
-      {selectedModel.description && !showDropdown && (
+      {selectedImageModel.description && !showDropdown && (
         <div className="model-description">
           <span className="model-description-text">
-            {truncateText(selectedModel.description, 120)}
+            {truncateText(selectedImageModel.description, 120)}
           </span>
         </div>
       )}
@@ -109,7 +130,7 @@ const ModelSelector: React.FC = () => {
             <input
               type="text"
               className="model-search"
-              placeholder="Search models..."
+              placeholder="Search image models..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
             />
@@ -133,14 +154,6 @@ const ModelSelector: React.FC = () => {
                     />
                     <span>Free models only</span>
                   </label>
-                  <label className="filter-option">
-                    <input
-                      type="checkbox"
-                      checked={showJsonOnly}
-                      onChange={toggleJsonOnly}
-                    />
-                    <span>JSON support only</span>
-                  </label>
                 </div>
               )}
             </div>
@@ -149,14 +162,14 @@ const ModelSelector: React.FC = () => {
           {/* Models list */}
           <div className="model-list">
             {isLoading ? (
-              <div className="model-loading">Loading models...</div>
+              <div className="model-loading">Loading image models...</div>
             ) : filteredModels.length === 0 ? (
-              <div className="model-no-results">No models found</div>
+              <div className="model-no-results">No image models found</div>
             ) : (
               filteredModels.map(model => (
                 <div
                   key={model.id}
-                  className={`model-item ${selectedModel.id === model.id ? 'selected' : ''}`}
+                  className={`model-item ${selectedImageModel.id === model.id ? 'selected' : ''}`}
                 >
                   <div
                     className="model-item-header"
@@ -166,11 +179,6 @@ const ModelSelector: React.FC = () => {
                       <span className="provider-name">{model.provider}</span>
                       <span className="model-name">{model.name}</span>
                       <div className="model-badges">
-                        {model.supportsJson && (
-                          <span className="model-feature model-feature-json">
-                            JSON
-                          </span>
-                        )}
                         {model.isFree && (
                           <span className="model-feature model-feature-free">
                             FREE
@@ -215,4 +223,4 @@ const ModelSelector: React.FC = () => {
   );
 };
 
-export default ModelSelector;
+export default ImageModelSelector;

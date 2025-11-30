@@ -1,13 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { StoryProvider, useStory } from './StoryContext';
 import { DiceProvider, useDice } from './DiceContext';
 import { CharacterProvider, useCharacter } from './CharacterContext';
-import { CombatProvider, useCombat } from './CombatContext';
 import { NPCProvider, useNPCs } from './NPCContext';
 import { RulesProvider, useRules } from './RulesContext';
-import { SelectedTheme } from '../components/ThemeSelector';
+import { SelectedTheme } from '../types';
 
-export type GameMode = 'setup' | 'system-select' | 'story' | 'combat';
+export type GameMode = 'setup' | 'system-select' | 'story';
 
 // Create a context for the game mode
 const GameModeContext = React.createContext<{
@@ -15,36 +14,34 @@ const GameModeContext = React.createContext<{
   setGameMode: (mode: GameMode) => void;
 }>({
   gameMode: 'setup',
-  setGameMode: () => {}
+  setGameMode: () => {},
 });
 
-export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [gameMode, setGameMode] = useState<GameMode>('setup');
 
   return (
     <GameModeContext.Provider value={{ gameMode, setGameMode }}>
       <CharacterProvider>
         <DiceProvider>
-          <CombatProvider>
-            <NPCProvider>
-              <RulesProvider>
-                <StoryProvider>
-                  <GameCoordinator>{children}</GameCoordinator>
-                </StoryProvider>
-              </RulesProvider>
-            </NPCProvider>
-          </CombatProvider>
+          <NPCProvider>
+            <RulesProvider>
+              <StoryProvider>
+                <GameCoordinator>{children}</GameCoordinator>
+              </StoryProvider>
+            </RulesProvider>
+          </NPCProvider>
         </DiceProvider>
       </CharacterProvider>
     </GameModeContext.Provider>
   );
 };
 
-const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { restartGame } = useStory();
-  const { characterSheet, isGenerating } = useCharacter();
-  const { isActive: isCombatActive } = useCombat();
-  const { gameMode, setGameMode } = React.useContext(GameModeContext);
+const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const initialLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -54,13 +51,6 @@ const GameCoordinator: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, []);
 
-  // Update game mode based on combat state
-  useEffect(() => {
-    if (gameMode !== 'system-select' && gameMode !== 'setup') {
-      setGameMode(isCombatActive ? 'combat' : 'story');
-    }
-  }, [isCombatActive, gameMode, setGameMode]);
-
   return <>{children}</>;
 };
 
@@ -69,146 +59,109 @@ export const useGame = () => {
   const story = useStory();
   const dice = useDice();
   const character = useCharacter();
-  const combat = useCombat();
   const npc = useNPCs();
   const rules = useRules();
-  
+
   // Log when character sheet changes in useGame
   useEffect(() => {
     console.log('GameContext detected character sheet change');
   }, [character.characterSheet]);
 
-  useEffect(() => {
-    // If we're not in setup or system selection mode, update based on combat state
-    if (gameMode !== 'system-select' && gameMode !== 'setup') {
-      setGameMode(combat.isActive ? 'combat' : 'story');
-    }
-    
-    // Check if combat just ended and we need to resume the story
-    if (!combat.isActive) {
-      const combatResult = localStorage.getItem('combatResult');
-      const pendingChoiceId = localStorage.getItem('pendingChoiceAfterCombat');
-      
-      if (combatResult && pendingChoiceId) {
-        // Only proceed with the story if combat ended in victory
-        if (combatResult === 'victory') {
-          story.chooseOption(pendingChoiceId, character.characterSheet);
-        }
-        
-        // Clear the stored values
-        localStorage.removeItem('combatResult');
-        localStorage.removeItem('pendingChoiceAfterCombat');
-      }
-    }
-  }, [combat.isActive, story, character.characterSheet]);
-
   const chooseOption = async (choiceNodeId: string) => {
-    const choice = story.graphData.nodes.find((node: any) => node.id === choiceNodeId);
+    const choice = story.graphData.nodes.find(
+      (node: any) => node.id === choiceNodeId
+    );
     if (!choice || choice.type !== 'choice') return;
 
-    // If this is a combat choice, initiate combat and pause story progression
-    if (choice.choiceType === 'combat' && choice.combatData) {
-      await combat.initiateCombat(choice.combatData);
-      // Store the choice ID to resume story after combat ends
-      localStorage.setItem('pendingChoiceAfterCombat', choiceNodeId);
-      return; // Don't proceed with story generation during combat
-    }
-
-    // Only proceed with the story choice if not in combat
-    if (!combat.isActive) {
-      return story.chooseOption(choiceNodeId, character.characterSheet);
-    }
+    // Only proceed with the story choice
+    return story.chooseOption(choiceNodeId, character.characterSheet);
   };
 
   // Function to handle system selection in the setup wizard
-  const selectSystem = async (system: string, preferences?: string) => {
+  const selectSystem = async (
+    system: string,
+    preferences?: string
+  ): Promise<string | undefined> => {
     try {
-      // Generate character using AI
-      await character.generateCharacter({ system, preferences });
-      
+      // Generate character using AI and get the character sheet
+      const generatedCharacterSheet = await character.generateCharacter({
+        system,
+        preferences,
+      });
+
       // In the new flow, we stay in setup mode until the entire setup is complete
       // The UI will show the next step (theme selection) within the wizard
+      return generatedCharacterSheet;
     } catch (error) {
       console.error('Error selecting system:', error);
+      return undefined;
     }
   };
 
   // Function to complete the setup process and start the game
-  const completeSetup = (themes: SelectedTheme[] | null) => {
-    // Select themes for the story
-    story.selectThemes(themes);
-    
-    // Move to story mode to start the game
-    setGameMode('story');
-    
-    // Log the transition for debugging
-    console.log('Completing setup and transitioning to story mode', themes);
-  };
+  const completeSetup = useCallback(
+    (themes: SelectedTheme[] | null, characterSheet?: string) => {
+      // Use the provided character sheet or fall back to the context state
+      const finalCharacterSheet = characterSheet || character.characterSheet;
+
+      // Select themes for the story, passing the character sheet
+      story.selectThemes(themes, finalCharacterSheet);
+
+      // Move to story mode to start the game
+      setGameMode('story');
+    },
+    [character.characterSheet, setGameMode, story]
+  );
 
   return {
     // Game state
     gameMode,
     setGameMode,
-    
+
     // Setup and system selection
     selectSystem,
     completeSetup,
     isGeneratingCharacter: character.isGenerating,
-    
+
     // Story state and functions
     graphData: story.graphData,
     currentStoryNode: story.currentStoryNode,
     isLoading: story.isLoading || character.isGenerating,
     error: story.error,
-    isThemeSelectionMode: story.isThemeSelectionMode,
     selectThemes: story.selectThemes,
     loadStoryNode: story.loadStoryNode,
     chooseOption,
     resetError: story.resetError,
     restartGame: () => {
-      setGameMode('setup'); // Go back to setup wizard
+      // Reset character first, get the empty state, then restart story
+      // This avoids the race condition where characterSheet is read before reset
       character.resetCharacter();
-      combat.endCombat();
-      return story.restartGame(character.characterSheet);
+      setGameMode('setup'); // Go back to setup wizard
+      return story.restartGame(''); // Pass empty string since character is reset
     },
 
     // Character state and functions
     characterSheet: character.characterSheet,
     updateCharacterSheet: character.updateCharacterSheet,
 
-    // Combat state and functions
-    isCombatActive: combat.isActive,
-    combatState: combat.combatState,
-    currentCombatEntity: combat.currentEntity,
-    combatLog: combat.combatLog,
-    executeAction: combat.executeAction,
-    nextTurn: combat.nextTurn,
-    endCombat: combat.endCombat,
-    narrativeDescription: combat.narrativeDescription,
-    processingRound: combat.processingRound,
-    pendingUpdates: combat.pendingUpdates,
-    applyUpdate: combat.applyUpdate,
-    skipUpdate: combat.skipUpdate,
-    processRound: combat.processRound,
-
     // Dice state and functions
     currentRollResult: dice.currentRollResult,
     showDiceAnimation: dice.showDiceAnimation,
     performDiceRoll: dice.performDiceRoll,
-    
+
     // NPC state and functions
     npcs: npc.npcs,
     addNPC: npc.addNPC,
     updateNPC: npc.updateNPC,
     deleteNPC: npc.deleteNPC,
     getNPCsForStoryContext: npc.getNPCsForStoryContext,
-    
+
     // Rules state and functions
     rules: rules.rules,
     addRule: rules.addRule,
     updateRule: rules.updateRule,
     deleteRule: rules.deleteRule,
     toggleRule: rules.toggleRule,
-    getEnabledRulesForStoryContext: rules.getEnabledRulesForStoryContext
+    getEnabledRulesForStoryContext: rules.getEnabledRulesForStoryContext,
   };
 };

@@ -1,26 +1,10 @@
-import * as THREE from 'three';
+// Module augmentation placeholder for 'three' types.
+// No additional properties are currently added.
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+// Module augmentation placeholder for 'three' types.
+// No additional properties are currently added.
 
 declare module 'three' {
-  interface Scene {
-    new(): Scene;
-  }
-  
-  interface AmbientLight {
-    new(color?: THREE.ColorRepresentation, intensity?: number): AmbientLight;
-  }
-  
-  interface SpotLight {
-    new(color?: THREE.ColorRepresentation, intensity?: number): SpotLight;
-  }
-  
-  interface PlaneGeometry {
-    new(width?: number, height?: number, widthSegments?: number, heightSegments?: number): PlaneGeometry;
-  }
-  
-  interface Mesh<
-    TGeometry extends THREE.BufferGeometry = THREE.BufferGeometry,
-    TMaterial extends THREE.Material | THREE.Material[] = THREE.Material | THREE.Material[]
-  > {
-    new(geometry?: TGeometry, material?: TMaterial): Mesh<TGeometry, TMaterial>;
-  }
+  // Intentionally left empty for future augmentation.
 }

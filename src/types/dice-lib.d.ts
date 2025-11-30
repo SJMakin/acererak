@@ -3,8 +3,8 @@ declare module '../services/dice-lib.js' {
   import * as CANNON from 'cannon';
 
   export class DiceManager {
-    static setWorld(world: CANNON.World): void;
-    static prepareValues(values: Array<{dice: DiceObject, value: number}>): void;
+    static setWorld(): void;
+    static prepareValues(): void;
     static floorBodyMaterial: CANNON.Material;
   }
 
@@ -22,7 +22,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD4 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;
@@ -31,7 +31,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD6 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;
@@ -40,7 +40,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD8 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;
@@ -49,7 +49,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD10 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;
@@ -58,7 +58,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD12 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;
@@ -67,7 +67,7 @@ declare module '../services/dice-lib.js' {
   }
 
   export class DiceD20 implements DiceObject {
-    constructor(options: DiceOptions);
+    constructor();
     getObject(): THREE.Mesh;
     resetBody(): void;
     updateBodyFromMesh(): void;

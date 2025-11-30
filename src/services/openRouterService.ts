@@ -1,23 +1,137 @@
-import { type OpenRouterProviderSettings } from '@openrouter/ai-sdk-provider';
-import OpenAI from 'openai';
-import { StoryGenerationResponse, isValidStoryResponse } from '../types';
-import { SelectedTheme } from '../components/ThemeSelector';
+import {
+  StoryGenerationResponse,
+  isValidStoryResponse,
+  SelectedTheme,
+} from '../types';
 import { ModelOption } from '../contexts/ModelContext';
+import {
+  getOpenRouterClient,
+  stripMarkdownCodeBlock,
+  getCurrentModel,
+} from './openRouterClient';
+import {
+  generateImage,
+  createImagePromptFromStory,
+} from './imageGenerationService';
 
 // Environments and other thematic categories
-const environments = ['desert', 'jungle', 'mountain', 'underwater', 'space', 'volcano', 'city', 'forest', 'underdark', 'abyss', 'hell', 'shadowfell', 'necropolis', 'void', 'astral-plane', 'blood-marsh', 'crystal-cavern', 'bone-wastes'];
-const emotions = ['revenge', 'love', 'greed', 'fear', 'pride', 'betrayal', 'hatred', 'madness', 'despair', 'ecstasy', 'paranoia', 'bloodlust'];
-const objects = ['crystal', 'sword', 'book', 'crown', 'portal', 'artifact', 'phylactery', 'grimoire', 'relic', 'altar', 'throne', 'sacrifice-dagger', 'soul-gem', 'demon-chain', 'void-shard'];
-const concepts = ['time', 'death', 'life', 'chaos', 'order', 'magic', 'corruption', 'sacrifice', 'destiny', 'damnation', 'ascension', 'immortality', 'torment', 'transformation'];
-const creatures = ['dragon', 'demon', 'angel', 'undead', 'elemental', 'beast', 'lich', 'mindflayer', 'aboleth', 'elder-brain', 'nightwalker', 'death-knight', 'vampire-lord', 'pit-fiend'];
-const rituals = ['blood-sacrifice', 'soul-binding', 'flesh-warping', 'mind-breaking', 'void-calling', 'demon-pact', 'lichdom', 'ascension'];
-const factions = ['cult', 'cabal', 'inquisition', 'dark-council', 'blood-court', 'shadow-conclave', 'void-seekers', 'flesh-shapers'];
+const environments = [
+  'desert',
+  'jungle',
+  'mountain',
+  'underwater',
+  'space',
+  'volcano',
+  'city',
+  'forest',
+  'underdark',
+  'abyss',
+  'hell',
+  'shadowfell',
+  'necropolis',
+  'void',
+  'astral-plane',
+  'blood-marsh',
+  'crystal-cavern',
+  'bone-wastes',
+];
+const emotions = [
+  'revenge',
+  'love',
+  'greed',
+  'fear',
+  'pride',
+  'betrayal',
+  'hatred',
+  'madness',
+  'despair',
+  'ecstasy',
+  'paranoia',
+  'bloodlust',
+];
+const objects = [
+  'crystal',
+  'sword',
+  'book',
+  'crown',
+  'portal',
+  'artifact',
+  'phylactery',
+  'grimoire',
+  'relic',
+  'altar',
+  'throne',
+  'sacrifice-dagger',
+  'soul-gem',
+  'demon-chain',
+  'void-shard',
+];
+const concepts = [
+  'time',
+  'death',
+  'life',
+  'chaos',
+  'order',
+  'magic',
+  'corruption',
+  'sacrifice',
+  'destiny',
+  'damnation',
+  'ascension',
+  'immortality',
+  'torment',
+  'transformation',
+];
+const creatures = [
+  'dragon',
+  'demon',
+  'angel',
+  'undead',
+  'elemental',
+  'beast',
+  'lich',
+  'mindflayer',
+  'aboleth',
+  'elder-brain',
+  'nightwalker',
+  'death-knight',
+  'vampire-lord',
+  'pit-fiend',
+];
+const rituals = [
+  'blood-sacrifice',
+  'soul-binding',
+  'flesh-warping',
+  'mind-breaking',
+  'void-calling',
+  'demon-pact',
+  'lichdom',
+  'ascension',
+];
+const factions = [
+  'cult',
+  'cabal',
+  'inquisition',
+  'dark-council',
+  'blood-court',
+  'shadow-conclave',
+  'void-seekers',
+  'flesh-shapers',
+];
 
-const themeCategories = [environments, emotions, objects, concepts, creatures, rituals, factions];
+const themeCategories = [
+  environments,
+  emotions,
+  objects,
+  concepts,
+  creatures,
+  rituals,
+  factions,
+];
 
 let storyPlan: string | null = null;
 let userSelectedThemes: SelectedTheme[] | null = null;
-let currentModel: ModelOption | null = null;
+let imageGenerationEnabled: boolean = true; // Default to enabled
 
 const categoryNames = {
   [environments.toString()]: 'Environment',
@@ -26,27 +140,7 @@ const categoryNames = {
   [concepts.toString()]: 'Concept',
   [creatures.toString()]: 'Creature',
   [rituals.toString()]: 'Ritual',
-  [factions.toString()]: 'Faction'
-};
-
-// Get API key from localStorage
-const getApiKey = (): string => {
-  return localStorage.getItem('openRouterApiKey') || '';
-};
-
-// Create a function to get OpenAI client with current API key
-const getOpenRouterClient = (): OpenAI => {
-  const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is required. Please add your API key in settings.');
-  }
-  
-  return new OpenAI({
-    apiKey,
-    baseURL: 'https://openrouter.ai/api/v1',
-    dangerouslyAllowBrowser: true // Allow client to run in browser environment
-  });
+  [factions.toString()]: 'Faction',
 };
 
 // Function to set user-selected themes
@@ -56,25 +150,109 @@ export function setSelectedThemes(themes: SelectedTheme[] | null): void {
   storyPlan = null;
 }
 
-// Function to set the current model
-export function setCurrentModel(model: ModelOption): void {
-  currentModel = model;
-  console.log(`Model set to: ${model.name} (${model.id})`);
+// Function to enable/disable image generation
+export function setImageGenerationEnabled(enabled: boolean): void {
+  imageGenerationEnabled = enabled;
+}
+
+export function isImageGenerationEnabled(): boolean {
+  return imageGenerationEnabled;
+}
+
+/**
+ * Generate quick "filler" content to display while the main story is being generated
+ * Uses a fast, lightweight prompt to keep the player engaged during wait times
+ */
+export async function generateFillerContent(
+  context: string,
+  type: 'thoughts' | 'omen' | 'flavor' = 'thoughts'
+): Promise<string> {
+  const currentModel = getCurrentModel();
+
+  let prompt = '';
+  
+  switch (type) {
+    case 'thoughts':
+      prompt = `Based on this context: ${context.slice(0, 200)}
+      
+Generate a brief (2-3 sentences) internal monologue from the player character's perspective. Make it visceral, immediate, and reflective of their current situation. No formatting, just raw thought.`;
+      break;
+    case 'omen':
+      prompt = `Based on this context: ${context.slice(0, 200)}
+      
+Generate a brief (1-2 sentences) cryptic omen or prophetic hint about what's to come. Make it mysterious and unsettling. No formatting, just the omen.`;
+      break;
+    case 'flavor':
+      prompt = `Based on this context: ${context.slice(0, 200)}
+      
+Generate a brief (2-3 sentences) sensory detail about the environment. Focus on sounds, smells, textures, or background activity. Make it atmospheric and dark. No formatting, just description.`;
+      break;
+  }
+
+  try {
+    const openRouter = getOpenRouterClient();
+    const response = await openRouter.chat.completions.create({
+      model: currentModel.id,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.9,
+      max_tokens: 150, // Keep it short for speed
+    });
+
+    const fillerText = response.choices[0].message.content || '';
+    console.log('Generated filler content:', fillerText);
+    return fillerText;
+  } catch (error) {
+    console.error('Failed to generate filler content:', error);
+    // Return a generic fallback
+    return 'The tension builds as events unfold...';
+  }
+}
+
+/**
+ * Generate an image for a story node
+ * Returns the image URL or undefined if generation fails or is disabled
+ */
+export async function generateStoryImage(
+  storyContent: string,
+  storySummary?: string
+): Promise<string | undefined> {
+  if (!imageGenerationEnabled) {
+    console.log('Image generation is disabled');
+    return undefined;
+  }
+
+  try {
+    const imagePrompt = createImagePromptFromStory(storyContent, storySummary);
+    const imageUrl = await generateImage(imagePrompt);
+    return imageUrl;
+  } catch (error) {
+    console.error('Failed to generate story image:', error);
+    // Don't throw - just return undefined so the story can continue without an image
+    return undefined;
+  }
 }
 
 // Export the generateStoryPlan function for use in other components
-export async function generateStoryPlan(model: ModelOption, customThemes: SelectedTheme[] | null = null): Promise<string> {
+export async function generateStoryPlan(
+  model: ModelOption,
+  customThemes: SelectedTheme[] | null = null
+): Promise<string> {
   // Temporarily set themes for this generation if provided
   const originalThemes = userSelectedThemes;
   if (customThemes !== null) {
     userSelectedThemes = customThemes;
   }
   let selectedThemes: string[];
-  
+
   if (userSelectedThemes) {
     // Use user-selected themes
     selectedThemes = userSelectedThemes.map(theme => theme.theme);
-    
+
     if (userSelectedThemes[0].category === 'Custom') {
       console.log('Using custom free-text themes:', selectedThemes);
     } else {
@@ -85,7 +263,7 @@ export async function generateStoryPlan(model: ModelOption, customThemes: Select
     const selectedCategories = themeCategories
       .sort(() => Math.random() - 0.5)
       .slice(0, 3);
-      
+
     selectedThemes = selectedCategories.map(category => {
       const word = category[Math.floor(Math.random() * category.length)];
       return word;
@@ -94,15 +272,15 @@ export async function generateStoryPlan(model: ModelOption, customThemes: Select
     console.log('Using random story themes:', {
       themes: selectedThemes.map((word, i) => ({
         theme: word,
-        category: categoryNames[selectedCategories[i].toString()] || 'Unknown'
-      }))
+        category: categoryNames[selectedCategories[i].toString()] || 'Unknown',
+      })),
     });
   }
-  
-  const prompt = `Create a brief D&D campaign outline using these themes: ${selectedThemes.join(', ')}. Include a main conflict with some idea of how to end the game, key locations, and potential major events. Keep it under 300 words.`;
-  
+
+  const prompt = `Dark one-shot campaign. Themes: ${selectedThemes.join(', ')}. Give me conflict, ending, locations, major beats. Under 200 words. Make it VISCERAL.`;
+
   console.log('Story plan prompt:', prompt);
-  
+
   try {
     const openRouter = getOpenRouterClient();
     // Using the OpenAI client with OpenRouter
@@ -111,11 +289,11 @@ export async function generateStoryPlan(model: ModelOption, customThemes: Select
       messages: [
         {
           role: 'user',
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       temperature: 0.8,
-      top_p: 0.95
+      top_p: 0.95,
     });
 
     // Extract the text from the response
@@ -134,82 +312,46 @@ export async function generateStoryPlan(model: ModelOption, customThemes: Select
 
 export async function generateStoryNode(
   context: string,
-  entities: { player: string; npcs?: string[]; enemies?: string[]; customRules?: string[] }
-): Promise<StoryGenerationResponse> {
-  if (!currentModel) {
-    throw new Error('Model not set - please set a model before generating story');
+  entities: {
+    player: string;
+    npcs?: string[];
+    enemies?: string[];
+    customRules?: string[];
   }
+): Promise<StoryGenerationResponse> {
+  const currentModel = getCurrentModel();
 
   if (!storyPlan) {
     storyPlan = await generateStoryPlan(currentModel);
   }
 
   try {
-    const systemMessage = `You are a creative dungeon master - Acererak the twisted - crafting an RPG adventure. You will respond with a valid JSON object that includes a story section with content and summary fields, and a choices array with options for the player.`;
+    const systemMessage = `You are Acererak - chaos incarnate, death's architect. Weave dark fantasy nightmares. Respond ONLY in valid JSON: story object (content, summary), choices array.`;
 
-    const prompt = `Current Player Character:
-${entities.player}
+    const prompt = `PC: ${entities.player}
+${entities.npcs ? `\nNPCs: ${entities.npcs.join(', ')}` : ''}
+${entities.enemies ? `\nEnemies: ${entities.enemies.join(', ')}` : ''}
+${entities.customRules ? `\nRules: ${entities.customRules.join('; ')}` : ''}
 
-${entities.npcs ? `NPCs in Scene:\n${entities.npcs.join('\n')}` : ''}
+PLAN: ${storyPlan}
+CONTEXT: ${context}
 
-${entities.enemies ? `Enemies in Scene:\n${entities.enemies.join('\n')}` : ''}
-
-${entities.customRules ? `Custom Rules:\n${entities.customRules.join('\n')}` : ''}
-
-Story Plan:
-${storyPlan}
-
-Current Context:
-${context}
-
-Follow the story plan loosely. Use the current context to generate the next story segment and 2-5 possible choices.
-
-Ensure the story includes fantasy elements and RPG-appropriate descriptions. Make each choice distinct and maintain consistency with previous events. 
-
-For choices that require skill checks, combat rolls, or other chance-based outcomes, include requiredRolls in your response. Each roll should specify:
-- type: 'd4', 'd6', 'd8', 'd10', 'd12', 'd20', or 'd100'
-- count: number of dice to roll
-- modifier: bonus/penalty to add (optional)
-- difficulty: DC for skill checks (optional)
-- skill: relevant skill being checked (optional)
-- description: what this roll represents
-
-When generating choices, indicate if a choice will initiate combat by setting its type to 'combat' and including combatData with:
-- enemies: array of enemy types to spawn
-- difficulty: 'easy', 'medium', or 'hard'
-- environment: optional combat arena description
-
-Your response MUST be a valid JSON object with this structure:
+Generate next beat + 2-5 brutal choices. JSON format:
 {
-  "story": {
-    "content": "detailed story text here",
-    "summary": "brief summary here"
-  },
-  "choices": [
-    {
-      "text": "Option text here",
-      "nextNodeId": "unique-id-here",
-      "type": "story or combat or other type",
-      "requiredRolls": [
-        {
-          "type": "d20",
-          "count": 1,
-          "modifier": 0,
-          "difficulty": 15,
-          "skill": "Perception",
-          "description": "Spot hidden danger"
-        }
-      ],
-      "combatData": {
-        "enemies": ["Enemy Type 1", "Enemy Type 2"],
-        "difficulty": "medium",
-        "environment": "environment description"
-      }
-    }
-  ]
+  "story": {"content": "vivid scene", "summary": "tight beat"},
+  "choices": [{
+    "text": "choice",
+    "nextNodeId": "id",
+    "type": "story/combat",
+    "requiredRolls": [{"type": "d20", "count": 1, "modifier": 0, "difficulty": 15, "skill": "Skill", "description": "what"}],
+    "combatData": {"enemies": ["type"], "difficulty": "easy/medium/hard", "environment": "arena"}
+  }]
 }
 
-Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND film together, targeted at someone that likes all sorts of cool weird stuff.`;
+requiredRolls: d4/d6/d8/d10/d12/d20/d100, count, modifier, difficulty, skill, description
+Combat choices: type='combat', include combatData
+
+WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visceral. Weird. Dark. No mercy.`;
 
     console.log('Story node prompt:', prompt);
 
@@ -220,30 +362,19 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
         model: currentModel.id,
         messages: [
           { role: 'system', content: systemMessage },
-          { role: 'user', content: prompt }
+          { role: 'user', content: prompt },
         ],
         temperature: 0.8,
         top_p: 0.95,
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
       });
 
       // Extract the text from the response
       const jsonContent = response.choices[0].message.content || '';
       console.log('Story node raw response:', jsonContent);
-      
+
       // Try to parse the JSON, handling potential markdown code blocks
-      let processedContent = jsonContent;
-      
-      // Check if response is wrapped in markdown code block
-      if (processedContent.startsWith('```') && processedContent.includes('```')) {
-        // Extract content between first ``` and last ```
-        const startIndex = processedContent.indexOf('\n') + 1;
-        const endIndex = processedContent.lastIndexOf('```');
-        if (startIndex > 0 && endIndex > startIndex) {
-          processedContent = processedContent.substring(startIndex, endIndex).trim();
-        }
-      }
-      
+      const processedContent = stripMarkdownCodeBlock(jsonContent);
       const parsedContent = JSON.parse(processedContent);
 
       if (!isValidStoryResponse(parsedContent)) {
@@ -257,7 +388,9 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
         },
         choices: parsedContent.choices.map(choice => ({
           text: choice.text.trim(),
-          nextNodeId: choice.nextNodeId || `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          nextNodeId:
+            choice.nextNodeId ||
+            `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: choice.type || 'story',
           requiredRolls: choice.requiredRolls || [],
           combatData: choice.type === 'combat' ? choice.combatData : undefined,
@@ -268,8 +401,10 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
       if (cleanedResponse.choices.some(c => c.text.length < 10)) {
         throw new Error('Choice text too short (minimum 10 characters)');
       }
-      
-      const choiceTexts = new Set(cleanedResponse.choices.map(c => c.text.toLowerCase()));
+
+      const choiceTexts = new Set(
+        cleanedResponse.choices.map(c => c.text.toLowerCase())
+      );
       if (choiceTexts.size !== cleanedResponse.choices.length) {
         throw new Error('Duplicate choices detected');
       }
@@ -282,7 +417,10 @@ Make the story mad like Quentin Tarantino + Michael Bay made a heavy fantasy DND
       throw error;
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error during story generation';
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unknown error during story generation';
     console.error('Story generation failed:', message);
     throw new Error(message);
   }

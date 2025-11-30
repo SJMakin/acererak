@@ -6,6 +6,7 @@ export { NPCProvider, useNPCs } from './NPCContext';
 export { RulesProvider, useRules } from './RulesContext';
 export { ModelProvider, useModel } from './ModelContext';
 export { ApiKeyProvider, useApiKey } from './ApiKeyContext';
+export { TTSProvider, useTTS } from './TTSContext';
 
 // Re-export types that components might need
 export type { StoryState, StoryContextProps } from './StoryContext';

@@ -1,0 +1,38 @@
+.settings-panel {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  background: var(--background-color, #fff);
+}
+
+.settings-section h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  color: var(--text-color, #333);
+  border-bottom: 1px solid var(--border-color, #eee);
+  padding-bottom: 10px;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .settings-section {
+    background: var(--background-color, #2a2a2a);
+    border-color: var(--border-color, #444);
+  }
+  
+  .settings-section h2 {
+    color: var(--text-color, #fff);
+    border-bottom-color: var(--border-color, #555);
+  }
+}
