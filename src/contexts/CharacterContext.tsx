@@ -8,11 +8,7 @@ import React, {
 
 import type { CharacterGenerationOptions } from '../services/aiCharacterGenerator';
 import { generateAICharacterSheet } from '../services/aiCharacterGenerator';
-import { debugLog } from '../services/debugUtils';
-import {
-  findAndReplaceMarkdownText,
-  dumpSheetAndSearchText,
-} from '../services/markdownUtils';
+import { findAndReplaceMarkdownText } from '../services/markdownUtils';
 import { setCurrentModel } from '../services/openRouterClient';
 
 import { useModel } from './ModelContext';
@@ -61,51 +57,23 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
       setState(prev => {
         let newSheet = prev.characterSheet;
         updates.forEach(update => {
-          debugLog(
-            'CHARACTER_CONTEXT',
-            'Attempting to update character sheet',
-            {
-              oldText: update.oldText,
-              newText: update.newText,
-              description: update.description,
-            }
-          );
-
           // Use markdown-aware text replacement
           const result = findAndReplaceMarkdownText(
             newSheet,
             update.oldText,
-            update.newText,
-            'character-sheet'
+            update.newText
           );
           if (result.found) {
             newSheet = result.text;
             console.log(
               `Character sheet updated: ${update.description || 'No description'}`
             );
-            debugLog(
-              'CHARACTER_CONTEXT',
-              'Character sheet updated successfully',
-              {
-                description: update.description,
-              }
-            );
           } else {
             console.warn(
               `Failed to update character sheet: oldText "${update.oldText}" not found`
             );
-            debugLog('CHARACTER_CONTEXT', 'Failed to update character sheet', {
-              oldText: update.oldText,
-              reason: 'Text not found in character sheet',
-            });
           }
         });
-        // Dump the final character sheet for debugging
-        dumpSheetAndSearchText(
-          newSheet,
-          'final-character-sheet',
-          'character-sheet-after-updates'
-        );
         return { ...prev, characterSheet: newSheet };
       });
     },
