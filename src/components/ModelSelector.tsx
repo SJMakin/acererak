@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useModel, ModelOption } from '../contexts/ModelContext';
+
+import type { ModelOption } from '../contexts/ModelContext';
+import { useModel } from '../contexts/ModelContext';
 import './ModelSelector.css';
 
 // Maximum description length before truncating

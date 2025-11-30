@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { SelectedTheme } from '../types';
+import ReactMarkdown from 'react-markdown';
+
+import { useApiKey } from '../contexts/ApiKeyContext';
+import { useModel } from '../contexts/ModelContext';
 import { generateAICharacterSheet } from '../services/aiCharacterGenerator';
 import { generateStoryPlan } from '../services/openRouterService';
-import { useModel } from '../contexts/ModelContext';
-import { useApiKey } from '../contexts/ApiKeyContext';
-import ReactMarkdown from 'react-markdown';
+import type { SelectedTheme } from '../types';
+
+import AdventureThemes from './AdventureThemes';
+import CharacterPreferences from './CharacterPreferences';
 import Settings from './Settings';
 import SystemSelector from './SystemSelector';
-import CharacterPreferences from './CharacterPreferences';
-import AdventureThemes from './AdventureThemes';
 import './GameSetupTabs.css';
 
 interface GameSetupTabsProps {
@@ -34,16 +36,20 @@ interface PreviewState {
 
 const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
   const { hasKey } = useApiKey();
-  
+
   const [activeTab, setActiveTab] = useState<
     'system' | 'character' | 'themes' | 'preview' | 'settings'
   >(hasKey ? 'system' : 'settings');
 
   // Preview sub-tab state
-  const [activePreviewTab, setActivePreviewTab] = useState<'character' | 'story'>('character');
+  const [activePreviewTab, setActivePreviewTab] = useState<
+    'character' | 'story'
+  >('character');
 
   const [customSystem, setCustomSystem] = useState<string>('');
-  const [selectedPredefined, setSelectedPredefined] = useState<string | null>(null);
+  const [selectedPredefined, setSelectedPredefined] = useState<string | null>(
+    null
+  );
   const [characterPreferences, setCharacterPreferences] = useState<string>('');
 
   const [freeTextThemes, setFreeTextThemes] = useState<string>('');
@@ -159,19 +165,20 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
     if (!system.trim()) return;
 
     // Generate both previews in parallel
-    await Promise.all([
-      generateCharacterPreview(),
-      generateStoryPlanPreview(),
-    ]);
+    await Promise.all([generateCharacterPreview(), generateStoryPlanPreview()]);
   };
 
-  const isGeneratingAny = previewState.character.isLoading || previewState.storyPlan.isLoading;
-  const hasAnyPreview = previewState.character.content || previewState.storyPlan.content;
+  const isGeneratingAny =
+    previewState.character.isLoading || previewState.storyPlan.isLoading;
+  const hasAnyPreview =
+    previewState.character.content || previewState.storyPlan.content;
 
   const handleSubmit = () => {
     // Validate API key before proceeding
     if (!hasKey) {
-      alert('Please add your OpenRouter API key in the Settings tab before starting the adventure.');
+      alert(
+        'Please add your OpenRouter API key in the Settings tab before starting the adventure.'
+      );
       setActiveTab('settings');
       return;
     }
@@ -370,9 +377,13 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                         <button
                           className="preview-regenerate-button"
                           onClick={generateCharacterPreview}
-                          disabled={previewState.character.isLoading || !canProceed()}
+                          disabled={
+                            previewState.character.isLoading || !canProceed()
+                          }
                         >
-                          {previewState.character.isLoading ? 'Generating...' : 'Regenerate'}
+                          {previewState.character.isLoading
+                            ? 'Generating...'
+                            : 'Regenerate'}
                         </button>
                       </div>
                       <div className="preview-section-content">
@@ -392,7 +403,9 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                           </div>
                         ) : (
                           <div className="preview-empty">
-                            <p>Click "Generate Previews" to see your character.</p>
+                            <p>
+                              Click "Generate Previews" to see your character.
+                            </p>
                           </div>
                         )}
                       </div>
@@ -408,7 +421,9 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                           onClick={generateStoryPlanPreview}
                           disabled={previewState.storyPlan.isLoading}
                         >
-                          {previewState.storyPlan.isLoading ? 'Generating...' : 'Regenerate'}
+                          {previewState.storyPlan.isLoading
+                            ? 'Generating...'
+                            : 'Regenerate'}
                         </button>
                       </div>
                       <div className="preview-section-content">
@@ -428,7 +443,10 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                           </div>
                         ) : (
                           <div className="preview-empty">
-                            <p>Click "Generate Previews" to see your adventure plan.</p>
+                            <p>
+                              Click "Generate Previews" to see your adventure
+                              plan.
+                            </p>
                           </div>
                         )}
                       </div>
@@ -449,7 +467,11 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                     className="start-button"
                     onClick={handleSubmit}
                     disabled={!canProceed()}
-                    title={!hasKey ? 'API key required - please add in Settings tab' : ''}
+                    title={
+                      !hasKey
+                        ? 'API key required - please add in Settings tab'
+                        : ''
+                    }
                   >
                     Begin Adventure
                   </button>
@@ -462,16 +484,19 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
             <div className="setup-tab-content">
               <div className="setup-section">
                 {!hasKey && (
-                  <div style={{
-                    padding: '1rem',
-                    marginBottom: '1rem',
-                    backgroundColor: '#ff9800',
-                    color: 'white',
-                    borderRadius: '4px'
-                  }}>
+                  <div
+                    style={{
+                      padding: '1rem',
+                      marginBottom: '1rem',
+                      backgroundColor: '#ff9800',
+                      color: 'white',
+                      borderRadius: '4px',
+                    }}
+                  >
                     <strong>⚠️ API Key Required</strong>
                     <p style={{ margin: '0.5rem 0 0 0' }}>
-                      Please add your OpenRouter API key below to start your adventure.
+                      Please add your OpenRouter API key below to start your
+                      adventure.
                     </p>
                   </div>
                 )}
@@ -479,7 +504,8 @@ const GameSetupTabs: React.FC<GameSetupTabsProps> = ({ onSetupComplete }) => {
                 {!hasKey && (
                   <div className="tab-navigation" style={{ marginTop: '2rem' }}>
                     <p style={{ textAlign: 'center', color: '#999' }}>
-                      After adding your API key, navigate to the System tab to begin setup.
+                      After adding your API key, navigate to the System tab to
+                      begin setup.
                     </p>
                   </div>
                 )}

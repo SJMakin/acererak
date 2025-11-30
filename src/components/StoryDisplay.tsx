@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { useGame } from '../contexts/GameContext';
 import { useTTS } from '../contexts/TTSContext';
 import { isStoryNode, isChoiceNode } from '../types';
@@ -37,8 +38,9 @@ const StoryDisplay: React.FC = () => {
   }
 
   if (error) {
-    const isApiKeyError = error.includes('API key') || error.includes('api key');
-    
+    const isApiKeyError =
+      error.includes('API key') || error.includes('api key');
+
     return (
       <div
         className="story-display"
@@ -48,18 +50,21 @@ const StoryDisplay: React.FC = () => {
           textAlign: 'center',
         }}
       >
-        <div style={{
-          backgroundColor: '#ff4444',
-          color: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          marginBottom: '20px'
-        }}>
+        <div
+          style={{
+            backgroundColor: '#ff4444',
+            color: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            marginBottom: '20px',
+          }}
+        >
           <h3 style={{ margin: '0 0 10px 0' }}>Error</h3>
           <p style={{ margin: '0 0 15px 0' }}>{error}</p>
           {isApiKeyError && (
             <p style={{ fontSize: '0.9em', opacity: 0.9, margin: '0' }}>
-              💡 Make sure you've added your OpenRouter API key in the Settings tab before starting a new adventure.
+              💡 Make sure you've added your OpenRouter API key in the Settings
+              tab before starting a new adventure.
             </p>
           )}
         </div>
@@ -227,7 +232,9 @@ const StoryDisplay: React.FC = () => {
             fontStyle: 'italic',
           }}
         >
-          <div style={{ fontSize: '0.9em', color: '#b0b0b0', marginBottom: '5px' }}>
+          <div
+            style={{ fontSize: '0.9em', color: '#b0b0b0', marginBottom: '5px' }}
+          >
             💭 Meanwhile...
           </div>
           <div style={{ color: '#d0d0d0' }}>
@@ -332,7 +339,16 @@ const StoryDisplay: React.FC = () => {
 };
 
 const TTSControls: React.FC<{ storyContent: string }> = ({ storyContent }) => {
-  const { speak, pause, resume, stop, isSpeaking, isPaused, isSupported, settings } = useTTS();
+  const {
+    speak,
+    pause,
+    resume,
+    stop,
+    isSpeaking,
+    isPaused,
+    isSupported,
+    settings,
+  } = useTTS();
 
   if (!isSupported || !settings.enabled) {
     return null;
@@ -372,14 +388,20 @@ const TTSControls: React.FC<{ storyContent: string }> = ({ storyContent }) => {
           alignItems: 'center',
           gap: '6px',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = isSpeaking || isPaused ? '#b0b8e0' : '#7c3aed';
+        onMouseEnter={e => {
+          e.currentTarget.style.backgroundColor =
+            isSpeaking || isPaused ? '#b0b8e0' : '#7c3aed';
         }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = isSpeaking || isPaused ? '#9fa8da' : '#6366f1';
+        onMouseLeave={e => {
+          e.currentTarget.style.backgroundColor =
+            isSpeaking || isPaused ? '#9fa8da' : '#6366f1';
         }}
       >
-        {isSpeaking && !isPaused ? '⏸️ Pause' : isPaused ? '▶️ Resume' : '🔊 Read Aloud'}
+        {isSpeaking && !isPaused
+          ? '⏸️ Pause'
+          : isPaused
+            ? '▶️ Resume'
+            : '🔊 Read Aloud'}
       </button>
 
       {(isSpeaking || isPaused) && (
@@ -395,10 +417,10 @@ const TTSControls: React.FC<{ storyContent: string }> = ({ storyContent }) => {
             borderRadius: '5px',
             transition: 'background-color 0.2s',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={e => {
             e.currentTarget.style.backgroundColor = '#c82333';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={e => {
             e.currentTarget.style.backgroundColor = '#dc3545';
           }}
         >

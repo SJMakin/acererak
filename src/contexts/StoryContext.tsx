@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid';
 import React, {
   createContext,
   useState,
@@ -5,35 +6,31 @@ import React, {
   useContext,
   useEffect,
 } from 'react';
-import { nanoid } from 'nanoid';
-import {
-  GraphData,
-  Edge,
-  StoryNode,
-  ChoiceNode,
-  isStoryNode,
-  isChoiceNode,
-  isValidStoryResponse,
-  RollResult,
-  Entity,
-} from '../types';
+
+import type { CharacterUpdate } from '../services/characterUpdateService';
+import { generateCharacterUpdates } from '../services/characterUpdateService';
+import { setCurrentModel } from '../services/openRouterClient';
 import {
   generateStoryNode,
   setSelectedThemes,
   generateFillerContent,
   generateStoryImage,
 } from '../services/openRouterService';
-import { setCurrentModel } from '../services/openRouterClient';
-import { useModel } from './ModelContext';
-import {
-  generateCharacterUpdates,
-  CharacterUpdate,
-} from '../services/characterUpdateService';
-import { useDice } from './DiceContext';
+import type {
+  GraphData,
+  Edge,
+  StoryNode,
+  ChoiceNode,
+  RollResult,
+  Entity,
+  SelectedTheme,
+} from '../types';
+import { isStoryNode, isChoiceNode, isValidStoryResponse } from '../types';
+
 import { useCharacter } from './CharacterContext';
-import { useNPCs } from './NPCContext';
+import { useDice } from './DiceContext';
+import { useModel } from './ModelContext';
 import { useRules } from './RulesContext';
-import { SelectedTheme } from '../types';
 
 export interface StoryState {
   graphData: GraphData;
@@ -46,7 +43,10 @@ export interface StoryState {
 
 export interface StoryContextProps extends StoryState {
   loadStoryNode: (_nodeId: string) => Promise<void>;
-  chooseOption: (_choiceNodeId: string, _characterSheet: string) => Promise<void>;
+  chooseOption: (
+    _choiceNodeId: string,
+    _characterSheet: string
+  ) => Promise<void>;
   resetError: () => void;
   restartGame: (_characterSheet: string) => Promise<void>;
   selectThemes: (
@@ -109,11 +109,19 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Generate filler content immediately to display while waiting
       let fillerContent: string | undefined;
-      const fillerTypes: ('thoughts' | 'omen' | 'flavor')[] = ['thoughts', 'omen', 'flavor'];
-      const randomFillerType = fillerTypes[Math.floor(Math.random() * fillerTypes.length)];
-      
+      const fillerTypes: Array<'thoughts' | 'omen' | 'flavor'> = [
+        'thoughts',
+        'omen',
+        'flavor',
+      ];
+      const randomFillerType =
+        fillerTypes[Math.floor(Math.random() * fillerTypes.length)];
+
       // Start filler content generation (don't await - let it run in parallel)
-      const fillerPromise = generateFillerContent(context, randomFillerType).catch(err => {
+      const fillerPromise = generateFillerContent(
+        context,
+        randomFillerType
+      ).catch(err => {
         console.error('Filler content generation failed:', err);
         return undefined;
       });
@@ -132,16 +140,14 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({
         context += `\nDice Rolls:\n${rollResults.map(r => r.formatted).join('\n')}`;
       }
 
-      // Get NPCs and rules for story context
-      const npcs = getNPCsForStoryContext();
+      // Get rules for story context
       const rules = getEnabledRulesForStoryContext();
 
       const newStoryData = await generateStoryNode(context, {
         player: characterSheet,
-        npcs: npcs.length > 0 ? npcs : undefined,
         customRules: rules.length > 0 ? rules : undefined,
       });
-      
+
       // Get filler content if it's ready
       fillerContent = await fillerPromise;
       if (!isValidStoryResponse(newStoryData)) {
@@ -284,7 +290,6 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const { updateCharacterSheet } = useCharacter();
-  const { getNPCsForStoryContext } = useNPCs();
   const { getEnabledRulesForStoryContext } = useRules();
   const { selectedModel } = useModel();
 
@@ -310,7 +315,10 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({
       // Start the game with the selected themes and character sheet
       startGameWithThemes(currentCharacterSheet);
     },
-    [getNPCsForStoryContext, getEnabledRulesForStoryContext, updateCharacterSheet]
+    [
+      getEnabledRulesForStoryContext,
+      updateCharacterSheet,
+    ]
   );
 
   // This function starts the actual game after themes are selected
@@ -319,14 +327,12 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({
       const initialPrompt =
         'Begin the story. Introduce the character to the world.';
 
-      // Get NPCs and rules for story context
-      const npcs = getNPCsForStoryContext();
+      // Get rules for story context
       const rules = getEnabledRulesForStoryContext();
-
+ 
       console.log('StoryContext: Generating initial story node');
       const newStoryData = await generateStoryNode(initialPrompt, {
         player: characterSheet,
-        npcs: npcs.length > 0 ? npcs : undefined,
         customRules: rules.length > 0 ? rules : undefined,
       });
 

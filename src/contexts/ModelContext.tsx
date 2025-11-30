@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+
 import { syncImageModelFromContext } from '../services/imageGenerationService';
 
 // Define model options with provider, support and release info
@@ -16,7 +17,7 @@ export interface ModelOption {
 // Determine the type of model based on its ID and architecture
 function getModelType(model: any): 'text' | 'image' {
   const id = model.id.toLowerCase();
-  
+
   // Check for image generation model keywords
   if (
     id.includes('flux') ||
@@ -185,7 +186,8 @@ async function fetchAvailableModels(): Promise<ModelOption[]> {
       const modelType = getModelType(model);
 
       // Determine if model supports structured output (only relevant for text models)
-      const supportsJson = modelType === 'text' ? modelSupportsStructuredOutput(model) : false;
+      const supportsJson =
+        modelType === 'text' ? modelSupportsStructuredOutput(model) : false;
 
       // Return enhanced model object
       return {
@@ -258,10 +260,11 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   // Try to get selected image model from localStorage
-  const [selectedImageModel, setSelectedImageModel] = useState<ModelOption | null>(() => {
-    const saved = localStorage.getItem('selectedImageModel');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [selectedImageModel, setSelectedImageModel] =
+    useState<ModelOption | null>(() => {
+      const saved = localStorage.getItem('selectedImageModel');
+      return saved ? JSON.parse(saved) : null;
+    });
 
   // Helper function to find the best default text model based on metadata
   const findBestDefaultModel = (models: ModelOption[]): ModelOption | null => {
@@ -294,7 +297,9 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Helper function to find the best default image model
-  const findBestDefaultImageModel = (models: ModelOption[]): ModelOption | null => {
+  const findBestDefaultImageModel = (
+    models: ModelOption[]
+  ): ModelOption | null => {
     if (models.length === 0) return null;
 
     // Filter for image models only
@@ -375,7 +380,9 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
         if (savedImageModelJson) {
           try {
             const savedImageModel = JSON.parse(savedImageModelJson);
-            const matchedImageModel = imageModels.find(m => m.id === savedImageModel.id);
+            const matchedImageModel = imageModels.find(
+              m => m.id === savedImageModel.id
+            );
 
             if (matchedImageModel) {
               setSelectedImageModel(matchedImageModel);
@@ -410,7 +417,10 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     if (!isLoading && selectedImageModel) {
-      localStorage.setItem('selectedImageModel', JSON.stringify(selectedImageModel));
+      localStorage.setItem(
+        'selectedImageModel',
+        JSON.stringify(selectedImageModel)
+      );
       // Sync with image generation service
       syncImageModelFromContext(selectedImageModel.id);
     }

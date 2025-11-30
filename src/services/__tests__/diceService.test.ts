@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+import type { DiceRoll } from '../../types';
 import { performRoll, performRolls } from '../diceService';
-import { DiceRoll } from '../../types';
 
 describe('Dice Service', () => {
   describe('performRoll', () => {

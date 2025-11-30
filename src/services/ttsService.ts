@@ -1,4 +1,4 @@
-// Text-to-Speech service using Web Speech API
+is// Text-to-Speech service using Web Speech API
 export interface Voice {
   name: string;
   lang: string;
@@ -23,7 +23,7 @@ export class TTSService {
 
   getVoices(): Voice[] {
     if (!this.synth) return [];
-    
+
     const voices = this.synth.getVoices();
     return voices.map(v => ({
       name: v.name,
@@ -54,7 +54,7 @@ export class TTSService {
     this.stop();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    
+
     // Set voice if specified
     if (options.voice) {
       const voices = this.synth.getVoices();
@@ -75,7 +75,7 @@ export class TTSService {
       options.onEnd?.();
     };
 
-    utterance.onerror = (event) => {
+    utterance.onerror = event => {
       this.currentUtterance = null;
       options.onError?.(new Error(`Speech synthesis error: ${event.error}`));
     };

@@ -26,8 +26,9 @@ export const ApiKeyProvider: React.FC<{ children: React.ReactNode }> = ({
     // This is expected to be defined in a gitignored .env.local file:
     // VITE_OPENROUTER_API_KEY=sk-...
     const envKey =
-      ((import.meta as any).env?.VITE_OPENROUTER_API_KEY as string | undefined) ||
-      '';
+      ((import.meta as any).env?.VITE_OPENROUTER_API_KEY as
+        | string
+        | undefined) || '';
 
     return envKey;
   });

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import { ModelOption } from '../contexts/ModelContext';
+
+import type { ModelOption } from '../contexts/ModelContext';
 
 // Get API key from localStorage
 export const getApiKey = (): string => {

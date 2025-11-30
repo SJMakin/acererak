@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import StoryDisplay from './StoryDisplay';
+
 import CharacterSheet from './CharacterSheet';
-import NPCPanel from './NPCPanel';
+import GameGraph from './GameGraph';
 import RulesPanel from './RulesPanel';
 import Settings from './Settings';
-import GameGraph from './GameGraph';
-import './TabPanel.css';
+import StoryDisplay from './StoryDisplay';
+import './GameTabs.css';
 
 interface GameTabsProps {
   className?: string;
@@ -13,7 +13,7 @@ interface GameTabsProps {
 
 const GameTabs: React.FC<GameTabsProps> = ({ className = '' }) => {
   const [activeTab, setActiveTab] = useState<
-    'story' | 'character' | 'npcs' | 'rules' | 'graph' | 'settings'
+    'story' | 'character' | 'rules' | 'graph' | 'settings'
   >('story');
 
   return (
@@ -32,13 +32,6 @@ const GameTabs: React.FC<GameTabsProps> = ({ className = '' }) => {
           aria-label="Character sheet tab"
         >
           Character
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'npcs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('npcs')}
-          aria-label="NPCs tab"
-        >
-          NPCs
         </button>
         <button
           className={`tab-button ${activeTab === 'rules' ? 'active' : ''}`}
@@ -66,7 +59,6 @@ const GameTabs: React.FC<GameTabsProps> = ({ className = '' }) => {
       <div className="tab-content">
         {activeTab === 'story' && <StoryDisplay />}
         {activeTab === 'character' && <CharacterSheet />}
-        {activeTab === 'npcs' && <NPCPanel />}
         {activeTab === 'rules' && <RulesPanel />}
         {activeTab === 'graph' && <GameGraph />}
         {activeTab === 'settings' && <Settings />}

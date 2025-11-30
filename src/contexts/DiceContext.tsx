@@ -6,9 +6,10 @@ import React, {
   useRef,
 } from 'react';
 import { createRoot } from 'react-dom/client';
+
 import DiceAnimation from '../components/DiceAnimation';
-import { RollResult, DiceRoll } from '../types';
 import { performRoll } from '../services/diceService';
+import type { RollResult, DiceRoll } from '../types';
 
 export interface DiceState {
   currentRollResult: RollResult | null;

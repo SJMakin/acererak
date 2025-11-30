@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useModel, ModelOption } from '../contexts/ModelContext';
+
+import type { ModelOption } from '../contexts/ModelContext';
+import { useModel } from '../contexts/ModelContext';
 import './ModelSelector.css';
 
 // Maximum description length before truncating
@@ -12,8 +14,12 @@ const truncateText = (text: string, maxLength: number): string => {
 };
 
 const ImageModelSelector: React.FC = () => {
-  const { selectedImageModel, imageModelOptions, setSelectedImageModel, isLoading } =
-    useModel();
+  const {
+    selectedImageModel,
+    imageModelOptions,
+    setSelectedImageModel,
+    isLoading,
+  } = useModel();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showFreeOnly, setShowFreeOnly] = useState(false);

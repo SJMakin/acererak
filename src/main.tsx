@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
 import App from './App';
 import 'reactflow/dist/style.css';
 import { initDebugUtils, setDebugMode, DebugMode } from './services/debugUtils';

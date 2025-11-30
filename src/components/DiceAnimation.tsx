@@ -1,8 +1,9 @@
+import * as CANNON from 'cannon';
 import React, { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
-import * as CANNON from 'cannon';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
 import {
   DiceManager,
   DiceD20,
@@ -12,7 +13,7 @@ import {
   DiceD10,
   DiceD12,
 } from '../services/dice-lib.js';
-import { RollResult, DiceGeometryType } from '../types';
+import type { RollResult, DiceGeometryType } from '../types';
 
 interface DiceAnimationProps {
   roll: RollResult;

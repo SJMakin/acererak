@@ -1,5 +1,6 @@
-import { Entity } from '../types';
-import { ModelOption } from '../contexts/ModelContext';
+import type { ModelOption } from '../contexts/ModelContext';
+import type { Entity } from '../types';
+
 import {
   getOpenRouterClient,
   setCurrentModel as setSharedModel,

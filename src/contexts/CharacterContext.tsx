@@ -5,17 +5,17 @@ import React, {
   useContext,
   useEffect,
 } from 'react';
-import {
-  generateAICharacterSheet,
-  CharacterGenerationOptions,
-} from '../services/aiCharacterGenerator';
-import { setCurrentModel } from '../services/openRouterClient';
-import { useModel } from './ModelContext';
+
+import type { CharacterGenerationOptions } from '../services/aiCharacterGenerator';
+import { generateAICharacterSheet } from '../services/aiCharacterGenerator';
+import { debugLog } from '../services/debugUtils';
 import {
   findAndReplaceMarkdownText,
   dumpSheetAndSearchText,
 } from '../services/markdownUtils';
-import { debugLog } from '../services/debugUtils';
+import { setCurrentModel } from '../services/openRouterClient';
+
+import { useModel } from './ModelContext';
 
 export interface CharacterState {
   characterSheet: string;

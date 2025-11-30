@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import ReactMarkdown, { Components } from 'react-markdown';
 import type { ComponentPropsWithoutRef } from 'react';
+import type { Components } from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
+
 import { useGame } from '../contexts/GameContext';
 
 interface CharacterSheetProps {

@@ -1,18 +1,16 @@
+import type { ModelOption } from '../contexts/ModelContext';
+import type { StoryGenerationResponse, SelectedTheme } from '../types';
+import { isValidStoryResponse } from '../types';
+
 import {
-  StoryGenerationResponse,
-  isValidStoryResponse,
-  SelectedTheme,
-} from '../types';
-import { ModelOption } from '../contexts/ModelContext';
+  generateImage,
+  createImagePromptFromStory,
+} from './imageGenerationService';
 import {
   getOpenRouterClient,
   stripMarkdownCodeBlock,
   getCurrentModel,
 } from './openRouterClient';
-import {
-  generateImage,
-  createImagePromptFromStory,
-} from './imageGenerationService';
 
 // Environments and other thematic categories
 const environments = [
@@ -170,7 +168,7 @@ export async function generateFillerContent(
   const currentModel = getCurrentModel();
 
   let prompt = '';
-  
+
   switch (type) {
     case 'thoughts':
       prompt = `Based on this context: ${context.slice(0, 200)}

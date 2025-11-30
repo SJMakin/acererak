@@ -1,6 +1,12 @@
 import React from 'react';
-import { GameProvider, ModelProvider, ApiKeyProvider, TTSProvider } from './contexts';
+
 import Layout from './components/Layout';
+import {
+  GameProvider,
+  ModelProvider,
+  ApiKeyProvider,
+  TTSProvider,
+} from './contexts';
 
 const App: React.FC = () => {
   return (

@@ -1,6 +1,6 @@
 declare module '../services/dice-lib.js' {
-  import * as THREE from 'three';
-  import * as CANNON from 'cannon';
+  import type * as CANNON from 'cannon';
+  import type * as THREE from 'three';
 
   export class DiceManager {
     static setWorld(): void;

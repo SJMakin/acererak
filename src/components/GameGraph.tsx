@@ -1,21 +1,20 @@
 import React, { useMemo, useRef, useEffect } from 'react';
+import type { NodeProps, ReactFlowInstance } from 'reactflow';
 import ReactFlow, {
   Background,
   Controls,
-  NodeProps,
   Handle,
   Position,
-  ReactFlowInstance,
   MarkerType,
 } from 'reactflow';
+
 import 'reactflow/dist/style.css';
 import { useGame } from '../contexts/GameContext';
-import {
+import type {
   StoryNode as StoryNodeType,
   ChoiceNode as ChoiceNodeType,
-  isStoryNode,
-  isChoiceNode,
 } from '../types';
+import { isStoryNode, isChoiceNode } from '../types';
 
 const StoryNode: React.FC<NodeProps<StoryNodeType>> = ({ data, selected }) => (
   <div

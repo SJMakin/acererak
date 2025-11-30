@@ -1,6 +1,7 @@
-import { Entity } from '../types';
-import { markdownTextExists } from './markdownUtils';
+import type { Entity } from '../types';
+
 import { debugLog } from './debugUtils';
+import { markdownTextExists } from './markdownUtils';
 import {
   getOpenRouterClient,
   stripMarkdownCodeBlock,

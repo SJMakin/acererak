@@ -1,5 +1,13 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { ttsService, Voice } from '../services/ttsService';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+} from 'react';
+
+import type { Voice } from '../services/ttsService';
+import { ttsService } from '../services/ttsService';
 
 interface TTSSettings {
   selectedVoice: string | null;
@@ -34,7 +42,9 @@ const defaultSettings: TTSSettings = {
   enabled: true,
 };
 
-export const TTSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TTSProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [settings, setSettings] = useState<TTSSettings>(defaultSettings);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -69,11 +79,15 @@ export const TTSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // If no voice selected, select the default or first English voice
       if (!settings.selectedVoice && availableVoices.length > 0) {
-        const defaultVoice = availableVoices.find(v => v.default) ||
-                           availableVoices.find(v => v.lang.startsWith('en')) ||
-                           availableVoices[0];
+        const defaultVoice =
+          availableVoices.find(v => v.default) ||
+          availableVoices.find(v => v.lang.startsWith('en')) ||
+          availableVoices[0];
         if (defaultVoice) {
-          setSettings(prev => ({ ...prev, selectedVoice: defaultVoice.voiceURI }));
+          setSettings(prev => ({
+            ...prev,
+            selectedVoice: defaultVoice.voiceURI,
+          }));
         }
       }
     };
@@ -93,28 +107,31 @@ export const TTSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [isSupported, settings.selectedVoice]);
 
-  const speak = useCallback((text: string) => {
-    if (!isSupported || !settings.enabled) return;
+  const speak = useCallback(
+    (text: string) => {
+      if (!isSupported || !settings.enabled) return;
 
-    setIsSpeaking(true);
-    setIsPaused(false);
+      setIsSpeaking(true);
+      setIsPaused(false);
 
-    ttsService.speak(text, {
-      voice: settings.selectedVoice || undefined,
-      rate: settings.rate,
-      pitch: settings.pitch,
-      volume: settings.volume,
-      onEnd: () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
-      },
-      onError: (error) => {
-        console.error('TTS error:', error);
-        setIsSpeaking(false);
-        setIsPaused(false);
-      },
-    });
-  }, [isSupported, settings]);
+      ttsService.speak(text, {
+        voice: settings.selectedVoice || undefined,
+        rate: settings.rate,
+        pitch: settings.pitch,
+        volume: settings.volume,
+        onEnd: () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        },
+        onError: error => {
+          console.error('TTS error:', error);
+          setIsSpeaking(false);
+          setIsPaused(false);
+        },
+      });
+    },
+    [isSupported, settings]
+  );
 
   const pause = useCallback(() => {
     ttsService.pause();

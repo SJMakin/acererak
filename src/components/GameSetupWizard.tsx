@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+
 import { useGame } from '../contexts/GameContext';
-import { SelectedTheme } from '../types';
+import type { SelectedTheme } from '../types';
+
 import GameSetupTabs from './GameSetupTabs';
 import './GameSetupWizard.css';
 
@@ -23,18 +25,23 @@ const GameSetupWizard: React.FC = () => {
       const generatedCharacterSheet = await selectSystem(system, preferences);
 
       if (!generatedCharacterSheet) {
-        throw new Error('Failed to generate character. Please check your API key and try again.');
+        throw new Error(
+          'Failed to generate character. Please check your API key and try again.'
+        );
       }
 
       // Complete the setup process and start the game with themes, passing the character sheet
       completeSetup(themes, generatedCharacterSheet);
-      
+
       // Setup completed successfully, clear processing state
       // Note: We don't set isProcessing to false here because the component will unmount
       // when gameMode changes to 'story', but if it doesn't unmount, this prevents stuck state
       setIsProcessing(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to complete setup. Please try again.';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to complete setup. Please try again.';
       console.error('Failed to complete setup:', errorMessage);
       setError(errorMessage);
       setIsProcessing(false);
@@ -46,16 +53,19 @@ const GameSetupWizard: React.FC = () => {
       <div className="wizard-container">
         <div className="wizard-content">
           {error && (
-            <div className="error-message" style={{
-              padding: '1rem',
-              marginBottom: '1rem',
-              backgroundColor: '#ff4444',
-              color: 'white',
-              borderRadius: '4px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
+            <div
+              className="error-message"
+              style={{
+                padding: '1rem',
+                marginBottom: '1rem',
+                backgroundColor: '#ff4444',
+                color: 'white',
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
               <span>{error}</span>
               <button
                 onClick={() => setError(null)}
@@ -65,7 +75,7 @@ const GameSetupWizard: React.FC = () => {
                   color: 'white',
                   padding: '0.5rem 1rem',
                   cursor: 'pointer',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
                 }}
               >
                 Dismiss

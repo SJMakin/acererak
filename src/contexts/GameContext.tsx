@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { StoryProvider, useStory } from './StoryContext';
-import { DiceProvider, useDice } from './DiceContext';
+
+import type { SelectedTheme } from '../types';
+
 import { CharacterProvider, useCharacter } from './CharacterContext';
-import { NPCProvider, useNPCs } from './NPCContext';
+import { DiceProvider, useDice } from './DiceContext';
 import { RulesProvider, useRules } from './RulesContext';
-import { SelectedTheme } from '../types';
+import { StoryProvider, useStory } from './StoryContext';
 
 export type GameMode = 'setup' | 'system-select' | 'story';
 
@@ -26,13 +27,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     <GameModeContext.Provider value={{ gameMode, setGameMode }}>
       <CharacterProvider>
         <DiceProvider>
-          <NPCProvider>
-            <RulesProvider>
+          <RulesProvider>
               <StoryProvider>
                 <GameCoordinator>{children}</GameCoordinator>
               </StoryProvider>
             </RulesProvider>
-          </NPCProvider>
         </DiceProvider>
       </CharacterProvider>
     </GameModeContext.Provider>
@@ -59,7 +58,6 @@ export const useGame = () => {
   const story = useStory();
   const dice = useDice();
   const character = useCharacter();
-  const npc = useNPCs();
   const rules = useRules();
 
   // Log when character sheet changes in useGame
@@ -148,13 +146,6 @@ export const useGame = () => {
     currentRollResult: dice.currentRollResult,
     showDiceAnimation: dice.showDiceAnimation,
     performDiceRoll: dice.performDiceRoll,
-
-    // NPC state and functions
-    npcs: npc.npcs,
-    addNPC: npc.addNPC,
-    updateNPC: npc.updateNPC,
-    deleteNPC: npc.deleteNPC,
-    getNPCsForStoryContext: npc.getNPCsForStoryContext,
 
     // Rules state and functions
     rules: rules.rules,

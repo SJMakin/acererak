@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { useTTS } from '../contexts/TTSContext';
 
 const TTSSettings: React.FC = () => {
@@ -6,7 +7,13 @@ const TTSSettings: React.FC = () => {
 
   if (!isSupported) {
     return (
-      <div style={{ padding: '15px', backgroundColor: '#252525', borderRadius: '8px' }}>
+      <div
+        style={{
+          padding: '15px',
+          backgroundColor: '#252525',
+          borderRadius: '8px',
+        }}
+      >
         <p style={{ color: '#ff6b6b', margin: 0 }}>
           ⚠️ Text-to-Speech is not supported in your browser.
         </p>
@@ -18,11 +25,18 @@ const TTSSettings: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Enable/Disable TTS */}
       <div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            cursor: 'pointer',
+          }}
+        >
           <input
             type="checkbox"
             checked={settings.enabled}
-            onChange={(e) => updateSettings({ enabled: e.target.checked })}
+            onChange={e => updateSettings({ enabled: e.target.checked })}
             style={{ cursor: 'pointer', width: '18px', height: '18px' }}
           />
           <span style={{ fontSize: '1em', color: '#e0e0e0' }}>
@@ -35,13 +49,20 @@ const TTSSettings: React.FC = () => {
         <>
           {/* Voice Selection */}
           <div>
-            <label htmlFor="tts-voice" style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0' }}>
+            <label
+              htmlFor="tts-voice"
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                color: '#e0e0e0',
+              }}
+            >
               Voice:
             </label>
             <select
               id="tts-voice"
               value={settings.selectedVoice || ''}
-              onChange={(e) => updateSettings({ selectedVoice: e.target.value })}
+              onChange={e => updateSettings({ selectedVoice: e.target.value })}
               style={{
                 width: '100%',
                 padding: '10px',
@@ -56,21 +77,30 @@ const TTSSettings: React.FC = () => {
               {voices.length === 0 ? (
                 <option value="">Loading voices...</option>
               ) : (
-                voices.map((voice) => (
+                voices.map(voice => (
                   <option key={voice.voiceURI} value={voice.voiceURI}>
                     {voice.name} ({voice.lang})
                   </option>
                 ))
               )}
             </select>
-            <p style={{ fontSize: '0.85em', color: '#9fa8da', marginTop: '5px' }}>
+            <p
+              style={{ fontSize: '0.85em', color: '#9fa8da', marginTop: '5px' }}
+            >
               {voices.length} voice{voices.length !== 1 ? 's' : ''} available
             </p>
           </div>
 
           {/* Speech Rate */}
           <div>
-            <label htmlFor="tts-rate" style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0' }}>
+            <label
+              htmlFor="tts-rate"
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                color: '#e0e0e0',
+              }}
+            >
               Speed: {settings.rate.toFixed(1)}x
             </label>
             <input
@@ -80,13 +110,23 @@ const TTSSettings: React.FC = () => {
               max="2"
               step="0.1"
               value={settings.rate}
-              onChange={(e) => updateSettings({ rate: parseFloat(e.target.value) })}
+              onChange={e =>
+                updateSettings({ rate: parseFloat(e.target.value) })
+              }
               style={{
                 width: '100%',
                 cursor: 'pointer',
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', color: '#9fa8da', marginTop: '5px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '0.85em',
+                color: '#9fa8da',
+                marginTop: '5px',
+              }}
+            >
               <span>Slower</span>
               <span>Normal</span>
               <span>Faster</span>
@@ -95,7 +135,14 @@ const TTSSettings: React.FC = () => {
 
           {/* Pitch */}
           <div>
-            <label htmlFor="tts-pitch" style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0' }}>
+            <label
+              htmlFor="tts-pitch"
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                color: '#e0e0e0',
+              }}
+            >
               Pitch: {settings.pitch.toFixed(1)}
             </label>
             <input
@@ -105,13 +152,23 @@ const TTSSettings: React.FC = () => {
               max="2"
               step="0.1"
               value={settings.pitch}
-              onChange={(e) => updateSettings({ pitch: parseFloat(e.target.value) })}
+              onChange={e =>
+                updateSettings({ pitch: parseFloat(e.target.value) })
+              }
               style={{
                 width: '100%',
                 cursor: 'pointer',
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', color: '#9fa8da', marginTop: '5px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '0.85em',
+                color: '#9fa8da',
+                marginTop: '5px',
+              }}
+            >
               <span>Lower</span>
               <span>Normal</span>
               <span>Higher</span>
@@ -120,7 +177,14 @@ const TTSSettings: React.FC = () => {
 
           {/* Volume */}
           <div>
-            <label htmlFor="tts-volume" style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0' }}>
+            <label
+              htmlFor="tts-volume"
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                color: '#e0e0e0',
+              }}
+            >
               Volume: {Math.round(settings.volume * 100)}%
             </label>
             <input
@@ -130,13 +194,23 @@ const TTSSettings: React.FC = () => {
               max="1"
               step="0.1"
               value={settings.volume}
-              onChange={(e) => updateSettings({ volume: parseFloat(e.target.value) })}
+              onChange={e =>
+                updateSettings({ volume: parseFloat(e.target.value) })
+              }
               style={{
                 width: '100%',
                 cursor: 'pointer',
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', color: '#9fa8da', marginTop: '5px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '0.85em',
+                color: '#9fa8da',
+                marginTop: '5px',
+              }}
+            >
               <span>Quiet</span>
               <span>Loud</span>
             </div>

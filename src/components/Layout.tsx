@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import GameTabs from './GameTabs';
-import GameSetupWizard from './GameSetupWizard';
+
 import { useGame } from '../contexts/GameContext';
+
+import GameSetupWizard from './GameSetupWizard';
+import GameTabs from './GameTabs';
 import './Layout.css';
 
 const Layout: React.FC = () => {
