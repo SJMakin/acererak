@@ -24,6 +24,7 @@ export interface CharacterContextProps extends CharacterState {
   updateCharacterSheet: (
     updates: Array<{ oldText: string; newText: string; description?: string }>
   ) => void;
+  setCharacterSheet: (sheet: string) => void;
   resetCharacter: () => void;
   generateCharacter: (options: CharacterGenerationOptions) => Promise<string>;
 }
@@ -104,6 +105,13 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
+  const setCharacterSheet = useCallback((sheet: string) => {
+    setState(prev => ({
+      ...prev,
+      characterSheet: sheet,
+    }));
+  }, []);
+
   const resetCharacter = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -116,6 +124,7 @@ export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({
   const value = {
     ...state,
     updateCharacterSheet,
+    setCharacterSheet,
     resetCharacter,
     generateCharacter,
   };

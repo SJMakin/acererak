@@ -7,16 +7,16 @@
 .settings-section {
   margin-bottom: 30px;
   padding: 20px;
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: var(--background-color, #fff);
+  background: var(--background-secondary);
 }
 
 .settings-section h2 {
   margin: 0 0 15px 0;
   font-size: 1.2em;
-  color: var(--text-color, #333);
-  border-bottom: 1px solid var(--border-color, #eee);
+  color: var(--text-bright);
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 10px;
 }
 
@@ -24,15 +24,85 @@
   margin-bottom: 0;
 }
 
-/* Dark theme support */
-@media (prefers-color-scheme: dark) {
-  .settings-section {
-    background: var(--background-color, #2a2a2a);
-    border-color: var(--border-color, #444);
-  }
-  
-  .settings-section h2 {
-    color: var(--text-color, #fff);
-    border-bottom-color: var(--border-color, #555);
-  }
+/* Toggle settings */
+.settings-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-toggle {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  position: relative;
+}
+
+.settings-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-toggle .toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-color);
+  position: relative;
+  padding-left: 56px;
+}
+
+.settings-toggle .toggle-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 24px;
+  background: #555;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.settings-toggle .toggle-label::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: left 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.settings-toggle input:checked + .toggle-label::before {
+  background: var(--accent-color);
+}
+
+.settings-toggle input:checked + .toggle-label::after {
+  left: 22px;
+}
+
+.settings-toggle .toggle-description {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  margin-left: 56px;
 }

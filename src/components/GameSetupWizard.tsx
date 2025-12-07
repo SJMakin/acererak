@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
+import { Box, Text, VStack } from '@chakra-ui/react';
 
 import { useGame } from '../contexts/GameContext';
 import type { SelectedTheme } from '../types';
 
-import GameSetupTabs from './GameSetupTabs';
-import './GameSetupWizard.css';
+import SetupModal from './SetupModal';
 
 const GameSetupWizard: React.FC = () => {
-  const { selectSystem, completeSetup, isGeneratingCharacter } = useGame();
+  const { selectSystem, completeSetup, isGeneratingCharacter, setCharacterSheet } = useGame();
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,32 +15,40 @@ const GameSetupWizard: React.FC = () => {
   const handleSetupComplete = async (
     system: string,
     preferences: string | undefined,
-    themes: SelectedTheme[] | null
+    themes: SelectedTheme[] | null,
+    previewedCharacterSheet?: string,
+    previewedStoryPlan?: string
   ) => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      // Generate character using the selected system and get the character sheet
-      const generatedCharacterSheet = await selectSystem(system, preferences);
+      let characterSheet = previewedCharacterSheet;
 
-      if (!generatedCharacterSheet) {
-        throw new Error(
-          'Failed to generate character. Please check your API key and try again.'
-        );
+      // Only generate character if not already previewed
+      if (!characterSheet) {
+        characterSheet = await selectSystem(system, preferences);
+
+        if (!characterSheet) {
+          throw new Error(
+            'Failed to generate character. Please check your API key and try again.'
+          );
+        }
+      } else {
+        // Set the previewed character sheet in context
+        setCharacterSheet(characterSheet);
       }
 
       // Complete the setup process and start the game with themes, passing the character sheet
-      completeSetup(themes, generatedCharacterSheet);
+      // Also pass the previewed story plan if available
+      completeSetup(themes, characterSheet, previewedStoryPlan);
 
       // Setup completed successfully, clear processing state
-      // Note: We don't set isProcessing to false here because the component will unmount
-      // when gameMode changes to 'story', but if it doesn't unmount, this prevents stuck state
       setIsProcessing(false);
-    } catch (error) {
+    } catch (err) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : 'Failed to complete setup. Please try again.';
       console.error('Failed to complete setup:', errorMessage);
       setError(errorMessage);
@@ -48,54 +56,40 @@ const GameSetupWizard: React.FC = () => {
     }
   };
 
-  return (
-    <div className="game-setup-wizard">
-      <div className="wizard-container">
-        <div className="wizard-content">
+  // Show loading state when generating
+  if (isGeneratingCharacter || isProcessing) {
+    return (
+      <Box
+        minH="100vh"
+        bg="gray.900"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <VStack gap={4}>
+          <Text fontSize="xl" color="purple.300" fontWeight="bold">
+            Creating Your Adventure...
+          </Text>
+          <Text color="gray.400">
+            Generating character and world, this may take a moment
+          </Text>
           {error && (
-            <div
-              className="error-message"
-              style={{
-                padding: '1rem',
-                marginBottom: '1rem',
-                backgroundColor: '#ff4444',
-                color: 'white',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
+            <Box
+              p={4}
+              bg="red.900"
+              borderRadius="md"
+              border="1px solid"
+              borderColor="red.600"
             >
-              <span>{error}</span>
-              <button
-                onClick={() => setError(null)}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
+              <Text color="red.200">{error}</Text>
+            </Box>
           )}
-          {isGeneratingCharacter || isProcessing ? (
-            <div className="loading-state">
-              <p>Creating your adventure...</p>
-              <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>
-                This may take a moment...
-              </p>
-            </div>
-          ) : (
-            <GameSetupTabs onSetupComplete={handleSetupComplete} />
-          )}
-        </div>
-      </div>
-    </div>
-  );
+        </VStack>
+      </Box>
+    );
+  }
+
+  return <SetupModal onSetupComplete={handleSetupComplete} />;
 };
 
 export default GameSetupWizard;

@@ -10,6 +10,16 @@
   font-size: 0.85rem;
 }
 
+/* Panel mode - no positioning or toggle needed */
+.character-sheet--in-panel {
+  position: static;
+  transform: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
 .character-sheet-content {
   font-family:
     'Roboto',

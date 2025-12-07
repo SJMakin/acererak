@@ -7,9 +7,10 @@ import { useGame } from '../contexts/GameContext';
 
 interface CharacterSheetProps {
   className?: string;
+  inPanel?: boolean;
 }
 
-const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
+const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '', inPanel = false }) => {
   const { characterSheet } = useGame();
   const [isExpanded, setIsExpanded] = useState(false);
   const [updateCounter, setUpdateCounter] = useState(0);
@@ -24,7 +25,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
     setIsExpanded(prev => !prev);
   }, []);
 
-  // Custom components for ReactMarkdown
+  // Custom components for ReactMarkdown - defined before early returns
   const components: Components = {
     h1: (props: ComponentPropsWithoutRef<'h1'>) => (
       <h1 className="character-sheet-title" {...props} />
@@ -65,6 +66,19 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ className = '' }) => {
       <li className="character-sheet-item" {...props} />
     ),
   };
+
+  // When in panel mode, render content directly without toggle
+  if (inPanel) {
+    return (
+      <div className={`character-sheet character-sheet--in-panel ${className}`}>
+        <div className="character-sheet-content">
+          <ReactMarkdown components={components} key={updateCounter}>
+            {characterSheet || '*No character created yet. Start a new adventure to create your character.*'}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

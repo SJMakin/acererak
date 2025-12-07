@@ -1,50 +1,91 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 
 import { useGame } from '../contexts/GameContext';
 
-import GameSetupWizard from './GameSetupWizard';
-import GameTabs from './GameTabs';
+import ChatView from './chat/ChatView';
+import SetupModal from './SetupModal';
+import type { SelectedTheme } from '../types';
 import './Layout.css';
 
 const Layout: React.FC = () => {
-  const { gameMode } = useGame();
-  const [isMounted, setIsMounted] = useState(false);
+  const {
+    setGameMode,
+    selectSystem,
+    completeSetup,
+    isGeneratingCharacter,
+    setCharacterSheet
+  } = useGame();
+  
+  // Don't show modal automatically - let user click "New Adventure" or load a game first
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Make sure the component is mounted before rendering
-  useEffect(() => {
-    setIsMounted(true);
+  const handleNewGame = useCallback(() => {
+    setShowSetupModal(true);
   }, []);
 
-  // Log game mode changes for debugging
-  useEffect(() => {
-    console.log('Layout: Game mode changed to', gameMode);
-  }, [gameMode]);
+  const handleSetupComplete = useCallback(async (
+    system: string,
+    preferences: string | undefined,
+    themes: SelectedTheme[] | null,
+    previewedCharacterSheet?: string,
+    previewedStoryPlan?: string
+  ) => {
+    setIsProcessing(true);
 
-  if (!isMounted) {
-    return (
-      <div className="game-layout">
-        <div className="loading">Loading...</div>
-      </div>
-    );
-  }
+    try {
+      let characterSheet = previewedCharacterSheet;
 
-  // If in setup mode, show the setup wizard
-  if (gameMode === 'setup') {
-    console.log('Layout: Rendering GameSetupWizard');
-    return (
-      <div className="game-layout">
-        <GameSetupWizard />
-      </div>
-    );
-  }
+      // Only generate character if not already previewed
+      if (!characterSheet) {
+        characterSheet = await selectSystem(system, preferences);
 
-  // Otherwise show the regular tabbed layout
-  console.log('Layout: Rendering game content for mode:', gameMode);
+        if (!characterSheet) {
+          throw new Error(
+            'Failed to generate character. Please check your API key and try again.'
+          );
+        }
+      } else {
+        // Set the previewed character sheet in context
+        setCharacterSheet(characterSheet);
+      }
+
+      // Complete the setup process and start the game with themes
+      await completeSetup(themes, characterSheet, previewedStoryPlan);
+      
+      // Close modal and switch to story mode
+      setShowSetupModal(false);
+      setGameMode('story');
+      setIsProcessing(false);
+    } catch (err) {
+      console.error('Failed to complete setup:', err);
+      setIsProcessing(false);
+      // Keep modal open to show error in modal
+      throw err;
+    }
+  }, [selectSystem, completeSetup, setCharacterSheet, setGameMode]);
+
+  const handleCloseSetup = useCallback(() => {
+    // Always allow closing - user can access empty state with load/save options
+    setShowSetupModal(false);
+  }, []);
+
   return (
     <div className="game-layout">
       <div className="main-content-full">
-        <GameTabs />
+        <ChatView onNewGame={handleNewGame} />
       </div>
+      
+      {/* Setup modal overlay */}
+      {showSetupModal && (
+        <div className="setup-modal-overlay">
+          <SetupModal
+            onSetupComplete={handleSetupComplete}
+            onClose={handleCloseSetup}
+            isProcessing={isProcessing || isGeneratingCharacter}
+          />
+        </div>
+      )}
     </div>
   );
 };

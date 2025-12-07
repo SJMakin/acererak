@@ -1,6 +1,48 @@
 import type { ModelOption } from '../contexts/ModelContext';
-import type { StoryGenerationResponse, SelectedTheme } from '../types';
+import type { StoryGenerationResponse, SelectedTheme, DiceRoll, LlmCallInfo } from '../types';
 import { isValidStoryResponse } from '../types';
+
+// ============================================================================
+// LLM COST TRACKING
+// ============================================================================
+
+/**
+ * Estimate cost based on model pricing and token counts
+ * Uses pricing from the model object (fetched from OpenRouter API)
+ */
+export function estimateCost(
+  modelPricing: { prompt: number; completion: number } | undefined,
+  promptTokens: number,
+  completionTokens: number
+): number {
+  // Default fallback pricing if model doesn't have pricing info (per 1M tokens)
+  const pricing = modelPricing || { prompt: 1, completion: 2 };
+  return (promptTokens * pricing.prompt + completionTokens * pricing.completion) / 1_000_000;
+}
+
+/**
+ * Create LlmCallInfo from usage data
+ * Uses dynamic pricing from the model object
+ */
+export function createLlmCallInfo(
+  model: ModelOption,
+  promptTokens: number,
+  completionTokens: number,
+  duration: number,
+  type: LlmCallInfo['type']
+): LlmCallInfo {
+  return {
+    id: `llm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    timestamp: new Date(),
+    model: model.id,
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    estimatedCost: estimateCost(model.pricing, promptTokens, completionTokens),
+    duration,
+    type,
+  };
+}
 
 import {
   generateImage,
@@ -217,7 +259,8 @@ Generate a brief (2-3 sentences) sensory detail about the environment. Focus on 
  */
 export async function generateStoryImage(
   storyContent: string,
-  storySummary?: string
+  storySummary?: string,
+  imagePrompt?: string
 ): Promise<string | undefined> {
   if (!imageGenerationEnabled) {
     console.log('Image generation is disabled');
@@ -225,8 +268,8 @@ export async function generateStoryImage(
   }
 
   try {
-    const imagePrompt = createImagePromptFromStory(storyContent, storySummary);
-    const imageUrl = await generateImage(imagePrompt);
+    const finalImagePrompt = createImagePromptFromStory(storyContent, storySummary, imagePrompt);
+    const imageUrl = await generateImage(finalImagePrompt);
     return imageUrl;
   } catch (error) {
     console.error('Failed to generate story image:', error);
@@ -247,7 +290,7 @@ export async function generateStoryPlan(
   }
   let selectedThemes: string[];
 
-  if (userSelectedThemes) {
+  if (userSelectedThemes && userSelectedThemes.length > 0) {
     // Use user-selected themes
     selectedThemes = userSelectedThemes.map(theme => theme.theme);
 
@@ -308,6 +351,222 @@ export async function generateStoryPlan(
   }
 }
 
+/**
+ * Generate a story node with streaming support
+ * Calls onPartialContent callback as story content arrives
+ */
+export async function generateStoryNodeStreaming(
+  context: string,
+  entities: {
+    player: string;
+    npcs?: string[];
+    enemies?: string[];
+    customRules?: string[];
+  },
+  onPartialContent?: (content: string) => void
+): Promise<StoryGenerationResponse> {
+  const currentModel = getCurrentModel();
+
+  if (!storyPlan) {
+    storyPlan = await generateStoryPlan(currentModel);
+  }
+
+  try {
+    const systemMessage = `You are Acererak - chaos incarnate, death's architect. Weave dark fantasy nightmares. Respond ONLY in valid JSON: story object (content, summary), choices array.`;
+
+    const prompt = `PC: ${entities.player}
+${entities.npcs ? `\nNPCs: ${entities.npcs.join(', ')}` : ''}
+${entities.enemies ? `\nEnemies: ${entities.enemies.join(', ')}` : ''}
+${entities.customRules ? `\nRules: ${entities.customRules.join('; ')}` : ''}
+
+PLAN: ${storyPlan}
+CONTEXT: ${context}
+
+Generate next beat + 2-5 brutal choices. JSON format:
+{
+  "story": {"content": "vivid scene", "summary": "tight beat"},
+  "choices": [{
+    "text": "choice",
+    "nextNodeId": "id",
+    "requiredRolls": [{"type": "d20", "count": 1, "modifier": 0, "difficulty": 15, "skill": "Skill", "description": "what"}]
+  }]
+}
+
+requiredRolls: d4/d6/d8/d10/d12/d20/d100, count, modifier, difficulty, skill, description
+
+WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visceral. Weird. Dark. No mercy.`;
+
+    console.log('Story node streaming prompt:', prompt);
+
+    try {
+      const openRouter = getOpenRouterClient();
+      
+      // Use streaming if callback provided
+      if (onPartialContent) {
+        const stream = await openRouter.chat.completions.create({
+          model: currentModel.id,
+          messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.8,
+          top_p: 0.95,
+          stream: true,
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'story_generation',
+              schema: {
+                type: 'object',
+                properties: {
+                  story: {
+                    type: 'object',
+                    properties: {
+                      content: { type: 'string' },
+                      summary: { type: 'string' },
+                      imagePrompt: { type: 'string' },
+                    },
+                    required: ['content', 'summary', 'imagePrompt'],
+                    additionalProperties: false,
+                  },
+                  choices: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        text: { type: 'string' },
+                        nextNodeId: { type: 'string' },
+                        imagePrompt: { type: 'string' },
+                        requiredRolls: {
+                          type: ['array', 'null'],
+                          items: {
+                            type: 'object',
+                            properties: {
+                              type: {
+                                type: 'string',
+                                enum: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'],
+                              },
+                              count: { type: 'number' },
+                              modifier: { type: ['number', 'null'] },
+                              difficulty: { type: ['number', 'null'] },
+                              skill: { type: ['string', 'null'] },
+                              description: { type: 'string' },
+                            },
+                            required: ['type', 'count', 'modifier', 'difficulty', 'skill', 'description'],
+                            additionalProperties: false,
+                          },
+                        },
+                      },
+                      required: ['text', 'nextNodeId', 'imagePrompt', 'requiredRolls'],
+                      additionalProperties: false,
+                    },
+                    minItems: 2,
+                  },
+                },
+                required: ['story', 'choices'],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        let accumulated = '';
+        let lastContentLength = 0;
+        let chunkCount = 0;
+
+        console.log('Starting streaming story generation...');
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta?.content || '';
+          accumulated += delta;
+          chunkCount++;
+
+          // Log every 10 chunks to see streaming progress
+          if (chunkCount % 10 === 0) {
+            console.log(`Streaming chunk ${chunkCount}, accumulated length: ${accumulated.length}`);
+          }
+
+          // Extract partial content using regex - more reliable than parsing incomplete JSON
+          // Look for "content": " followed by any characters (including partial strings)
+          const contentMatch = accumulated.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/);
+          if (contentMatch && contentMatch[1]) {
+            // Unescape the content
+            let content = contentMatch[1]
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\');
+            
+            // Only update if content has grown
+            if (content.length > lastContentLength) {
+              console.log(`Content update: ${lastContentLength} -> ${content.length} chars`);
+              lastContentLength = content.length;
+              onPartialContent(content);
+            }
+          }
+        }
+
+        console.log(`Streaming complete: ${chunkCount} chunks, final length: ${accumulated.length}`);
+
+        // Parse final complete JSON
+        const processedContent = stripMarkdownCodeBlock(accumulated);
+        const parsedContent = JSON.parse(processedContent);
+
+        if (!isValidStoryResponse(parsedContent)) {
+          throw new Error('Invalid AI response structure');
+        }
+
+        const cleanedResponse: StoryGenerationResponse = {
+          story: {
+            content: parsedContent.story.content.trim(),
+            summary: parsedContent.story.summary.trim(),
+            imagePrompt: parsedContent.story.imagePrompt?.trim() || '',
+          },
+          choices: parsedContent.choices.map((choice: { text: string; nextNodeId?: string; imagePrompt?: string; requiredRolls?: DiceRoll[] }) => ({
+            text: choice.text.trim(),
+            nextNodeId:
+              choice.nextNodeId ||
+              `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            imagePrompt: choice.imagePrompt?.trim() || '',
+            requiredRolls: (choice.requiredRolls || []) as DiceRoll[],
+          })),
+        };
+
+        // Validate response
+        if (cleanedResponse.choices.some(c => c.text.length < 10)) {
+          throw new Error('Choice text too short (minimum 10 characters)');
+        }
+
+        const choiceTexts = new Set(
+          cleanedResponse.choices.map(c => c.text.toLowerCase())
+        );
+        if (choiceTexts.size !== cleanedResponse.choices.length) {
+          throw new Error('Duplicate choices detected');
+        }
+
+        console.log('Generated story node (streaming):', cleanedResponse);
+        return cleanedResponse;
+      } else {
+        // Fall back to non-streaming if no callback provided
+        return generateStoryNode(context, entities);
+      }
+    } catch (error) {
+      const parseError = error as Error;
+      console.error('Story generation error:', { error: parseError.message });
+      throw error;
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unknown error during story generation';
+    console.error('Story generation failed:', message);
+    throw new Error(message);
+  }
+}
+
+/**
+ * Generate a story node (non-streaming, original implementation)
+ */
 export async function generateStoryNode(
   context: string,
   entities: {
@@ -340,14 +599,11 @@ Generate next beat + 2-5 brutal choices. JSON format:
   "choices": [{
     "text": "choice",
     "nextNodeId": "id",
-    "type": "story/combat",
-    "requiredRolls": [{"type": "d20", "count": 1, "modifier": 0, "difficulty": 15, "skill": "Skill", "description": "what"}],
-    "combatData": {"enemies": ["type"], "difficulty": "easy/medium/hard", "environment": "arena"}
+    "requiredRolls": [{"type": "d20", "count": 1, "modifier": 0, "difficulty": 15, "skill": "Skill", "description": "what"}]
   }]
 }
 
 requiredRolls: d4/d6/d8/d10/d12/d20/d100, count, modifier, difficulty, skill, description
-Combat choices: type='combat', include combatData
 
 WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visceral. Weird. Dark. No mercy.`;
 
@@ -364,7 +620,62 @@ WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visc
         ],
         temperature: 0.8,
         top_p: 0.95,
-        response_format: { type: 'json_object' },
+        response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'story_generation',
+              schema: {
+                type: 'object',
+                properties: {
+                  story: {
+                    type: 'object',
+                    properties: {
+                      content: { type: 'string' },
+                      summary: { type: 'string' },
+                      imagePrompt: { type: 'string' },
+                    },
+                    required: ['content', 'summary', 'imagePrompt'],
+                    additionalProperties: false,
+                  },
+                choices: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      text: { type: 'string' },
+                      nextNodeId: { type: 'string' },
+                      imagePrompt: { type: 'string' },
+                      requiredRolls: {
+                        type: ['array', 'null'],
+                        items: {
+                          type: 'object',
+                          properties: {
+                            type: {
+                              type: 'string',
+                              enum: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'],
+                            },
+                            count: { type: 'number' },
+                            modifier: { type: ['number', 'null'] },
+                            difficulty: { type: ['number', 'null'] },
+                            skill: { type: ['string', 'null'] },
+                            description: { type: 'string' },
+                          },
+                          required: ['type', 'count', 'modifier', 'difficulty', 'skill', 'description'],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ['text', 'nextNodeId', 'imagePrompt', 'requiredRolls'],
+                    additionalProperties: false,
+                  },
+                  minItems: 2,
+                },
+              },
+              required: ['story', 'choices'],
+              additionalProperties: false,
+            },
+          },
+        },
       });
 
       // Extract the text from the response
@@ -379,19 +690,19 @@ WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visc
         throw new Error('Invalid AI response structure');
       }
 
-      const cleanedResponse = {
+      const cleanedResponse: StoryGenerationResponse = {
         story: {
           content: parsedContent.story.content.trim(),
           summary: parsedContent.story.summary.trim(),
+          imagePrompt: parsedContent.story.imagePrompt?.trim() || '',
         },
-        choices: parsedContent.choices.map(choice => ({
+        choices: parsedContent.choices.map((choice: { text: string; nextNodeId?: string; imagePrompt?: string; requiredRolls?: DiceRoll[] }) => ({
           text: choice.text.trim(),
           nextNodeId:
             choice.nextNodeId ||
             `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: choice.type || 'story',
-          requiredRolls: choice.requiredRolls || [],
-          combatData: choice.type === 'combat' ? choice.combatData : undefined,
+          imagePrompt: choice.imagePrompt?.trim() || '',
+          requiredRolls: (choice.requiredRolls || []) as DiceRoll[],
         })),
       };
 

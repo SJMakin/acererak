@@ -1,0 +1,85 @@
+/**
+ * LlmCallBadge styles
+ */
+
+.llm-call-badge {
+  position: relative;
+}
+
+.llm-badge-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.llm-badge-toggle:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.llm-badge-icon {
+  font-size: 0.85rem;
+}
+
+.llm-badge-cost {
+  font-family: monospace;
+}
+
+.llm-badge-details {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  padding: 12px;
+  min-width: 280px;
+  background: var(--surface-color, #1a1a2e);
+  border: 1px solid var(--border-color, #2a2a4e);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.llm-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+
+.llm-badge-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-color, #2a2a4e);
+}
+
+.llm-badge-label {
+  color: var(--text-muted, #888);
+}
+
+.llm-badge-value {
+  color: var(--text-primary, #e0e0e0);
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+/* Animation */
+.llm-call-badge.expanded .llm-badge-toggle {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--accent-color, #6366f1);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .llm-badge-details {
+    min-width: 220px;
+    right: -20px;
+  }
+}

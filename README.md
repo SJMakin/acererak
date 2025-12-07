@@ -81,7 +81,6 @@ npm run preview
 
 ## Roadmap
 
-- 🗡️ Combat system integration
 - 📝 Character creation and progression
 - 🎲 Skill checks and saving throws
 - 💾 Save/load functionality

@@ -1,4 +1,4 @@
-is// Text-to-Speech service using Web Speech API
+// Text-to-Speech service using Web Speech API
 export interface Voice {
   name: string;
   lang: string;
@@ -9,7 +9,6 @@ export interface Voice {
 
 export class TTSService {
   private synth: SpeechSynthesis | null = null;
-  private currentUtterance: SpeechSynthesisUtterance | null = null;
 
   constructor() {
     if ('speechSynthesis' in window) {
@@ -71,16 +70,13 @@ export class TTSService {
 
     // Set event handlers
     utterance.onend = () => {
-      this.currentUtterance = null;
       options.onEnd?.();
     };
 
     utterance.onerror = event => {
-      this.currentUtterance = null;
       options.onError?.(new Error(`Speech synthesis error: ${event.error}`));
     };
 
-    this.currentUtterance = utterance;
     this.synth.speak(utterance);
   }
 
@@ -91,7 +87,7 @@ export class TTSService {
   }
 
   resume(): void {
-    if (this.synth && this.synth.paused) {
+    if (this.synth?.paused) {
       this.synth.resume();
     }
   }
@@ -99,7 +95,6 @@ export class TTSService {
   stop(): void {
     if (this.synth) {
       this.synth.cancel();
-      this.currentUtterance = null;
     }
   }
 

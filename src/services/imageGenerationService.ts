@@ -104,9 +104,16 @@ export async function generateImage(prompt: string): Promise<string> {
  */
 export function createImagePromptFromStory(
   storyContent: string,
-  storySummary?: string
+  storySummary?: string,
+  imagePrompt?: string
 ): string {
-  // Use summary if available as it's more concise, otherwise use first part of content
+  // Use dedicated imagePrompt if available, otherwise fall back to story content
+  if (imagePrompt) {
+    // Limit prompt length (most image models have token limits)
+    return imagePrompt.slice(0, 500);
+  }
+
+  // Fallback: Use summary if available as it's more concise, otherwise use first part of content
   const baseText = storySummary || storyContent.slice(0, 300);
 
   // Create a dark fantasy styled prompt

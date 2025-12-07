@@ -2,7 +2,7 @@
   height: 100vh;
   margin: 0;
   overflow: hidden;
-  background-color: #1e1e1e;
+  background-color: var(--background-tertiary);
   display: flex;
   flex-direction: column;
 }
@@ -12,7 +12,7 @@
   justify-content: center;
   align-items: center;
   height: 100%;
-  color: #e0e0e0;
+  color: var(--text-color);
   font-size: 1.2rem;
 }
 
@@ -21,7 +21,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  background-color: #272822;
+  background-color: var(--background-secondary);
 }
 
 .split-layout {
@@ -40,7 +40,7 @@
 
 /* Split.js gutter styling */
 .gutter {
-  background-color: #333;
+  background-color: var(--border-color);
   background-repeat: no-repeat;
   background-position: 50%;
 }
@@ -53,23 +53,23 @@
 .main-content {
   height: 100%;
   overflow: hidden;
-  background-color: #1e1e1e;
+  background-color: var(--background-tertiary);
   border-radius: 8px 0 0 8px;
 }
 
 .graph-panel {
   height: 100%;
   overflow: hidden;
-  background-color: #252525;
+  background-color: var(--background-secondary);
   border-radius: 0 8px 8px 0;
-  border-left: 1px solid #333;
+  border-left: 1px solid var(--border-color);
 }
 
 .main-content-full {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: #1e1e1e;
+  background-color: var(--background-tertiary);
   flex: 1;
 }
 
@@ -96,4 +96,20 @@
   .game-header {
     padding: 12px;
   }
+}
+
+/* Setup Modal Overlay */
+.setup-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+  padding: 20px;
 }

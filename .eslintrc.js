@@ -70,6 +70,9 @@ module.exports = {
     'import/default': 'off', // Temporarily disabled due to ESLint 9 compatibility issue
     'import/export': 'off', // Temporarily disabled due to ESLint 9 compatibility issue
 
+    // Variable Rules
+    'no-undef': 'error', // Catch undefined variables at build time
+    
     // Unused Variables Rules
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': [

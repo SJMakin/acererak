@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Game Flow', () => {
-  test('should handle complete game flow including combat', async ({ page }) => {
+  test('should handle complete game flow', async ({ page }) => {
     // Start the game and wait for initial load
     await page.goto('http://localhost:5173');
     await page.waitForLoadState('networkidle');
@@ -30,27 +30,6 @@ test.describe('Game Flow', () => {
     if (await diceAnimation.isVisible()) {
       // Wait for dice animation to complete
       await expect(diceAnimation).not.toBeVisible({ timeout: 5000 });
-    }
-
-    // Check for combat mode
-    const combatDisplay = page.locator('.combat-display');
-    if (await combatDisplay.isVisible()) {
-      // Wait for initiative order
-      await expect(page.locator('.initiative-order')).toBeVisible();
-
-      // Wait for player's turn
-      await expect(page.locator('.action-panel')).toBeVisible();
-
-      // Select an action and target
-      const targetButton = page.locator('.target-button').first();
-      await targetButton.click();
-
-      // Wait for combat action to complete
-      await expect(page.locator('.combat-log')).toContainText('damage');
-
-      // End combat
-      const endCombatButton = page.locator('.end-combat-button');
-      await endCombatButton.click();
     }
 
     // Verify return to story mode

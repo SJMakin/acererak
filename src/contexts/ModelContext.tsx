@@ -12,10 +12,39 @@ export interface ModelOption {
   isFree: boolean;
   releaseRank: number; // Higher number = more recent release
   modelType?: 'text' | 'image'; // Type of model
+  pricing?: {
+    prompt: number; // Cost per 1M tokens (input)
+    completion: number; // Cost per 1M tokens (output)
+  };
+}
+
+interface OpenRouterModel {
+  id: string;
+  name?: string;
+  description?: string;
+  architecture?: {
+    output_modalities?: string[];
+    supports_json?: boolean;
+  };
+  top_provider?: {
+    is_free?: boolean;
+  };
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    request?: string;
+  };
+  context?:
+    | {
+        free?: boolean;
+        size?: string;
+      }
+    | string;
+  created?: number;
 }
 
 // Determine the type of model based on its ID and architecture
-function getModelType(model: any): 'text' | 'image' {
+function getModelType(model: OpenRouterModel): 'text' | 'image' {
   const id = model.id.toLowerCase();
 
   // Check for image generation model keywords
@@ -46,7 +75,7 @@ function getModelType(model: any): 'text' | 'image' {
 }
 
 // Determine if a model supports JSON based on the model's metadata
-function modelSupportsStructuredOutput(model: any): boolean {
+function modelSupportsStructuredOutput(model: OpenRouterModel): boolean {
   // If we have proper architecture information
   if (model.architecture) {
     // Check for "json" capability explicitly if available in future API versions
@@ -78,9 +107,9 @@ function modelSupportsStructuredOutput(model: any): boolean {
 }
 
 // Determine if a model is free or has minimal cost based on pricing data
-function modelIsFree(model: any): boolean {
+function modelIsFree(model: OpenRouterModel): boolean {
   // If explicitly marked as free in the top_provider section
-  if (model.top_provider && model.top_provider.is_free === true) {
+  if (model.top_provider?.is_free === true) {
     return true;
   }
 
@@ -88,9 +117,9 @@ function modelIsFree(model: any): boolean {
   if (model.pricing) {
     try {
       // Get all the cost components
-      const promptCost = parseFloat(model.pricing.prompt) || 0;
-      const completionCost = parseFloat(model.pricing.completion) || 0;
-      const requestCost = parseFloat(model.pricing.request) || 0;
+      const promptCost = parseFloat(model.pricing.prompt || '0') || 0;
+      const completionCost = parseFloat(model.pricing.completion || '0') || 0;
+      const requestCost = parseFloat(model.pricing.request || '0') || 0;
 
       // Sum them up
       const totalCost = promptCost + completionCost + requestCost;
@@ -111,12 +140,13 @@ function modelIsFree(model: any): boolean {
   }
 
   // If context indicates free
-  if (
-    model.context &&
-    (model.context.free === true ||
-      (typeof model.context === 'string' && model.context.includes('free')))
-  ) {
-    return true;
+  if (model.context) {
+    if (typeof model.context === 'object' && model.context.free === true) {
+      return true;
+    }
+    if (typeof model.context === 'string' && model.context.includes('free')) {
+      return true;
+    }
   }
 
   // Check name or description for "free" mentions
@@ -128,7 +158,11 @@ function modelIsFree(model: any): boolean {
 
   // If pricing structure indicates this is a smaller model
   // (smaller models are often free or very low cost)
-  if (model.context && model.context.size === 'small') {
+  if (
+    model.context &&
+    typeof model.context === 'object' &&
+    model.context.size === 'small'
+  ) {
     return true;
   }
 
@@ -137,7 +171,7 @@ function modelIsFree(model: any): boolean {
 }
 
 // Get model release recency rank based on creation date
-function getModelReleaseRank(model: any): number {
+function getModelReleaseRank(model: OpenRouterModel): number {
   // If we have a creation date, use it as the primary ranking factor
   if (model.created) {
     // Models with a recent creation timestamp get a high base score
@@ -171,7 +205,7 @@ async function fetchAvailableModels(): Promise<ModelOption[]> {
     const data = await response.json();
 
     // Process all models from API response
-    return data.data.map((model: any) => {
+    return data.data.map((model: OpenRouterModel) => {
       // Extract provider from model ID
       const id = model.id;
       const providerName = id.includes('/') ? id.split('/')[0] : 'Other';
@@ -189,6 +223,16 @@ async function fetchAvailableModels(): Promise<ModelOption[]> {
       const supportsJson =
         modelType === 'text' ? modelSupportsStructuredOutput(model) : false;
 
+      // Parse pricing (API returns string like "0.00003" per token, convert to per 1M tokens)
+      let pricing: { prompt: number; completion: number } | undefined;
+      if (model.pricing) {
+        const promptCost = parseFloat(model.pricing.prompt || '0') * 1_000_000;
+        const completionCost = parseFloat(model.pricing.completion || '0') * 1_000_000;
+        if (promptCost > 0 || completionCost > 0) {
+          pricing = { prompt: promptCost, completion: completionCost };
+        }
+      }
+
       // Return enhanced model object
       return {
         id: model.id,
@@ -199,6 +243,7 @@ async function fetchAvailableModels(): Promise<ModelOption[]> {
         isFree: modelIsFree(model),
         releaseRank: getModelReleaseRank(model),
         modelType,
+        pricing,
       };
     });
   } catch (error) {
@@ -363,7 +408,7 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
               const bestModel = findBestDefaultModel(textModels);
               if (bestModel) setSelectedModel(bestModel);
             }
-          } catch (e) {
+          } catch (_e) {
             // Error parsing saved model, find the best default
             const bestModel = findBestDefaultModel(textModels);
             if (bestModel) setSelectedModel(bestModel);
@@ -390,7 +435,7 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
               const bestImageModel = findBestDefaultImageModel(imageModels);
               if (bestImageModel) setSelectedImageModel(bestImageModel);
             }
-          } catch (e) {
+          } catch (_e) {
             const bestImageModel = findBestDefaultImageModel(imageModels);
             if (bestImageModel) setSelectedImageModel(bestImageModel);
           }

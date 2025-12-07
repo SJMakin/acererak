@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChakraProvider } from '@chakra-ui/react';
 
 import Layout from './components/Layout';
 import {
@@ -7,18 +8,21 @@ import {
   ApiKeyProvider,
   TTSProvider,
 } from './contexts';
+import { system } from './theme';
 
 const App: React.FC = () => {
   return (
-    <ApiKeyProvider>
-      <ModelProvider>
-        <TTSProvider>
-          <GameProvider>
-            <Layout />
-          </GameProvider>
-        </TTSProvider>
-      </ModelProvider>
-    </ApiKeyProvider>
+    <ChakraProvider value={system}>
+      <ApiKeyProvider>
+        <ModelProvider>
+          <TTSProvider>
+            <GameProvider>
+              <Layout />
+            </GameProvider>
+          </TTSProvider>
+        </ModelProvider>
+      </ApiKeyProvider>
+    </ChakraProvider>
   );
 };
 
