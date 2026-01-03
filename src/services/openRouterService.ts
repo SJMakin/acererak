@@ -352,8 +352,17 @@ export async function generateStoryPlan(
 }
 
 /**
+ * Extended response type that includes LLM call info for cost tracking
+ */
+export interface StoryGenerationResult {
+  response: StoryGenerationResponse;
+  llmCall: LlmCallInfo;
+}
+
+/**
  * Generate a story node with streaming support
  * Calls onPartialContent callback as story content arrives
+ * Returns both the story response and LLM call info for cost tracking
  */
 export async function generateStoryNodeStreaming(
   context: string,
@@ -364,8 +373,9 @@ export async function generateStoryNodeStreaming(
     customRules?: string[];
   },
   onPartialContent?: (content: string) => void
-): Promise<StoryGenerationResponse> {
+): Promise<StoryGenerationResult> {
   const currentModel = getCurrentModel();
+  const startTime = Date.now();
 
   if (!storyPlan) {
     storyPlan = await generateStoryPlan(currentModel);
@@ -543,11 +553,27 @@ WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visc
           throw new Error('Duplicate choices detected');
         }
 
+        // Calculate duration and estimate tokens (streaming doesn't always provide usage)
+        const duration = Date.now() - startTime;
+        // Rough estimation: ~4 chars per token for English text
+        const estimatedPromptTokens = Math.ceil((prompt.length + systemMessage.length) / 4);
+        const estimatedCompletionTokens = Math.ceil(accumulated.length / 4);
+        
+        const llmCall = createLlmCallInfo(
+          currentModel,
+          estimatedPromptTokens,
+          estimatedCompletionTokens,
+          duration,
+          'story'
+        );
+
         console.log('Generated story node (streaming):', cleanedResponse);
-        return cleanedResponse;
+        console.log('LLM call info:', llmCall);
+        return { response: cleanedResponse, llmCall };
       } else {
         // Fall back to non-streaming if no callback provided
-        return generateStoryNode(context, entities);
+        const nonStreamingResult = await generateStoryNodeNonStreaming(context, entities, startTime);
+        return nonStreamingResult;
       }
     } catch (error) {
       const parseError = error as Error;
@@ -565,17 +591,19 @@ WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visc
 }
 
 /**
- * Generate a story node (non-streaming, original implementation)
+ * Generate a story node (non-streaming implementation)
+ * Internal function used by generateStoryNodeStreaming when no callback is provided
  */
-export async function generateStoryNode(
+async function generateStoryNodeNonStreaming(
   context: string,
   entities: {
     player: string;
     npcs?: string[];
     enemies?: string[];
     customRules?: string[];
-  }
-): Promise<StoryGenerationResponse> {
+  },
+  startTime: number
+): Promise<StoryGenerationResult> {
   const currentModel = getCurrentModel();
 
   if (!storyPlan) {
@@ -718,8 +746,23 @@ WRITE LIKE: Cronenberg fever dream × Black Sabbath album × cosmic horror. Visc
         throw new Error('Duplicate choices detected');
       }
 
+      // Calculate duration and get token usage from response (or estimate if not available)
+      const duration = Date.now() - startTime;
+      const usage = response.usage;
+      const promptTokens = usage?.prompt_tokens || Math.ceil((prompt.length + systemMessage.length) / 4);
+      const completionTokens = usage?.completion_tokens || Math.ceil(jsonContent.length / 4);
+      
+      const llmCall = createLlmCallInfo(
+        currentModel,
+        promptTokens,
+        completionTokens,
+        duration,
+        'story'
+      );
+
       console.log('Generated story node:', cleanedResponse);
-      return cleanedResponse;
+      console.log('LLM call info:', llmCall);
+      return { response: cleanedResponse, llmCall };
     } catch (error) {
       const parseError = error as Error;
       console.error('Story generation error:', { error: parseError.message });

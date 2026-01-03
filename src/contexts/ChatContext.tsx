@@ -31,6 +31,7 @@ import {
   generateFillerContent,
   generateStoryImage,
   generateStoryPlan,
+  type StoryGenerationResult,
 } from '../services/openRouterService';
 import type {
   ChatMessage,
@@ -307,7 +308,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         const rules = getEnabledRulesForStoryContext();
 
         // Generate story with streaming
-        const storyData = await generateStoryNodeStreaming(
+        const storyResult: StoryGenerationResult = await generateStoryNodeStreaming(
           context,
           {
             player: characterSheet,
@@ -320,9 +321,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         );
 
-        if (!isValidStoryResponse(storyData)) {
-          throw new Error('Invalid story response structure');
-        }
+        const { response: storyData, llmCall } = storyResult;
 
         // Generate character updates
         const playerEntity: Entity = {
@@ -365,18 +364,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           requiredRolls: c.requiredRolls,
         }));
 
-        // Update story message with final content and choices
+        // Update story message with final content, choices, and LLM call info
         updateMessage(storyMsgId, {
           content: storyData.story.content,
           summary: storyData.story.summary,
           streaming: false,
           choices: chatChoices,
+          llmCall: llmCall,
         });
 
+        // Update session costs with LLM call info
         setState((prev) => ({
           ...prev,
           streamingMessageId: null,
           sessionCalls: prev.sessionCalls + 1,
+          sessionCost: prev.sessionCost + llmCall.estimatedCost,
+          sessionTokens: prev.sessionTokens + llmCall.totalTokens,
         }));
 
         // Generate image if enabled
@@ -539,7 +542,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           hasUnsavedChanges: true,
         }));
 
-        const storyData = await generateStoryNodeStreaming(
+        const storyResult: StoryGenerationResult = await generateStoryNodeStreaming(
           context,
           {
             player: newCharacterSheet,
@@ -557,9 +560,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         );
 
-        if (!isValidStoryResponse(storyData)) {
-          throw new Error('Invalid story response structure');
-        }
+        const { response: storyData, llmCall } = storyResult;
 
         // Convert choices
         const chatChoices: ChatChoice[] = storyData.choices.map((c) => ({
@@ -569,7 +570,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           requiredRolls: c.requiredRolls,
         }));
 
-        // Create the complete story message
+        // Create the complete story message with LLM call info
         const completeStoryMessage: StoryMessage = {
           id: storyMsgId,
           type: 'story',
@@ -579,6 +580,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           summary: storyData.story.summary,
           streaming: false,
           choices: chatChoices,
+          llmCall: llmCall,
         };
 
         const messages: ChatMessage[] = [completeStoryMessage];
@@ -636,6 +638,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           isGenerating: false,
           streamingMessageId: null,
           sessionCalls: prev.sessionCalls + 1,
+          sessionCost: prev.sessionCost + llmCall.estimatedCost,
+          sessionTokens: prev.sessionTokens + llmCall.totalTokens,
           hasUnsavedChanges: true,
         }));
       } catch (error) {

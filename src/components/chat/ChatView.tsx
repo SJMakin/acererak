@@ -2,10 +2,11 @@
  * ChatView - Main chat interface view with header and panels
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 import { useChat } from '../../contexts/ChatContext';
 import { getDisplaySettings } from '../../services/gameStorageService';
+import type { DisplaySettings } from '../../types';
 
 import CharacterSheet from '../CharacterSheet';
 import RulesPanel from '../RulesPanel';
@@ -39,7 +40,15 @@ const ChatView: React.FC<ChatViewProps> = ({ onNewGame }) => {
   } = useChat();
 
   const [activePanel, setActivePanel] = useState<PanelType>(null);
-  const displaySettings = getDisplaySettings();
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => getDisplaySettings());
+
+  // Re-fetch display settings when settings panel is closed (user might have changed them)
+  useEffect(() => {
+    if (activePanel === null) {
+      // Panel just closed, refresh settings in case they changed
+      setDisplaySettings(getDisplaySettings());
+    }
+  }, [activePanel]);
 
   // Get game name from current game
   const gameName = currentGame?.name || 'Acererak';

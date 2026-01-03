@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 import { syncImageModelFromContext } from '../services/imageGenerationService';
 
+// Preferred default models (used when no saved preference exists)
+const PREFERRED_TEXT_MODEL = 'openai/gpt-5.1-chat';
+const PREFERRED_IMAGE_MODEL = 'google/gemini-2.0-flash-exp:free';
+
 // Define model options with provider, support and release info
 export interface ModelOption {
   id: string;
@@ -318,6 +322,13 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
     // Filter for text models only
     const textModels = models.filter(model => model.modelType === 'text');
 
+    // First, check if the preferred model exists
+    const preferredModel = textModels.find(m => m.id === PREFERRED_TEXT_MODEL);
+    if (preferredModel) {
+      console.log('Using preferred text model:', PREFERRED_TEXT_MODEL);
+      return preferredModel;
+    }
+
     // Filter for models that support JSON and are free
     const freeJsonModels = textModels.filter(
       model => model.supportsJson && model.isFree
@@ -351,6 +362,13 @@ export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({
     const imageModels = models.filter(model => model.modelType === 'image');
 
     if (imageModels.length === 0) return null;
+
+    // First, check if the preferred model exists
+    const preferredModel = imageModels.find(m => m.id === PREFERRED_IMAGE_MODEL);
+    if (preferredModel) {
+      console.log('Using preferred image model:', PREFERRED_IMAGE_MODEL);
+      return preferredModel;
+    }
 
     // Prefer free models
     const freeImageModels = imageModels.filter(model => model.isFree);

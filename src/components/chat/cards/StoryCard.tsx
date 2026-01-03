@@ -38,7 +38,14 @@ const StoryCard: React.FC<StoryCardProps> = ({
           <span className="chat-card-title-icon">💀</span>
           <span>Story</span>
         </div>
-        {showLlmInfo && llmCall && <LlmCallBadge llmCall={llmCall} />}
+        <div className="chat-card-header-actions">
+          {showLlmInfo && llmCall && <LlmCallBadge llmCall={llmCall} />}
+          {onBranch && !streaming && (
+            <button className="chat-card-header-btn" onClick={onBranch} title="Branch from here">
+              ↩
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="chat-card-content">
@@ -48,18 +55,13 @@ const StoryCard: React.FC<StoryCardProps> = ({
       </div>
       {streaming && <span className="streaming-cursor" />}
 
-      <div className="chat-card-actions">
-        {ttsEnabled && onTtsPlay && (
+      {ttsEnabled && onTtsPlay && (
+        <div className="chat-card-actions">
           <button className="chat-card-action" onClick={onTtsPlay}>
             🔊 Read Aloud
           </button>
-        )}
-        {onBranch && !streaming && (
-          <button className="chat-card-action" onClick={onBranch}>
-            ↩ Branch
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {choices && choices.length > 0 && !streaming && (
         <div className="choices-section">

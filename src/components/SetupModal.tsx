@@ -229,7 +229,7 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
       {/* Step Indicator */}
       <Box bg="gray.850" py={3} borderBottom="1px solid" borderColor="gray.700" flexShrink={0}>
         <Box px={4}>
-          <HStack justify="center" gap={1} flexWrap="wrap">
+          <HStack justify="center" gap={2} flexWrap="wrap">
             {[
               { key: 'system', label: '1. System' },
               { key: 'character', label: '2. Character' },
@@ -239,8 +239,13 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
               <Button
                 key={key}
                 size="sm"
-                variant={step === key ? 'solid' : 'ghost'}
-                colorPalette={step === key ? 'purple' : 'gray'}
+                variant="outline"
+                px={4}
+                bg={step === key ? 'purple.600' : 'gray.800'}
+                color={step === key ? 'white' : 'gray.300'}
+                borderColor={step === key ? 'purple.500' : 'gray.600'}
+                borderWidth="1px"
+                _hover={step === key ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'gray.500' }}
                 onClick={() => setStep(key as Step)}
                 disabled={key !== 'system' && key !== 'settings' && !canProceed}
               >
@@ -249,8 +254,13 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
             ))}
             <Button
               size="sm"
-              variant={step === 'settings' ? 'solid' : 'ghost'}
-              colorPalette={step === 'settings' ? 'purple' : 'gray'}
+              variant="outline"
+              px={4}
+              bg={step === 'settings' ? 'purple.600' : 'gray.800'}
+              color={step === 'settings' ? 'white' : 'gray.300'}
+              borderColor={step === 'settings' ? 'purple.500' : 'gray.600'}
+              borderWidth="1px"
+              _hover={step === 'settings' ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'gray.500' }}
               onClick={() => setStep('settings')}
             >
               ⚙️ Settings
@@ -272,8 +282,12 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
               {PREDEFINED_SYSTEMS.map((system) => (
                 <Button
                   key={system}
-                  variant={selectedSystem === system ? 'solid' : 'outline'}
-                  colorPalette={selectedSystem === system ? 'purple' : 'gray'}
+                  variant="outline"
+                  bg={selectedSystem === system ? 'purple.600' : 'gray.800'}
+                  color={selectedSystem === system ? 'white' : 'gray.300'}
+                  borderColor={selectedSystem === system ? 'purple.500' : 'gray.600'}
+                  borderWidth="1px"
+                  _hover={selectedSystem === system ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'purple.400' }}
                   onClick={() => handleSystemSelect(system)}
                   size="sm"
                   height="auto"
@@ -337,7 +351,16 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
             </Text>
 
             <Flex justify="space-between">
-              <Button variant="ghost" onClick={() => setStep('system')}>
+              <Button
+                variant="outline"
+                px={4}
+                bg="gray.800"
+                color="gray.300"
+                borderColor="gray.600"
+                borderWidth="1px"
+                _hover={{ bg: 'gray.700', borderColor: 'gray.500' }}
+                onClick={() => setStep('system')}
+              >
                 ← Back
               </Button>
               <Button colorPalette="purple" onClick={() => setStep('themes')}>
@@ -358,16 +381,24 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
               <HStack mb={3}>
                 <Button
                   size="sm"
-                  variant={!useRandomThemes ? 'solid' : 'outline'}
-                  colorPalette={!useRandomThemes ? 'purple' : 'gray'}
+                  variant="outline"
+                  bg={!useRandomThemes ? 'purple.600' : 'gray.800'}
+                  color={!useRandomThemes ? 'white' : 'gray.300'}
+                  borderColor={!useRandomThemes ? 'purple.500' : 'gray.600'}
+                  borderWidth="1px"
+                  _hover={!useRandomThemes ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'purple.400' }}
                   onClick={() => setUseRandomThemes(false)}
                 >
                   Custom Themes
                 </Button>
                 <Button
                   size="sm"
-                  variant={useRandomThemes ? 'solid' : 'outline'}
-                  colorPalette={useRandomThemes ? 'purple' : 'gray'}
+                  variant="outline"
+                  bg={useRandomThemes ? 'purple.600' : 'gray.800'}
+                  color={useRandomThemes ? 'white' : 'gray.300'}
+                  borderColor={useRandomThemes ? 'purple.500' : 'gray.600'}
+                  borderWidth="1px"
+                  _hover={useRandomThemes ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'purple.400' }}
                   onClick={() => setUseRandomThemes(true)}
                 >
                   🎲 Random
@@ -401,7 +432,16 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
             </Box>
 
             <Flex justify="space-between">
-              <Button variant="ghost" onClick={() => setStep('character')}>
+              <Button
+                variant="outline"
+                px={4}
+                bg="gray.800"
+                color="gray.300"
+                borderColor="gray.600"
+                borderWidth="1px"
+                _hover={{ bg: 'gray.700', borderColor: 'gray.500' }}
+                onClick={() => setStep('character')}
+              >
                 ← Back
               </Button>
               <Button colorPalette="purple" onClick={() => setStep('preview')}>
@@ -413,8 +453,8 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
 
         {/* Preview */}
         {step === 'preview' && (
-          <VStack gap={6} align="stretch">
-            <Flex justify="space-between" align="center">
+          <VStack gap={4} align="stretch" height="100%">
+            <Flex justify="space-between" align="center" flexShrink={0}>
               <Heading size="md" color="purple.300">
                 Preview Your Adventure
               </Heading>
@@ -432,19 +472,27 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
               </Button>
             </Flex>
 
-            <HStack>
+            <HStack flexShrink={0}>
               <Button
                 size="sm"
-                variant={previewTab === 'character' ? 'solid' : 'ghost'}
-                colorPalette={previewTab === 'character' ? 'purple' : 'gray'}
+                variant="outline"
+                bg={previewTab === 'character' ? 'purple.600' : 'gray.800'}
+                color={previewTab === 'character' ? 'white' : 'gray.300'}
+                borderColor={previewTab === 'character' ? 'purple.500' : 'gray.600'}
+                borderWidth="1px"
+                _hover={previewTab === 'character' ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'purple.400' }}
                 onClick={() => setPreviewTab('character')}
               >
                 Character {characterPreview && '✓'}
               </Button>
               <Button
                 size="sm"
-                variant={previewTab === 'story' ? 'solid' : 'ghost'}
-                colorPalette={previewTab === 'story' ? 'purple' : 'gray'}
+                variant="outline"
+                bg={previewTab === 'story' ? 'purple.600' : 'gray.800'}
+                color={previewTab === 'story' ? 'white' : 'gray.300'}
+                borderColor={previewTab === 'story' ? 'purple.500' : 'gray.600'}
+                borderWidth="1px"
+                _hover={previewTab === 'story' ? { bg: 'purple.500' } : { bg: 'gray.700', borderColor: 'purple.400' }}
                 onClick={() => setPreviewTab('story')}
               >
                 Story Plan {storyPlanPreview && '✓'}
@@ -455,8 +503,8 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
               bg="gray.800"
               p={4}
               borderRadius="md"
-              minH="200px"
-              maxH="400px"
+              flex={1}
+              minH="150px"
               overflowY="auto"
             >
               {previewTab === 'character' && (
@@ -494,20 +542,6 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
                 </>
               )}
             </Box>
-
-            <Flex justify="space-between" align="center">
-              <Button variant="ghost" onClick={() => setStep('themes')}>
-                ← Back
-              </Button>
-              <Button
-                colorPalette="green"
-                size="lg"
-                onClick={handleSubmit}
-                disabled={!canProceed}
-              >
-                🎮 Begin Adventure
-              </Button>
-            </Flex>
           </VStack>
         )}
 
@@ -541,6 +575,41 @@ const SetupModal: React.FC<SetupModalProps> = ({ onSetupComplete, onClose, isPro
           </VStack>
         )}
       </Box>
+
+      {/* Fixed Footer for Preview Step */}
+      {step === 'preview' && (
+        <Box
+          bg="gray.800"
+          borderTop="1px solid"
+          borderColor="gray.700"
+          py={4}
+          px={4}
+          flexShrink={0}
+        >
+          <Flex justify="space-between" align="center">
+            <Button
+              variant="outline"
+              px={4}
+              bg="gray.800"
+              color="gray.300"
+              borderColor="gray.600"
+              borderWidth="1px"
+              _hover={{ bg: 'gray.700', borderColor: 'gray.500' }}
+              onClick={() => setStep('themes')}
+            >
+              ← Back
+            </Button>
+            <Button
+              colorPalette="green"
+              size="lg"
+              onClick={handleSubmit}
+              disabled={!canProceed}
+            >
+              🎮 Begin Adventure
+            </Button>
+          </Flex>
+        </Box>
+      )}
     </Box>
   );
 };

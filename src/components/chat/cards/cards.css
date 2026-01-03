@@ -42,6 +42,33 @@
   font-size: 1rem;
 }
 
+.chat-card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-card-header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 0.9rem;
+  color: var(--text-muted, #888);
+  background: transparent;
+  border: 1px solid var(--border-color, #2a2a4e);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-card-header-btn:hover {
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.1);
+}
+
 /* Card content */
 .chat-card-content {
   font-size: 1rem;
