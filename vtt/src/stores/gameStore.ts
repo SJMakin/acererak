@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
+import { saveGame } from '../db/database';
+import { useHistoryStore } from './historyStore';
 import type {
   GameState,
   CanvasElement,
@@ -8,7 +10,55 @@ import type {
   ToolType,
   Point,
   DEFAULT_GRID_SETTINGS,
+  CombatTracker,
+  Combatant,
+  TokenElement,
+  DiceRoll,
+  Settings,
 } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
+
+// Debounce helper
+let saveTimeout: NodeJS.Timeout | null = null;
+const SAVE_DEBOUNCE_MS = 1000;
+
+function debouncedSave(game: GameState, isDM: boolean) {
+  if (!isDM) return; // Only save if current user is DM
+  
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  
+  saveTimeout = setTimeout(() => {
+    saveGame(game, isDM).catch((err) => {
+      console.error('Failed to save game:', err);
+    });
+  }, SAVE_DEBOUNCE_MS);
+}
+
+// Settings localStorage helpers
+const SETTINGS_STORAGE_KEY = 'vtt-settings';
+
+function loadSettings(): Settings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+  }
+  return DEFAULT_SETTINGS;
+}
+
+function saveSettings(settings: Settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+  }
+}
 
 interface GameStore {
   // Game state
@@ -20,8 +70,12 @@ interface GameStore {
   // UI state
   selectedTool: ToolType;
   selectedElementId: string | null;
+  selectedElementIds: string[];
   viewportOffset: Point;
   viewportScale: number;
+
+  // Settings state
+  settings: Settings;
 
   // Actions - Game management
   createGame: (name: string, playerName: string) => void;
@@ -29,10 +83,16 @@ interface GameStore {
   setConnected: (connected: boolean, peerId?: string) => void;
 
   // Actions - Elements
-  addElement: (element: Omit<CanvasElement, 'id'>) => string;
-  updateElement: (id: string, updates: Partial<CanvasElement>) => void;
-  deleteElement: (id: string) => void;
+  addElement: (element: Omit<CanvasElement, 'id'>, skipHistory?: boolean) => string;
+  addElements: (elements: Omit<CanvasElement, 'id'>[]) => string[];
+  updateElement: (id: string, updates: Partial<CanvasElement>, skipHistory?: boolean) => void;
+  deleteElement: (id: string, skipHistory?: boolean) => void;
+  deleteElements: (ids: string[]) => void;
   selectElement: (id: string | null) => void;
+  selectElements: (ids: string[]) => void;
+  toggleElementSelection: (id: string) => void;
+  addToSelection: (id: string) => void;
+  clearSelection: () => void;
 
   // Actions - Players
   addPlayer: (player: Player) => void;
@@ -43,15 +103,37 @@ interface GameStore {
   updateGridSettings: (settings: Partial<GridSettings>) => void;
 
   // Actions - Fog of War
-  revealFog: (polygon: Point[]) => void;
-  hideFog: (polygon: Point[]) => void;
+  revealFog: (polygon: Point[], skipHistory?: boolean) => void;
+  hideFog: (polygon: Point[], skipHistory?: boolean) => void;
   toggleFog: (enabled: boolean) => void;
+
+  // Actions - Combat
+  startCombat: () => void;
+  endCombat: () => void;
+  addCombatant: (tokenId: string, initiative: number, dexterity?: number) => void;
+  removeCombatant: (combatantId: string) => void;
+  updateCombatant: (combatantId: string, updates: Partial<Combatant>) => void;
+  nextTurn: () => void;
+  previousTurn: () => void;
+  updateCombatState: (combat: CombatTracker) => void;
+
+  // Actions - Dice
+  addDiceRoll: (roll: DiceRoll) => void;
+  clearDiceHistory: () => void;
+
+  // Actions - Settings
+  updateSettings: (settings: Partial<Settings>) => void;
+  resetSettings: () => void;
 
   // Actions - UI
   setTool: (tool: ToolType) => void;
   setViewport: (offset: Point, scale: number) => void;
   panViewport: (delta: Point) => void;
   zoomViewport: (delta: number, center: Point) => void;
+
+  // Actions - Undo/Redo
+  performUndo: () => void;
+  performRedo: () => void;
 }
 
 const DEFAULT_GRID: GridSettings = {
@@ -73,16 +155,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedElementId: null,
   viewportOffset: { x: 0, y: 0 },
   viewportScale: 1,
+  settings: loadSettings(),
 
   // Game management
   createGame: (name, playerName) => {
     const peerId = nanoid(10);
+    const state = get();
     const game: GameState = {
       id: nanoid(12),
       name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      gridSettings: DEFAULT_GRID,
+      gridSettings: {
+        cellSize: state.settings.cellSize,
+        width: state.settings.gridSize.width,
+        height: state.settings.gridSize.height,
+        showGrid: state.settings.showGridByDefault,
+        snapToGrid: state.settings.snapToGridByDefault,
+        gridColor: state.settings.gridColor,
+      },
       elements: [],
       fogOfWar: { enabled: false, revealed: [] },
       players: {
@@ -97,6 +188,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dmPeerId: peerId,
     };
     set({ game, myPeerId: peerId, isDM: true });
+    debouncedSave(game, true);
   },
 
   loadGame: (game) => {
@@ -108,48 +200,103 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   // Element management
-  addElement: (elementData) => {
+  addElement: (elementData, skipHistory = false) => {
     const id = nanoid(10);
     const element = { ...elementData, id } as CanvasElement;
 
     set((state) => {
       if (!state.game) return state;
+      
+      // Track action in history
+      if (!skipHistory) {
+        useHistoryStore.getState().pushAction({
+          type: 'add',
+          timestamp: Date.now(),
+          before: { elements: state.game.elements },
+          after: { elements: [...state.game.elements, element] },
+          elementId: id,
+          description: `Added ${element.type}`,
+        });
+      }
+      
+      const updatedGame = {
+        ...state.game,
+        elements: [...state.game.elements, element],
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
       return {
-        game: {
-          ...state.game,
-          elements: [...state.game.elements, element],
-          updatedAt: new Date().toISOString(),
-        },
+        game: updatedGame,
       };
     });
 
     return id;
   },
 
-  updateElement: (id, updates) => {
+  updateElement: (id, updates, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      
+      const oldElement = state.game.elements.find(el => el.id === id);
+      if (!oldElement) return state;
+      
+      // Track action in history (only for significant updates like position or properties)
+      const isPositionUpdate = updates.x !== undefined || updates.y !== undefined;
+      const isPropertyUpdate = 'hp' in updates && updates.hp !== undefined;
+      
+      if (!skipHistory && (isPositionUpdate || isPropertyUpdate)) {
+        useHistoryStore.getState().pushAction({
+          type: isPositionUpdate ? 'move' : 'update',
+          timestamp: Date.now(),
+          before: { elements: state.game.elements },
+          after: { elements: state.game.elements.map((el) =>
+            el.id === id ? { ...el, ...updates } as CanvasElement : el
+          ) },
+          elementId: id,
+          description: `Updated ${oldElement.type}`,
+        });
+      }
+      
+      const updatedGame: GameState = {
+        ...state.game,
+        elements: state.game.elements.map((el) =>
+          el.id === id ? { ...el, ...updates } as CanvasElement : el
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
       return {
-        game: {
-          ...state.game,
-          elements: state.game.elements.map((el) =>
-            el.id === id ? { ...el, ...updates } : el
-          ),
-          updatedAt: new Date().toISOString(),
-        },
+        game: updatedGame,
       };
     });
   },
 
-  deleteElement: (id) => {
+  deleteElement: (id, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      
+      const deletedElement = state.game.elements.find(el => el.id === id);
+      
+      // Track action in history
+      if (!skipHistory && deletedElement) {
+        useHistoryStore.getState().pushAction({
+          type: 'delete',
+          timestamp: Date.now(),
+          before: { elements: state.game.elements },
+          after: { elements: state.game.elements.filter((el) => el.id !== id) },
+          elementId: id,
+          description: `Deleted ${deletedElement.type}`,
+        });
+      }
+      
+      const updatedGame = {
+        ...state.game,
+        elements: state.game.elements.filter((el) => el.id !== id),
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
       return {
-        game: {
-          ...state.game,
-          elements: state.game.elements.filter((el) => el.id !== id),
-          updatedAt: new Date().toISOString(),
-        },
+        game: updatedGame,
         selectedElementId:
           state.selectedElementId === id ? null : state.selectedElementId,
       };
@@ -215,9 +362,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   // Fog of War management
-  revealFog: (polygon) => {
+  revealFog: (polygon, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      
+      // Track action in history
+      if (!skipHistory) {
+        useHistoryStore.getState().pushAction({
+          type: 'fog-reveal',
+          timestamp: Date.now(),
+          before: { fogOfWar: state.game.fogOfWar },
+          after: { fogOfWar: {
+            ...state.game.fogOfWar,
+            revealed: [...state.game.fogOfWar.revealed, polygon],
+          } },
+          description: 'Revealed fog area',
+        });
+      }
+      
       return {
         game: {
           ...state.game,
@@ -231,9 +393,61 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  hideFog: (_polygon) => {
-    // TODO: Implement fog hiding by subtracting polygon from revealed areas
-    console.log('hideFog not yet implemented');
+  hideFog: (polygon, skipHistory = false) => {
+    set((state) => {
+      if (!state.game) return {};
+      
+      // Simple implementation: remove revealed areas that intersect with hide polygon
+      // For a quick implementation, we'll filter out polygons whose first point
+      // is inside the hide polygon (simplified collision detection)
+      const isPointInPolygon = (point: Point, poly: Point[]): boolean => {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const xi = poly[i].x, yi = poly[i].y;
+          const xj = poly[j].x, yj = poly[j].y;
+          const intersect = ((yi > point.y) !== (yj > point.y))
+            && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      };
+      
+      const filteredRevealed = state.game.fogOfWar.revealed.filter((revealedPoly) => {
+        // Keep the revealed polygon if its center is NOT in the hide polygon
+        if (revealedPoly.length === 0) return false;
+        
+        // Calculate center point
+        const centerX = revealedPoly.reduce((sum, p) => sum + p.x, 0) / revealedPoly.length;
+        const centerY = revealedPoly.reduce((sum, p) => sum + p.y, 0) / revealedPoly.length;
+        
+        return !isPointInPolygon({ x: centerX, y: centerY }, polygon);
+      });
+      
+      // Track action in history
+      if (!skipHistory) {
+        useHistoryStore.getState().pushAction({
+          type: 'fog-hide',
+          timestamp: Date.now(),
+          before: { fogOfWar: state.game.fogOfWar },
+          after: { fogOfWar: {
+            ...state.game.fogOfWar,
+            revealed: filteredRevealed,
+          } },
+          description: 'Hid fog area',
+        });
+      }
+      
+      return {
+        game: {
+          ...state.game,
+          fogOfWar: {
+            ...state.game.fogOfWar,
+            revealed: filteredRevealed,
+          },
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
   },
 
   toggleFog: (enabled) => {
@@ -247,6 +461,196 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
       };
     });
+  },
+
+  // Combat management
+  startCombat: () => {
+    set((state) => {
+      if (!state.game) return state;
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            active: true,
+            round: 1,
+            currentTurn: 0,
+            combatants: [],
+          },
+        },
+      };
+    });
+  },
+
+  endCombat: () => {
+    set((state) => {
+      if (!state.game) return state;
+      return {
+        game: {
+          ...state.game,
+          combat: undefined,
+        },
+      };
+    });
+  },
+
+  addCombatant: (tokenId, initiative, dexterity) => {
+    set((state) => {
+      if (!state.game?.combat) return state;
+      const token = state.game.elements.find(e => e.id === tokenId) as TokenElement;
+      if (!token || token.type !== 'token') return state;
+
+      const combatant: Combatant = {
+        id: tokenId,
+        name: token.name,
+        initiative,
+        dexterity,
+        hp: token.hp || { current: 10, max: 10 },
+        conditions: token.conditions || [],
+      };
+
+      const combatants = [...state.game.combat.combatants, combatant].sort((a, b) => {
+        if (b.initiative !== a.initiative) return b.initiative - a.initiative;
+        return (b.dexterity || 0) - (a.dexterity || 0);
+      });
+
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            ...state.game.combat,
+            combatants,
+          },
+        },
+      };
+    });
+  },
+
+  removeCombatant: (combatantId) => {
+    set((state) => {
+      if (!state.game?.combat) return state;
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            ...state.game.combat,
+            combatants: state.game.combat.combatants.filter(c => c.id !== combatantId),
+          },
+        },
+      };
+    });
+  },
+
+  updateCombatant: (combatantId, updates) => {
+    set((state) => {
+      if (!state.game?.combat) return state;
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            ...state.game.combat,
+            combatants: state.game.combat.combatants.map(c =>
+              c.id === combatantId ? { ...c, ...updates } : c
+            ),
+          },
+        },
+      };
+    });
+  },
+
+  nextTurn: () => {
+    set((state) => {
+      if (!state.game?.combat) return state;
+      const currentTurn = state.game.combat.currentTurn + 1;
+      const round = currentTurn >= state.game.combat.combatants.length
+        ? state.game.combat.round + 1
+        : state.game.combat.round;
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            ...state.game.combat,
+            currentTurn: currentTurn % state.game.combat.combatants.length,
+            round,
+          },
+        },
+      };
+    });
+  },
+
+  previousTurn: () => {
+    set((state) => {
+      if (!state.game?.combat) return state;
+      let currentTurn = state.game.combat.currentTurn - 1;
+      let round = state.game.combat.round;
+      if (currentTurn < 0) {
+        currentTurn = state.game.combat.combatants.length - 1;
+        round = Math.max(1, round - 1);
+      }
+      return {
+        game: {
+          ...state.game,
+          combat: {
+            ...state.game.combat,
+            currentTurn,
+            round,
+          },
+        },
+      };
+    });
+  },
+
+  updateCombatState: (combat) => {
+    set((state) => {
+      if (!state.game) return state;
+      return {
+        game: {
+          ...state.game,
+          combat,
+        },
+      };
+    });
+  },
+
+  // Dice management
+  addDiceRoll: (roll) => {
+    set((state) => {
+      if (!state.game) return state;
+      const diceRolls = state.game.diceRolls || [];
+      // Keep only last 50 rolls
+      const updatedRolls = [...diceRolls, roll].slice(-50);
+      return {
+        game: {
+          ...state.game,
+          diceRolls: updatedRolls,
+        },
+      };
+    });
+  },
+
+  clearDiceHistory: () => {
+    set((state) => {
+      if (!state.game) return state;
+      return {
+        game: {
+          ...state.game,
+          diceRolls: [],
+        },
+      };
+    });
+  },
+
+  // Settings actions
+  updateSettings: (updates) => {
+    set((state) => {
+      const newSettings = { ...state.settings, ...updates };
+      saveSettings(newSettings);
+      return { settings: newSettings };
+    });
+  },
+
+  resetSettings: () => {
+    saveSettings(DEFAULT_SETTINGS);
+    set({ settings: DEFAULT_SETTINGS });
   },
 
   // UI actions
@@ -282,6 +686,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
         viewportScale: newScale,
         viewportOffset: newOffset,
       };
+    });
+  },
+
+  // Undo/Redo actions
+  performUndo: () => {
+    const action = useHistoryStore.getState().undo();
+    if (!action) return;
+
+    const state = get();
+    if (!state.game) return;
+
+    // Apply the before state
+    set({
+      game: {
+        ...state.game,
+        ...action.before,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  performRedo: () => {
+    const action = useHistoryStore.getState().redo();
+    if (!action) return;
+
+    const state = get();
+    if (!state.game) return;
+
+    // Apply the after state
+    set({
+      game: {
+        ...state.game,
+        ...action.after,
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 }));

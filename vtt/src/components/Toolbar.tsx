@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Group,
   ActionIcon,
@@ -9,7 +10,9 @@ import {
   Button,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
+import { useHistoryStore } from '../stores/historyStore';
 import type { ToolType } from '../types';
+import SettingsModal from './SettingsModal';
 
 interface ToolbarProps {
   sidebarOpen: boolean;
@@ -21,17 +24,17 @@ interface ToolbarProps {
   };
 }
 
-const tools: { id: ToolType; icon: string; label: string }[] = [
-  { id: 'select', icon: '👆', label: 'Select' },
-  { id: 'pan', icon: '✋', label: 'Pan' },
-  { id: 'token', icon: '🎯', label: 'Place Token' },
-  { id: 'draw-freehand', icon: '✏️', label: 'Freehand Draw' },
-  { id: 'draw-line', icon: '📏', label: 'Draw Line' },
-  { id: 'draw-rectangle', icon: '⬜', label: 'Draw Rectangle' },
-  { id: 'draw-circle', icon: '⭕', label: 'Draw Circle' },
-  { id: 'text', icon: '📝', label: 'Add Text' },
-  { id: 'measure', icon: '📐', label: 'Measure Distance' },
-  { id: 'ping', icon: '📍', label: 'Ping Location' },
+const tools: { id: ToolType; icon: string; label: string; shortcut?: string }[] = [
+  { id: 'select', icon: '👆', label: 'Select', shortcut: 'S' },
+  { id: 'pan', icon: '✋', label: 'Pan', shortcut: 'Space' },
+  { id: 'token', icon: '🎯', label: 'Place Token', shortcut: 'N' },
+  { id: 'draw-freehand', icon: '✏️', label: 'Freehand Draw', shortcut: 'D' },
+  { id: 'draw-line', icon: '📏', label: 'Draw Line', shortcut: 'L' },
+  { id: 'draw-rectangle', icon: '⬜', label: 'Draw Rectangle', shortcut: 'R' },
+  { id: 'draw-circle', icon: '⭕', label: 'Draw Circle', shortcut: 'C' },
+  { id: 'text', icon: '📝', label: 'Add Text', shortcut: 'T' },
+  { id: 'measure', icon: '📐', label: 'Measure Distance', shortcut: 'M' },
+  { id: 'ping', icon: '📍', label: 'Ping Location', shortcut: 'P' },
 ];
 
 const dmTools: { id: ToolType; icon: string; label: string }[] = [
@@ -40,7 +43,9 @@ const dmTools: { id: ToolType; icon: string; label: string }[] = [
 ];
 
 export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarProps) {
-  const { game, selectedTool, setTool, isDM, viewportScale, setViewport, viewportOffset } = useGameStore();
+  const { game, selectedTool, setTool, isDM, viewportScale, setViewport, viewportOffset, performUndo, performRedo } = useGameStore();
+  const { canUndo, canRedo } = useHistoryStore();
+  const [settingsOpened, setSettingsOpened] = useState(false);
 
   const handleZoom = (factor: number) => {
     const newScale = Math.min(Math.max(viewportScale * factor, 0.25), 3);
@@ -57,10 +62,40 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
         
         <Divider orientation="vertical" />
 
+        {/* Undo/Redo buttons */}
+        <Group gap="xs">
+          <Tooltip label="Undo (Ctrl+Z)" position="bottom">
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              onClick={performUndo}
+              disabled={!canUndo()}
+            >
+              ↶
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Redo (Ctrl+Y)" position="bottom">
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              onClick={performRedo}
+              disabled={!canRedo()}
+            >
+              ↷
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+
+        <Divider orientation="vertical" />
+
         {/* Tool buttons */}
         <Group gap="xs">
           {tools.map((tool) => (
-            <Tooltip key={tool.id} label={tool.label} position="bottom">
+            <Tooltip
+              key={tool.id}
+              label={`${tool.label}${tool.shortcut ? ` (${tool.shortcut})` : ''}`}
+              position="bottom"
+            >
               <ActionIcon
                 variant={selectedTool === tool.id ? 'filled' : 'subtle'}
                 color={selectedTool === tool.id ? 'violet' : 'gray'}
@@ -131,38 +166,35 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
           </Group>
         )}
 
+        {/* Settings button */}
+        <Tooltip label="Settings" position="bottom">
+          <ActionIcon variant="subtle" size="lg" onClick={() => setSettingsOpened(true)}>
+            ⚙️
+          </ActionIcon>
+        </Tooltip>
+
         {/* More menu */}
         <Menu shadow="md" width={200}>
           <Menu.Target>
             <ActionIcon variant="subtle" size="lg">
-              ⚙️
+              ⋮
             </ActionIcon>
           </Menu.Target>
 
           <Menu.Dropdown>
-            <Menu.Label>Grid Settings</Menu.Label>
-            <Menu.Item onClick={() => {}}>
-              Toggle Grid
-            </Menu.Item>
-            <Menu.Item onClick={() => {}}>
-              Snap to Grid
-            </Menu.Item>
-            
-            <Menu.Divider />
-            
             <Menu.Label>Game</Menu.Label>
             <Menu.Item onClick={() => {}}>
-              Export Game
+              💾 Export Game (Ctrl+S)
             </Menu.Item>
             <Menu.Item onClick={() => {}}>
-              Import Scene
+              📥 Import Scene
             </Menu.Item>
             
             {room.roomId && (
               <>
                 <Menu.Divider />
                 <Menu.Item color="red" onClick={room.leaveRoom}>
-                  Leave Game
+                  🚪 Leave Game
                 </Menu.Item>
               </>
             )}
@@ -176,6 +208,9 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      {/* Settings Modal */}
+      <SettingsModal opened={settingsOpened} onClose={() => setSettingsOpened(false)} />
     </Group>
   );
 }

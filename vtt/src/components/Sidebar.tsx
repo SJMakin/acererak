@@ -19,13 +19,17 @@ import {
 } from '@mantine/core';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
-import type { TokenElement, CanvasElement, GameExport, Visibility } from '../types';
+import type { TokenElement, CanvasElement, GameExport, Visibility, DiceRoll } from '../types';
+import CombatTracker from './CombatTracker';
+import DiceRoller from './DiceRoller';
 
 interface SidebarProps {
   room: {
     broadcastElementUpdate: (element: CanvasElement) => void;
     broadcastElementDelete: (elementId: string) => void;
     broadcastSync: () => void;
+    broadcastCombat?: () => void;
+    broadcastDiceRoll?: (roll: DiceRoll) => void;
   };
 }
 
@@ -33,10 +37,12 @@ export default function Sidebar({ room }: SidebarProps) {
   const {
     game,
     selectedElementId,
+    selectedElementIds,
     isDM,
     addElement,
     updateElement,
     deleteElement,
+    deleteElements,
     selectElement,
   } = useGameStore();
 
@@ -133,12 +139,19 @@ export default function Sidebar({ room }: SidebarProps) {
   const tokens = game?.elements.filter(e => e.type === 'token') || [];
   const players = game ? Object.values(game.players) : [];
 
+  const handleDiceRoll = (roll: DiceRoll) => {
+    if (room.broadcastDiceRoll) {
+      room.broadcastDiceRoll(roll);
+    }
+  };
+
   return (
     <Stack h="100%">
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
+          <Tabs.Tab value="dice">Dice</Tabs.Tab>
           {isDM && <Tabs.Tab value="dm">DM Tools</Tabs.Tab>}
         </Tabs.List>
 
@@ -252,6 +265,10 @@ export default function Sidebar({ room }: SidebarProps) {
                 </Paper>
               ))}
             </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="dice">
+            <DiceRoller onRoll={handleDiceRoll} />
           </Tabs.Panel>
 
           {isDM && (

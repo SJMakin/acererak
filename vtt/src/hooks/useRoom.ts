@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { joinRoom, type Room } from 'trystero/torrent';
+import { notifications } from '@mantine/notifications';
 import { useGameStore } from '../stores/gameStore';
 import type {
   GameState,
@@ -7,6 +8,8 @@ import type {
   Player,
   Point,
   P2PMessage,
+  CombatTracker,
+  DiceRoll,
 } from '../types';
 
 const APP_ID = 'acererak-vtt-v1';
@@ -38,6 +41,9 @@ export function useRoom() {
     sendPlayerJoin?: ActionSender<Player>;
     sendPlayerLeave?: ActionSender<string>;
     sendRequestSync?: ActionSender<null>;
+    sendFogUpdate?: ActionSender<{ enabled: boolean; revealed: Point[][] }>;
+    sendCombatUpdate?: ActionSender<CombatTracker>;
+    sendDiceRoll?: ActionSender<DiceRoll>;
   }>({});
 
   const {
@@ -52,7 +58,14 @@ export function useRoom() {
     setConnected,
     myPeerId,
     isDM,
+    addDiceRoll,
   } = useGameStore();
+  
+  const { revealFog, hideFog, toggleFog } = useGameStore((state) => ({
+    revealFog: state.revealFog,
+    hideFog: state.hideFog,
+    toggleFog: state.toggleFog,
+  }));
 
   // Create a new room (as DM/host)
   const createRoom = useCallback((roomId: string) => {
@@ -128,6 +141,8 @@ export function useRoom() {
     const [sendPlayerJoin, onPlayerJoin] = room.makeAction<any>('plyJoin');
     const [sendPlayerLeave, onPlayerLeave] = room.makeAction<any>('plyLeave');
     const [sendRequestSync, onRequestSync] = room.makeAction<any>('reqSync');
+    const [sendFogUpdate, onFogUpdate] = room.makeAction<any>('fogUpdate');
+    const [sendDiceRoll, onDiceRoll] = room.makeAction<any>('diceRoll');
 
     // Store senders
     actionsRef.current = {
@@ -139,6 +154,8 @@ export function useRoom() {
       sendPlayerJoin,
       sendPlayerLeave,
       sendRequestSync,
+      sendFogUpdate,
+      sendDiceRoll,
     };
 
     // Handle peer events
@@ -196,10 +213,25 @@ export function useRoom() {
 
     onPlayerJoin((player, _peerId) => {
       addPlayer(player);
+      notifications.show({
+        title: 'Player Joined',
+        message: `${player.name} has joined the game`,
+        color: 'green',
+        autoClose: 4000,
+      });
     });
 
     onPlayerLeave((playerId, _peerId) => {
+      // Get player name before removing
+      const player = useGameStore.getState().game?.players[playerId];
+      const playerName = player?.name || 'Unknown player';
       removePlayer(playerId);
+      notifications.show({
+        title: 'Player Left',
+        message: `${playerName} has left the game`,
+        color: 'orange',
+        autoClose: 4000,
+      });
     });
 
     onRequestSync((_data, peerId) => {
@@ -208,7 +240,41 @@ export function useRoom() {
         sendSync(game, [peerId]);
       }
     });
-  }, [game, loadGame, addElement, updateElement, deleteElement, addPlayer, removePlayer, updatePlayer]);
+
+    onFogUpdate((fogOfWar, _peerId) => {
+      console.log('Received fog update');
+      // Update fog of war state
+      if (fogOfWar.enabled !== undefined) {
+        toggleFog(fogOfWar.enabled);
+      }
+      // Update revealed areas by replacing them entirely
+      const currentGame = useGameStore.getState().game;
+      if (currentGame) {
+        useGameStore.setState({
+          game: {
+            ...currentGame,
+            fogOfWar: {
+              enabled: fogOfWar.enabled ?? currentGame.fogOfWar.enabled,
+              revealed: fogOfWar.revealed ?? currentGame.fogOfWar.revealed,
+            },
+            updatedAt: new Date().toISOString(),
+          },
+        });
+      }
+    });
+
+    onDiceRoll((diceRoll, _peerId) => {
+      console.log('Received dice roll from peer:', diceRoll);
+      addDiceRoll(diceRoll);
+      // Show notification
+      notifications.show({
+        title: 'Dice Roll',
+        message: `${diceRoll.playerName} rolled ${diceRoll.formula}: ${diceRoll.result}`,
+        color: 'violet',
+        autoClose: 4000,
+      });
+    });
+  }, [game, loadGame, addElement, updateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -240,6 +306,18 @@ export function useRoom() {
       actionsRef.current.sendSync(game);
     }
   }, [game]);
+
+  const broadcastFogUpdate = useCallback((fogOfWar: { enabled: boolean; revealed: Point[][] }) => {
+    if (actionsRef.current.sendFogUpdate) {
+      actionsRef.current.sendFogUpdate(fogOfWar);
+    }
+  }, []);
+
+  const broadcastDiceRoll = useCallback((roll: DiceRoll) => {
+    if (actionsRef.current.sendDiceRoll) {
+      actionsRef.current.sendDiceRoll(roll);
+    }
+  }, []);
 
   // Leave room
   const leaveRoom = useCallback(() => {
@@ -277,5 +355,7 @@ export function useRoom() {
     broadcastCursor,
     broadcastPing,
     broadcastSync,
+    broadcastFogUpdate,
+    broadcastDiceRoll,
   };
 }

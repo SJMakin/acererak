@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Container,
   Paper,
@@ -15,10 +15,13 @@ import {
   CopyButton,
   ActionIcon,
   Tooltip,
+  Card,
+  Badge,
 } from '@mantine/core';
 import { QRCodeSVG } from 'qrcode.react';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
+import { getRecentGames, deleteGame, type SavedGame } from '../db/database';
 
 interface LobbyProps {
   room: {
@@ -30,8 +33,8 @@ interface LobbyProps {
 }
 
 export default function Lobby({ room }: LobbyProps) {
-  const { createGame } = useGameStore();
-  const [activeTab, setActiveTab] = useState<string | null>('create');
+  const { createGame, loadGame } = useGameStore();
+  const [activeTab, setActiveTab] = useState<string | null>('recent');
   
   // Create game form
   const [gameName, setGameName] = useState('');
@@ -42,6 +45,9 @@ export default function Lobby({ room }: LobbyProps) {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [playerColor, setPlayerColor] = useState('#3b82f6');
+  
+  // Recent games
+  const [recentGames, setRecentGames] = useState<SavedGame[]>([]);
 
   const handleCreateGame = () => {
     if (!gameName.trim() || !dmName.trim()) return;
@@ -66,15 +72,49 @@ export default function Lobby({ room }: LobbyProps) {
     return `${baseUrl}?room=${createdRoomId}`;
   };
 
+  // Load recent games on mount
+  useEffect(() => {
+    loadRecentGames();
+  }, []);
+
   // Check for room ID in URL on component mount
-  useState(() => {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlRoomId = params.get('room');
     if (urlRoomId) {
       setJoinRoomId(urlRoomId);
       setActiveTab('join');
     }
-  });
+  }, []);
+
+  const loadRecentGames = async () => {
+    const games = await getRecentGames(10);
+    setRecentGames(games);
+  };
+
+  const handleLoadGame = (game: SavedGame) => {
+    loadGame(game.gameState);
+  };
+
+  const handleDeleteGame = async (gameId: string) => {
+    await deleteGame(gameId);
+    await loadRecentGames();
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <Container size="sm" py="xl">
@@ -88,9 +128,60 @@ export default function Lobby({ room }: LobbyProps) {
 
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List grow mb="lg">
+            <Tabs.Tab value="recent">Recent Games</Tabs.Tab>
             <Tabs.Tab value="create">Create Game</Tabs.Tab>
             <Tabs.Tab value="join">Join Game</Tabs.Tab>
           </Tabs.List>
+
+          <Tabs.Panel value="recent">
+            <Stack>
+              {recentGames.length === 0 ? (
+                <Text c="dimmed" ta="center" py="xl">
+                  No saved games yet. Create a new game to get started!
+                </Text>
+              ) : (
+                recentGames.map((game) => (
+                  <Card key={game.id} shadow="sm" padding="md" radius="md" withBorder>
+                    <Group justify="space-between" mb="xs">
+                      <Text fw={500}>{game.name}</Text>
+                      <Group gap="xs">
+                        {game.isDM && (
+                          <Badge color="violet" variant="light" size="sm">
+                            DM
+                          </Badge>
+                        )}
+                        <Badge color="gray" variant="light" size="sm">
+                          {game.playerCount} {game.playerCount === 1 ? 'player' : 'players'}
+                        </Badge>
+                      </Group>
+                    </Group>
+                    
+                    <Text size="sm" c="dimmed" mb="md">
+                      Last played: {formatDate(game.lastUpdated)}
+                    </Text>
+
+                    <Group justify="flex-end">
+                      <Button
+                        variant="subtle"
+                        color="red"
+                        size="xs"
+                        onClick={() => handleDeleteGame(game.id)}
+                      >
+                        Delete
+                      </Button>
+                      <Button
+                        variant="filled"
+                        size="xs"
+                        onClick={() => handleLoadGame(game)}
+                      >
+                        Load Game
+                      </Button>
+                    </Group>
+                  </Card>
+                ))
+              )}
+            </Stack>
+          </Tabs.Panel>
 
           <Tabs.Panel value="create">
             {!createdRoomId ? (

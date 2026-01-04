@@ -101,6 +101,8 @@ export interface GameState {
   fogOfWar: FogOfWar;
   players: Record<string, Player>;
   dmPeerId?: string;     // who is the DM
+  combat?: CombatTracker; // combat encounter state
+  diceRolls?: DiceRoll[]; // dice roll history
 }
 
 // P2P message types
@@ -140,6 +142,27 @@ export interface PlayerLeaveMessage {
   playerId: string;
 }
 
+export interface FogUpdateMessage {
+  type: 'fog-update';
+  fogOfWar: FogOfWar;
+}
+
+// Dice Roll types
+export interface DiceRoll {
+  id: string;
+  playerId: string;
+  playerName: string;
+  timestamp: number;
+  formula: string;
+  result: number;
+  breakdown: string; // e.g., "[4, 6] + 3 = 13"
+}
+
+export interface DiceRollMessage {
+  type: 'dice-roll';
+  roll: DiceRoll;
+}
+
 export type P2PMessage =
   | SyncMessage
   | ElementUpdateMessage
@@ -147,7 +170,9 @@ export type P2PMessage =
   | CursorMessage
   | PingMessage
   | PlayerJoinMessage
-  | PlayerLeaveMessage;
+  | PlayerLeaveMessage
+  | FogUpdateMessage
+  | DiceRollMessage;
 
 // Room/Session types
 export interface RoomConfig {
@@ -211,3 +236,58 @@ export const DEFAULT_STYLE: StyleProps = {
   fontFamily: 'sans-serif',
   opacity: 1,
 };
+
+// Settings types
+export interface Settings {
+  // Grid Settings
+  gridSize: {
+    width: number;  // number of cells
+    height: number; // number of cells
+  };
+  cellSize: number;  // pixels per cell
+  gridColor: string;
+  backgroundColor: string;
+  
+  // Token Defaults
+  defaultTokenSize: number;  // 1-10 grid cells
+  defaultHP: {
+    current: number;
+    max: number;
+  };
+  
+  // UI Preferences
+  autoSave: boolean;
+  showPlayerCursors: boolean;
+  showGridByDefault: boolean;
+  snapToGridByDefault: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  gridSize: { width: 30, height: 30 },
+  cellSize: 50,
+  gridColor: 'rgba(255, 255, 255, 0.2)',
+  backgroundColor: '#1a1a2e',
+  defaultTokenSize: 1,
+  defaultHP: { current: 10, max: 10 },
+  autoSave: true,
+  showPlayerCursors: true,
+  showGridByDefault: true,
+  snapToGridByDefault: true,
+};
+
+// Combat Tracker types
+export interface Combatant {
+  id: string;  // links to token element ID
+  name: string;
+  initiative: number;
+  dexterity?: number;  // for tie-breaking
+  hp: { current: number; max: number };
+  conditions: string[];
+}
+
+export interface CombatTracker {
+  active: boolean;
+  round: number;
+  currentTurn: number; // index into sorted combatants array
+  combatants: Combatant[];
+}
