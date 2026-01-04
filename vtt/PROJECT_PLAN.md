@@ -87,6 +87,7 @@ This is a **decentralized P2P VTT** - design decisions must respect:
 - [x] Keyboard shortcuts
 - [x] Settings modal (grid, tokens, preferences)
 - [x] Preview as player mode (DM)
+- [x] Layer visibility controls (toggle grid, map, tokens, drawings, text, fog)
 
 ## 🚀 Phase 2: Asset Management & Persistence
 
@@ -199,15 +200,27 @@ interface CampaignNote {
 - [ ] Conflict detection and resolution UI
 - [ ] File format versioning
 
-### Priority 4: Layer Controls (Data exists, needs UI)
+### ✅ Priority 4: Layer Controls - COMPLETE
 
-The store already has `layerVisibility` state - just needs UI:
+The store already has `layerVisibility` state - UI now implemented!
 
-**Tasks:**
-- [ ] Add layer visibility panel to sidebar
-- [ ] Checkboxes for each layer type
-- [ ] Wire to existing store actions
-- [ ] Update GameCanvas to respect visibility flags
+**Completed Tasks:**
+- [x] Add layer visibility panel to sidebar (DM Tools tab)
+- [x] Checkboxes for each layer type (grid, map, tokens, drawings, text, fog)
+- [x] Wire to existing store actions
+- [x] Update GameCanvas to respect visibility flags
+- [x] Preview as Player mode (uses `effectiveIsDM` for accurate preview)
+
+**How Layers & Z-Order Work:**
+- **Layers** = visibility categories (auto-assigned by element type)
+  - `map` layer → map images
+  - `token` layer → tokens
+  - `drawing` layer → shapes and text
+- **Z-order** = fine control within each layer (use Property Inspector's Bring Forward/Send Backward)
+- Elements are sorted first by layer, then by zIndex within each layer
+
+**Future Enhancement: Layer Assignment UI**
+- [ ] Add layer dropdown to Property Inspector to manually move elements between layers
 
 ### Priority 5: Selection Improvements
 
@@ -330,11 +343,14 @@ These features don't fit the decentralized design:
 - Combat tracker and dice roller
 - Full drawing toolkit
 
+### v1.0.1 (Current)
+- Layer visibility controls UI (toggle grid, map, tokens, drawings, text, fog)
+- Preview as Player mode for DMs
+
 ### v1.1.0 (Next - Asset Management)
 - Token & Map Library
 - Markdown notes system
 - Enhanced export/import dialog
-- Layer visibility UI
 
 ### v1.2.0 (Planned)
 - Selection improvements
