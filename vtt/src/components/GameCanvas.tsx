@@ -1,11 +1,12 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Stage, Layer, Rect, Line, Circle, Image, Text, Group, Path, Shape as KonvaShape } from 'react-konva';
+import { Stage, Layer, Rect, Line, Circle, Ellipse, Image, Text, Group, Path, Shape as KonvaShape, Arrow } from 'react-konva';
 import type Konva from 'konva';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import { useClipboard } from '../hooks/useClipboard';
 import type { CanvasElement, Point, TokenElement, ImageElement, ShapeElement, TextElement, Player } from '../types';
 import TokenConfigModal, { type TokenConfig } from './TokenConfigModal';
+import TextInputModal from './TextInputModal';
 
 interface GameCanvasProps {
   room: {
@@ -45,30 +46,40 @@ function Token({
   element,
   cellSize,
   isSelected,
-  isMultiSelected,
   isCurrentTurn,
   onSelect,
   onDragEnd,
   isDM,
+  showMetadata = true,
 }: {
   element: TokenElement;
   cellSize: number;
   isSelected: boolean;
-  isMultiSelected?: boolean;
   isCurrentTurn?: boolean;
   onSelect: (e?: any) => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
+  showMetadata?: boolean;
 }) {
   const [image] = useImage(element.imageUrl);
   const width = element.width * cellSize;
   const height = element.height * cellSize;
 
   // Check visibility
-  const visible = element.visibleTo === 'all' || 
+  const visible = element.visibleTo === 'all' ||
     (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
+
+  // Calculate HP percentage and color
+  const hpPercent = element.hp ? (element.hp.current / element.hp.max) : 1;
+  const hpColor = hpPercent > 0.66 ? '#22c55e' : hpPercent > 0.33 ? '#f59e0b' : '#ef4444';
+  
+  // Scale factors for metadata
+  const scale = Math.max(0.5, Math.min(1, width / 50)); // Scale based on token size
+  const fontSize = 12 * scale;
+  const badgeSize = 20 * scale;
+  const conditionBadgeSize = 16 * scale;
 
   return (
     <Group
@@ -113,43 +124,190 @@ function Token({
         />
       )}
 
-      {/* Name label */}
-      {element.name && (
-        <Text
-          x={0}
-          y={height + 4}
-          width={width}
-          text={element.name}
-          fontSize={12}
-          fill="white"
-          align="center"
+      {/* Current turn indicator */}
+      {isCurrentTurn && (
+        <Circle
+          x={width / 2}
+          y={height / 2}
+          radius={width / 2 + 4}
+          stroke="#fbbf24"
+          strokeWidth={3}
+          dash={[8, 4]}
+          listening={false}
         />
       )}
 
-      {/* HP bar */}
-      {element.hp && (
-        <Group y={height + 18}>
-          <Rect
-            width={width}
-            height={4}
-            fill="#1f2937"
-            cornerRadius={2}
-          />
-          <Rect
-            width={(element.hp.current / element.hp.max) * width}
-            height={4}
-            fill={element.hp.current > element.hp.max * 0.5 ? '#22c55e' : 
-                  element.hp.current > element.hp.max * 0.25 ? '#f59e0b' : '#ef4444'}
-            cornerRadius={2}
-          />
-        </Group>
+      {showMetadata && (
+        <>
+          {/* Name label with background */}
+          {element.name && (
+            <Group y={height + 2}>
+              <Rect
+                x={-2}
+                y={0}
+                width={width + 4}
+                height={fontSize + 6}
+                fill="rgba(0, 0, 0, 0.7)"
+                cornerRadius={3}
+              />
+              <Text
+                x={0}
+                y={3}
+                width={width}
+                text={element.name}
+                fontSize={fontSize}
+                fill="white"
+                align="center"
+                fontStyle="bold"
+              />
+            </Group>
+          )}
+
+          {/* HP bar with text */}
+          {element.hp && (
+            <Group y={height + (element.name ? fontSize + 10 : 4)}>
+              {/* HP bar background */}
+              <Rect
+                width={width}
+                height={6 * scale}
+                fill="#1f2937"
+                cornerRadius={3}
+              />
+              {/* HP bar foreground */}
+              <Rect
+                width={hpPercent * width}
+                height={6 * scale}
+                fill={hpColor}
+                cornerRadius={3}
+              />
+              {/* HP text */}
+              <Text
+                x={0}
+                y={8 * scale}
+                width={width}
+                text={`${element.hp.current}/${element.hp.max}`}
+                fontSize={fontSize * 0.85}
+                fill="white"
+                align="center"
+                fontStyle="bold"
+                shadowColor="black"
+                shadowBlur={3}
+                shadowOffsetX={1}
+                shadowOffsetY={1}
+              />
+            </Group>
+          )}
+
+          {/* AC badge (top-right corner) */}
+          {element.ac !== undefined && (
+            <Group x={width - badgeSize / 2} y={badgeSize / 2}>
+              {/* Shield background */}
+              <Circle
+                radius={badgeSize / 2}
+                fill="#3b82f6"
+                stroke="#1e40af"
+                strokeWidth={1.5}
+              />
+              {/* AC text */}
+              <Text
+                x={-badgeSize / 2}
+                y={-badgeSize / 2}
+                width={badgeSize}
+                height={badgeSize}
+                text={String(element.ac)}
+                fontSize={fontSize * 0.9}
+                fill="white"
+                align="center"
+                verticalAlign="middle"
+                fontStyle="bold"
+              />
+            </Group>
+          )}
+
+          {/* Condition badges (around token) */}
+          {element.conditions && element.conditions.length > 0 && (
+            <>
+              {element.conditions.slice(0, 6).map((condition, index) => {
+                // Position conditions around the token in a circle
+                const angle = (index / Math.min(element.conditions!.length, 6)) * Math.PI * 2 - Math.PI / 2;
+                const radius = width / 2 + conditionBadgeSize;
+                const x = width / 2 + Math.cos(angle) * radius;
+                const y = height / 2 + Math.sin(angle) * radius;
+                
+                // Get condition color
+                const conditionColors: Record<string, string> = {
+                  'poisoned': '#10b981',
+                  'stunned': '#f59e0b',
+                  'paralyzed': '#6366f1',
+                  'charmed': '#ec4899',
+                  'frightened': '#8b5cf6',
+                  'restrained': '#ef4444',
+                  'blinded': '#64748b',
+                  'deafened': '#64748b',
+                  'invisible': '#a855f7',
+                  'prone': '#78716c',
+                };
+                const conditionColor = conditionColors[condition.toLowerCase()] || '#94a3b8';
+                
+                return (
+                  <Group key={condition + index} x={x} y={y}>
+                    {/* Condition badge background */}
+                    <Circle
+                      radius={conditionBadgeSize / 2}
+                      fill={conditionColor}
+                      stroke="#000"
+                      strokeWidth={1}
+                    />
+                    {/* Condition initial */}
+                    <Text
+                      x={-conditionBadgeSize / 2}
+                      y={-conditionBadgeSize / 2}
+                      width={conditionBadgeSize}
+                      height={conditionBadgeSize}
+                      text={condition.charAt(0).toUpperCase()}
+                      fontSize={fontSize * 0.75}
+                      fill="white"
+                      align="center"
+                      verticalAlign="middle"
+                      fontStyle="bold"
+                    />
+                  </Group>
+                );
+              })}
+            </>
+          )}
+
+          {/* Token size indicator for large tokens */}
+          {(element.width > 1 || element.height > 1) && (
+            <Group x={badgeSize / 2} y={badgeSize / 2}>
+              <Circle
+                radius={badgeSize / 2}
+                fill="rgba(0, 0, 0, 0.7)"
+                stroke="#6b7280"
+                strokeWidth={1}
+              />
+              <Text
+                x={-badgeSize / 2}
+                y={-badgeSize / 2}
+                width={badgeSize}
+                height={badgeSize}
+                text={`${element.width}×${element.height}`}
+                fontSize={fontSize * 0.65}
+                fill="white"
+                align="center"
+                verticalAlign="middle"
+                fontStyle="bold"
+              />
+            </Group>
+          )}
+        </>
       )}
 
       {/* DM-only indicator */}
       {element.visibleTo === 'dm' && isDM && (
         <Circle
           x={width - 6}
-          y={6}
+          y={height - 6}
           radius={6}
           fill="#7c3aed"
           opacity={0.8}
@@ -214,18 +372,20 @@ function MapImage({
 }
 
 // Shape component
-function Shape({ 
-  element, 
+function Shape({
+  element,
   isSelected,
   onSelect,
+  onDragEnd,
   isDM,
-}: { 
+}: {
   element: ShapeElement;
   isSelected: boolean;
   onSelect: () => void;
+  onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
 }) {
-  const visible = element.visibleTo === 'all' || 
+  const visible = element.visibleTo === 'all' ||
     (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
@@ -235,89 +395,218 @@ function Shape({
   const fill = style?.fillColor || 'transparent';
   const strokeWidth = style?.lineWidth || 2;
 
+  // Calculate bounds for selection highlight
+  let boundsX = element.x;
+  let boundsY = element.y;
+  let boundsWidth = element.width || 100;
+  let boundsHeight = element.height || 100;
+
   if (element.shapeType === 'freehand' || element.shapeType === 'line' || element.shapeType === 'polygon') {
-    const points = element.points.flatMap(p => [p.x, p.y]);
-    return (
-      <Line
-        x={element.x}
-        y={element.y}
-        points={points}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        closed={element.shapeType === 'polygon'}
-        fill={element.shapeType === 'polygon' ? fill : undefined}
-        tension={element.shapeType === 'freehand' ? 0.5 : 0}
-        onClick={onSelect}
-        onTap={onSelect}
-      />
-    );
-  }
-
-  if (element.shapeType === 'rectangle') {
-    return (
-      <Rect
-        x={element.x}
-        y={element.y}
-        width={element.width || 100}
-        height={element.height || 100}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        fill={fill}
-        onClick={onSelect}
-        onTap={onSelect}
-      />
-    );
-  }
-
-  if (element.shapeType === 'circle') {
+    // Calculate bounding box from points
+    if (element.points.length > 0) {
+      const xs = element.points.map(p => p.x);
+      const ys = element.points.map(p => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      boundsX = minX;
+      boundsY = minY;
+      boundsWidth = maxX - minX;
+      boundsHeight = maxY - minY;
+    }
+  } else if (element.shapeType === 'circle') {
     const radius = Math.min(element.width || 50, element.height || 50) / 2;
-    return (
-      <Circle
-        x={element.x}
-        y={element.y}
-        radius={radius}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        fill={fill}
-        onClick={onSelect}
-        onTap={onSelect}
-      />
-    );
+    boundsX = element.x - radius;
+    boundsY = element.y - radius;
+    boundsWidth = radius * 2;
+    boundsHeight = radius * 2;
   }
 
-  return null;
+  return (
+    <Group
+      x={element.x}
+      y={element.y}
+      draggable={!element.locked}
+      onClick={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => {
+        const node = e.target;
+        onDragEnd(node.x(), node.y());
+      }}
+    >
+      {/* Shape rendering */}
+      {(element.shapeType === 'freehand' || element.shapeType === 'line' || element.shapeType === 'polygon') && (
+        <Line
+          points={element.points.flatMap(p => [p.x, p.y])}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          closed={element.shapeType === 'polygon'}
+          fill={element.shapeType === 'polygon' ? fill : undefined}
+          tension={element.shapeType === 'freehand' ? 0.5 : 0}
+        />
+      )}
+
+      {element.shapeType === 'rectangle' && (
+        <Rect
+          x={0}
+          y={0}
+          width={element.width || 100}
+          height={element.height || 100}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          fill={fill}
+        />
+      )}
+
+      {element.shapeType === 'circle' && (
+        <Circle
+          x={0}
+          y={0}
+          radius={Math.min(element.width || 50, element.height || 50) / 2}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          fill={fill}
+        />
+      )}
+
+      {element.shapeType === 'ellipse' && (
+        <Ellipse
+          x={(element.width || 100) / 2}
+          y={(element.height || 100) / 2}
+          radiusX={(element.width || 100) / 2}
+          radiusY={(element.height || 100) / 2}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          fill={fill}
+        />
+      )}
+
+      {element.shapeType === 'arrow' && element.points.length >= 2 && (
+        <Arrow
+          points={[element.points[0].x, element.points[0].y, element.points[1].x, element.points[1].y]}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          fill={style?.fillColor || stroke}
+          pointerLength={Math.max(10, strokeWidth * 3)}
+          pointerWidth={Math.max(8, strokeWidth * 2.5)}
+        />
+      )}
+
+      {/* Selection highlight */}
+      {isSelected && (
+        <Rect
+          x={boundsX - element.x - 2}
+          y={boundsY - element.y - 2}
+          width={boundsWidth + 4}
+          height={boundsHeight + 4}
+          stroke="#22c55e"
+          strokeWidth={2}
+          listening={false}
+        />
+      )}
+    </Group>
+  );
 }
 
 // Text component
-function TextLabel({ 
-  element, 
+function TextLabel({
+  element,
   isSelected,
   onSelect,
+  onDragEnd,
+  onDoubleClick,
   isDM,
-}: { 
+}: {
   element: TextElement;
   isSelected: boolean;
   onSelect: () => void;
+  onDragEnd: (x: number, y: number) => void;
+  onDoubleClick: () => void;
   isDM: boolean;
 }) {
-  const visible = element.visibleTo === 'all' || 
+  const visible = element.visibleTo === 'all' ||
     (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
 
   const { style } = element;
+  const fontSize = style?.fontSize || 16;
+  const fontFamily = style?.fontFamily || 'sans-serif';
+  const fontWeight = style?.fontWeight || 'normal';
+  const fontStyle = style?.fontStyle || 'normal';
+  const textAlign = style?.textAlign || 'left';
+  const textColor = style?.strokeColor || '#ffffff';
+  const width = element.width || 200;
+  
+  // Background properties
+  const backgroundEnabled = style?.backgroundEnabled ?? true;
+  const backgroundColor = style?.backgroundColor || 'rgba(0, 0, 0, 0.7)';
+  const backgroundOpacity = style?.backgroundOpacity ?? 0.7;
+
+  // Build fontStyle string for Konva (accepts 'normal', 'italic', 'bold', 'italic bold')
+  let konvaFontStyle = 'normal';
+  if (fontStyle === 'italic' && fontWeight === 'bold') {
+    konvaFontStyle = 'italic bold';
+  } else if (fontStyle === 'italic') {
+    konvaFontStyle = 'italic';
+  } else if (fontWeight === 'bold') {
+    konvaFontStyle = 'bold';
+  }
 
   return (
-    <Text
+    <Group
       x={element.x}
       y={element.y}
-      text={element.content}
-      fontSize={style?.fontSize || 16}
-      fontFamily={style?.fontFamily || 'sans-serif'}
-      fill={style?.strokeColor || '#ffffff'}
+      draggable={!element.locked}
       onClick={onSelect}
       onTap={onSelect}
-    />
+      onDblClick={onDoubleClick}
+      onDblTap={onDoubleClick}
+      onDragEnd={(e) => {
+        const node = e.target;
+        onDragEnd(node.x(), node.y());
+      }}
+    >
+      {/* Background rectangle */}
+      {backgroundEnabled && (
+        <Rect
+          x={0}
+          y={0}
+          width={width}
+          height={(element.height || fontSize * 1.5) + 8}
+          fill={backgroundColor}
+          opacity={backgroundOpacity}
+          cornerRadius={4}
+        />
+      )}
+      
+      {/* Text content with wrapping */}
+      <Text
+        text={element.content}
+        fontSize={fontSize}
+        fontFamily={fontFamily}
+        fontStyle={konvaFontStyle}
+        fill={textColor}
+        width={width}
+        padding={4}
+        align={textAlign}
+        wrap="word"
+      />
+      
+      {/* Selection highlight */}
+      {isSelected && (
+        <Rect
+          x={-2}
+          y={-2}
+          width={width + 4}
+          height={(element.height || fontSize * 1.5) + 12}
+          stroke="#22c55e"
+          strokeWidth={2}
+          listening={false}
+        />
+      )}
+    </Group>
   );
 }
 
@@ -374,9 +663,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const [currentLine, setCurrentLine] = useState<number[]>([]);
   const [drawStartPoint, setDrawStartPoint] = useState<Point | null>(null);
   
-  // Selection box state
-  const [selectionBox, setSelectionBox] = useState<{ start: Point; end: Point } | null>(null);
-  const isSelecting = useRef(false);
+  // Polygon drawing state
+  const [polygonPoints, setPolygonPoints] = useState<Point[]>([]);
   
   // Ping state for visualization
   const [pings, setPings] = useState<Array<{ id: string; x: number; y: number; color: string; timestamp: number }>>([]);
@@ -388,6 +676,12 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Token placement state
   const [tokenModalOpened, setTokenModalOpened] = useState(false);
   const [tokenPlacementPosition, setTokenPlacementPosition] = useState<Point | null>(null);
+  
+  // Text editing state
+  const [textModalOpened, setTextModalOpened] = useState(false);
+  const [textEditContent, setTextEditContent] = useState('');
+  const [textEditPosition, setTextEditPosition] = useState<Point | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   
   // Mouse position for paste
   const mousePosition = useRef<Point>({ x: 0, y: 0 });
@@ -402,11 +696,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     isDM,
     myPeerId,
     settings,
+    drawingStrokeColor,
+    drawingFillColor,
+    drawingFillEnabled,
+    drawingStrokeWidth,
+    layerVisibility,
+    previewAsPlayer,
     selectElement,
-    selectElements,
-    toggleElementSelection,
-    addToSelection,
-    clearSelection,
     updateElement,
     addElement,
     panViewport,
@@ -414,6 +710,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     revealFog,
     hideFog,
   } = useGameStore();
+
+  // When previewing as player, treat DM as non-DM for visibility purposes
+  const effectiveIsDM = isDM && !previewAsPlayer;
 
   // Clipboard functionality
   const clipboard = useClipboard();
@@ -429,6 +728,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Check if current tool is a drawing tool or fog tool
   const isDrawingTool = selectedTool.startsWith('draw-') || selectedTool === 'fog-reveal' || selectedTool === 'fog-hide';
   const isFogTool = selectedTool === 'fog-reveal' || selectedTool === 'fog-hide';
+
+  // Clear polygon points when switching away from polygon tool
+  useEffect(() => {
+    if (selectedTool !== 'draw-polygon') {
+      setPolygonPoints([]);
+    }
+  }, [selectedTool]);
 
   // Handle window resize
   useEffect(() => {
@@ -469,23 +775,6 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     const pos = stage.position();
     panViewport({ x: pos.x - viewportOffset.x, y: pos.y - viewportOffset.y });
   }, [selectedTool, panViewport, viewportOffset]);
-
-  // Handle element click for selection
-  const handleElementClick = useCallback((elementId: string, e?: any) => {
-    const isCtrlPressed = e?.evt?.ctrlKey || e?.evt?.metaKey;
-    const isShiftPressed = e?.evt?.shiftKey;
-
-    if (isCtrlPressed) {
-      // Ctrl+Click: toggle selection
-      toggleElementSelection(elementId);
-    } else if (isShiftPressed) {
-      // Shift+Click: add to selection
-      addToSelection(elementId);
-    } else {
-      // Regular click: select only this element
-      selectElement(elementId);
-    }
-  }, [selectElement, toggleElementSelection, addToSelection]);
 
   // Handle element drag end
   const handleElementDragEnd = useCallback((elementId: string, x: number, y: number) => {
@@ -544,20 +833,123 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     setTokenPlacementPosition(null);
   }, [tokenPlacementPosition, game, addElement, room]);
 
-  // Handle mouse move for cursor broadcasting
-  const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const pointer = stage.getPointerPosition();
-    if (pointer) {
-      // Throttle cursor updates
-      room.broadcastCursor(pointer);
+  // Handle text double-click for editing
+  const handleTextDoubleClick = useCallback((elementId: string) => {
+    const element = game?.elements.find(e => e.id === elementId);
+    if (element && element.type === 'text') {
+      setEditingTextId(elementId);
+      setTextEditContent(element.content);
+      setTextEditPosition({ x: element.x, y: element.y });
+      setTextModalOpened(true);
     }
-  }, [room]);
+  }, [game]);
+
+  // Handle text submission (new or edit)
+  const handleTextSubmit = useCallback((text: string) => {
+    if (!text.trim()) return;
+
+    if (editingTextId) {
+      // Update existing text
+      const element = game?.elements.find(e => e.id === editingTextId);
+      if (element && element.type === 'text') {
+        updateElement(editingTextId, { content: text });
+        const updatedElement: TextElement = { ...element, content: text };
+        room.broadcastElementUpdate(updatedElement);
+      }
+    } else if (textEditPosition && game) {
+      // Create new text element
+      const newElement: Omit<TextElement, 'id'> = {
+        type: 'text',
+        layer: 'drawing',
+        content: text,
+        x: textEditPosition.x,
+        y: textEditPosition.y,
+        width: 200,
+        visibleTo: 'all',
+        locked: false,
+        zIndex: game.elements.length,
+        style: {
+          fontSize: 16,
+          fontFamily: 'sans-serif',
+          fontWeight: 'normal',
+          fontStyle: 'normal',
+          textAlign: 'left',
+          strokeColor: '#ffffff',
+          backgroundEnabled: true,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backgroundOpacity: 0.7,
+        },
+      };
+
+      const id = addElement(newElement);
+      room.broadcastElementUpdate({ ...newElement, id } as TextElement);
+    }
+
+    // Reset state
+    setTextEditPosition(null);
+    setTextEditContent('');
+    setEditingTextId(null);
+  }, [editingTextId, textEditPosition, game, updateElement, addElement, room]);
+
+  // Finish polygon helper function - defined early so it can be used by handlers below
+  const finishPolygon = useCallback(() => {
+    if (polygonPoints.length >= 3 && game) {
+      const newElement: Omit<ShapeElement, 'id'> = {
+        type: 'shape' as const,
+        layer: 'drawing' as const,
+        shapeType: 'polygon',
+        x: 0,
+        y: 0,
+        points: polygonPoints,
+        visibleTo: 'all' as const,
+        locked: false,
+        zIndex: game.elements.length || 0,
+        style: {
+          strokeColor: drawingStrokeColor,
+          fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+          lineWidth: drawingStrokeWidth,
+        },
+      };
+      const id = addElement(newElement);
+      room.broadcastElementUpdate({ ...newElement, id } as ShapeElement);
+      setPolygonPoints([]);
+    }
+  }, [polygonPoints, game, drawingStrokeColor, drawingFillColor, drawingFillEnabled, drawingStrokeWidth, addElement, room]);
+
+  // Handle double-click for polygon completion
+  const handleStageDoubleClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (selectedTool === 'draw-polygon' && polygonPoints.length >= 3) {
+      e.evt.preventDefault();
+      finishPolygon();
+    }
+  }, [selectedTool, polygonPoints, finishPolygon]);
 
   // Handle mouse/touch down for drawing
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Handle polygon tool - click to add points
+    if (selectedTool === 'draw-polygon' && e.target === e.target.getStage()) {
+      const stage = stageRef.current;
+      if (stage) {
+        const pointer = stage.getPointerPosition();
+        if (pointer) {
+          const x = (pointer.x - viewportOffset.x) / viewportScale;
+          const y = (pointer.y - viewportOffset.y) / viewportScale;
+          
+          // Right-click to finish polygon
+          const isRightClick = (e.evt as MouseEvent).button === 2;
+          
+          if (isRightClick && polygonPoints.length >= 3) {
+            // Finish polygon on right-click
+            finishPolygon();
+          } else if (!isRightClick) {
+            // Add point to polygon on left-click
+            setPolygonPoints(prev => [...prev, { x, y }]);
+          }
+        }
+      }
+      return;
+    }
+    
     // Only draw when using a drawing tool and clicking on stage
     if (!isDrawingTool) {
       // Handle selection deselect
@@ -603,28 +995,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             const x = (pointer.x - viewportOffset.x) / viewportScale;
             const y = (pointer.y - viewportOffset.y) / viewportScale;
             
-            // Prompt for text content
-            const textContent = window.prompt('Enter text:');
-            if (textContent && textContent.trim()) {
-              const newElement: Omit<TextElement, 'id'> = {
-                type: 'text' as const,
-                layer: 'drawing' as const,
-                x,
-                y,
-                content: textContent.trim(),
-                visibleTo: 'all' as const,
-                locked: false,
-                zIndex: game?.elements.length || 0,
-                style: {
-                  fontSize: 24,
-                  fontFamily: 'sans-serif',
-                  strokeColor: '#ffffff',
-                },
-              };
-              
-              const id = addElement(newElement);
-              room.broadcastElementUpdate({ ...newElement, id } as TextElement);
-            }
+            // Open text modal for new text
+            setTextEditPosition({ x, y });
+            setTextEditContent('');
+            setEditingTextId(null);
+            setTextModalOpened(true);
           }
         }
       }
@@ -671,7 +1046,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   }, [isDrawingTool, selectedTool, selectElement, room, viewportOffset, viewportScale]);
 
   // Handle mouse/touch move for drawing
-  const handleMouseMoveForDrawing = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+  const handleMouseMoveForDrawing = useCallback((_e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     // Broadcast cursor position
     const stage = stageRef.current;
     if (stage) {
@@ -771,9 +1146,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           locked: false,
           zIndex: game?.elements.length || 0,
           style: {
-            strokeColor: '#ffffff',
-            fillColor: 'transparent',
-            lineWidth: 3,
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+            lineWidth: drawingStrokeWidth,
           },
         };
       } else if (selectedTool === 'draw-line') {
@@ -789,9 +1164,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           locked: false,
           zIndex: game?.elements.length || 0,
           style: {
-            strokeColor: '#ffffff',
+            strokeColor: drawingStrokeColor,
             fillColor: 'transparent',
-            lineWidth: 3,
+            lineWidth: drawingStrokeWidth,
           },
         };
       } else if (selectedTool === 'draw-rectangle') {
@@ -814,9 +1189,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           locked: false,
           zIndex: game?.elements.length || 0,
           style: {
-            strokeColor: '#ffffff',
-            fillColor: 'transparent',
-            lineWidth: 3,
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+            lineWidth: drawingStrokeWidth,
           },
         };
       } else if (selectedTool === 'draw-circle') {
@@ -836,9 +1211,52 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           locked: false,
           zIndex: game?.elements.length || 0,
           style: {
-            strokeColor: '#ffffff',
-            fillColor: 'transparent',
-            lineWidth: 3,
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+            lineWidth: drawingStrokeWidth,
+          },
+        };
+      } else if (selectedTool === 'draw-ellipse') {
+        // Ellipse: bounding box
+        const x = Math.min(startX, endX);
+        const y = Math.min(startY, endY);
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'ellipse',
+          x,
+          y,
+          width,
+          height,
+          points: [],
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+            lineWidth: drawingStrokeWidth,
+          },
+        };
+      } else if (selectedTool === 'draw-arrow') {
+        // Arrow: from start to end point
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'arrow',
+          x: 0,
+          y: 0,
+          points: [{ x: startX, y: startY }, { x: endX, y: endY }],
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingStrokeColor, // Arrow head uses stroke color
+            lineWidth: drawingStrokeWidth,
           },
         };
       } else {
@@ -859,9 +1277,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           locked: false,
           zIndex: game?.elements.length || 0,
           style: {
-            strokeColor: '#ffffff',
-            fillColor: 'transparent',
-            lineWidth: 3,
+            strokeColor: drawingStrokeColor,
+            fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+            lineWidth: drawingStrokeWidth,
           },
         };
       }
@@ -888,6 +1306,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       const ctrl = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
+      // Polygon tool: press Enter to finish
+      if (selectedTool === 'draw-polygon' && polygonPoints.length >= 3 && key === 'enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        finishPolygon();
+        return;
+      }
+
       if (ctrl && key === 'c' && selectedElementIds.length > 0) {
         clipboard.copySelected();
       } else if (ctrl && key === 'x' && selectedElementIds.length > 0) {
@@ -899,10 +1325,10 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, clipboard]);
+  }, [selectedElementIds, clipboard, selectedTool, polygonPoints, finishPolygon]);
 
   // Cleanup old pings and force re-render for animation
-  const [pingTick, setPingTick] = useState(0);
+  const [, setPingTick] = useState(0);
   const hasPings = pings.length > 0;
   useEffect(() => {
     if (!hasPings) return;
@@ -948,6 +1374,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         onWheel={handleWheel}
         onDragMove={handleDragMove}
         onMouseDown={handleMouseDown}
+        onDblClick={handleStageDoubleClick}
         onMousemove={handleMouseMoveForDrawing}
         onMouseup={handleMouseUp}
         onTouchStart={handleMouseDown}
@@ -963,7 +1390,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             height={gridHeight}
             fill={settings.backgroundColor}
           />
-          {gridSettings.showGrid && (
+          {layerVisibility.grid && gridSettings.showGrid && (
             <Grid
               width={gridSettings.width}
               height={gridSettings.height}
@@ -976,7 +1403,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         {/* Layer 2: StaticElements (listening: false) - Map layer + locked elements */}
         <Layer listening={false}>
           {/* Map images */}
-          {sortedElements
+          {layerVisibility.map && sortedElements
             .filter(el => el.layer === 'map' && el.type === 'image')
             .map(el => (
               <MapImage
@@ -985,11 +1412,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={isDM}
+                isDM={effectiveIsDM}
               />
             ))}
           {/* Locked shapes */}
-          {sortedElements
+          {layerVisibility.drawings && sortedElements
             .filter(el => el.type === 'shape' && el.locked)
             .map(el => (
               <Shape
@@ -997,11 +1424,12 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 element={el as ShapeElement}
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
-                isDM={isDM}
+                onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
+                isDM={effectiveIsDM}
               />
             ))}
           {/* Locked text */}
-          {sortedElements
+          {layerVisibility.text && sortedElements
             .filter(el => el.type === 'text' && el.locked)
             .map(el => (
               <TextLabel
@@ -1009,11 +1437,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 element={el as TextElement}
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
-                isDM={isDM}
+                onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
+                onDoubleClick={() => handleTextDoubleClick(el.id)}
+                isDM={effectiveIsDM}
               />
             ))}
           {/* Locked tokens */}
-          {sortedElements
+          {layerVisibility.tokens && sortedElements
             .filter(el => el.type === 'token' && el.locked)
             .map(el => (
               <Token
@@ -1023,13 +1453,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={isDM}
+                isDM={effectiveIsDM}
+                showMetadata={settings.showTokenMetadata}
               />
             ))}
         </Layer>
 
         {/* Layer 3: Fog of War (listening: false) - Only visible to non-DMs when enabled */}
-        {game.fogOfWar.enabled && !isDM && (
+        {game.fogOfWar.enabled && layerVisibility.fog && !effectiveIsDM && (
           <Layer listening={false}>
             <KonvaShape
               sceneFunc={(context, shape) => {
@@ -1068,7 +1499,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         {/* Layer 4: InteractiveElements (listening: true) - Shapes + Tokens (draggable/interactive) */}
         <Layer listening={true}>
           {/* Unlocked shapes */}
-          {sortedElements
+          {layerVisibility.drawings && sortedElements
             .filter(el => el.type === 'shape' && !el.locked)
             .map(el => (
               <Shape
@@ -1076,11 +1507,12 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 element={el as ShapeElement}
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
-                isDM={isDM}
+                onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
+                isDM={effectiveIsDM}
               />
             ))}
           {/* Unlocked text */}
-          {sortedElements
+          {layerVisibility.text && sortedElements
             .filter(el => el.type === 'text' && !el.locked)
             .map(el => (
               <TextLabel
@@ -1088,11 +1520,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 element={el as TextElement}
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
-                isDM={isDM}
+                onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
+                onDoubleClick={() => handleTextDoubleClick(el.id)}
+                isDM={effectiveIsDM}
               />
             ))}
           {/* Unlocked tokens */}
-          {sortedElements
+          {layerVisibility.tokens && sortedElements
             .filter(el => el.type === 'token' && !el.locked)
             .map(el => (
               <Token
@@ -1102,7 +1536,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id}
                 onSelect={() => selectElement(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={isDM}
+                isDM={effectiveIsDM}
+                showMetadata={settings.showTokenMetadata}
               />
             ))}
         </Layer>
@@ -1115,20 +1550,20 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               {(selectedTool === 'draw-freehand' || isFogTool) && (
                 <Line
                   points={currentLine}
-                  stroke={selectedTool === 'fog-reveal' ? '#22c55e' : selectedTool === 'fog-hide' ? '#ef4444' : '#ffffff'}
-                  strokeWidth={3}
+                  stroke={selectedTool === 'fog-reveal' ? '#22c55e' : selectedTool === 'fog-hide' ? '#ef4444' : drawingStrokeColor}
+                  strokeWidth={isFogTool ? 3 : drawingStrokeWidth}
                   tension={0.5}
                   lineCap="round"
                   lineJoin="round"
-                  fill={selectedTool === 'fog-reveal' ? 'rgba(34, 197, 94, 0.2)' : selectedTool === 'fog-hide' ? 'rgba(239, 68, 68, 0.2)' : 'transparent'}
+                  fill={selectedTool === 'fog-reveal' ? 'rgba(34, 197, 94, 0.2)' : selectedTool === 'fog-hide' ? 'rgba(239, 68, 68, 0.2)' : (drawingFillEnabled ? drawingFillColor : 'transparent')}
                   closed={isFogTool}
                 />
               )}
               {selectedTool === 'draw-line' && currentLine.length >= 4 && (
                 <Line
                   points={currentLine}
-                  stroke="#ffffff"
-                  strokeWidth={3}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
                   lineCap="round"
                 />
               )}
@@ -1138,8 +1573,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                   y={Math.min(drawStartPoint.y, currentLine[3])}
                   width={Math.abs(currentLine[2] - drawStartPoint.x)}
                   height={Math.abs(currentLine[3] - drawStartPoint.y)}
-                  stroke="#ffffff"
-                  strokeWidth={3}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
+                  fill={drawingFillEnabled ? drawingFillColor : undefined}
                 />
               )}
               {selectedTool === 'draw-circle' && currentLine.length >= 4 && drawStartPoint && (
@@ -1150,8 +1586,65 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                     Math.pow(currentLine[2] - drawStartPoint.x, 2) +
                     Math.pow(currentLine[3] - drawStartPoint.y, 2)
                   )}
-                  stroke="#ffffff"
-                  strokeWidth={3}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
+                  fill={drawingFillEnabled ? drawingFillColor : undefined}
+                />
+              )}
+              {selectedTool === 'draw-ellipse' && currentLine.length >= 4 && drawStartPoint && (
+                <Ellipse
+                  x={Math.min(drawStartPoint.x, currentLine[2]) + Math.abs(currentLine[2] - drawStartPoint.x) / 2}
+                  y={Math.min(drawStartPoint.y, currentLine[3]) + Math.abs(currentLine[3] - drawStartPoint.y) / 2}
+                  radiusX={Math.abs(currentLine[2] - drawStartPoint.x) / 2}
+                  radiusY={Math.abs(currentLine[3] - drawStartPoint.y) / 2}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
+                  fill={drawingFillEnabled ? drawingFillColor : undefined}
+                />
+              )}
+              {selectedTool === 'draw-arrow' && currentLine.length >= 4 && drawStartPoint && (
+                <Arrow
+                  points={[drawStartPoint.x, drawStartPoint.y, currentLine[2], currentLine[3]]}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
+                  fill={drawingStrokeColor}
+                  pointerLength={Math.max(10, drawingStrokeWidth * 3)}
+                  pointerWidth={Math.max(8, drawingStrokeWidth * 2.5)}
+                />
+              )}
+            </>
+          )}
+
+          {/* Polygon preview */}
+          {selectedTool === 'draw-polygon' && polygonPoints.length > 0 && (
+            <>
+              {/* Draw lines between points */}
+              <Line
+                points={polygonPoints.flatMap(p => [p.x, p.y])}
+                stroke={drawingStrokeColor}
+                strokeWidth={drawingStrokeWidth}
+                lineCap="round"
+                lineJoin="round"
+              />
+              {/* Draw points as circles */}
+              {polygonPoints.map((point, index) => (
+                <Circle
+                  key={index}
+                  x={point.x}
+                  y={point.y}
+                  radius={4}
+                  fill={drawingStrokeColor}
+                />
+              ))}
+              {/* Preview filled shape if enough points */}
+              {polygonPoints.length >= 3 && (
+                <Line
+                  points={polygonPoints.flatMap(p => [p.x, p.y])}
+                  stroke={drawingStrokeColor}
+                  strokeWidth={drawingStrokeWidth}
+                  fill={drawingFillEnabled ? drawingFillColor : undefined}
+                  closed={true}
+                  opacity={0.5}
                 />
               )}
             </>
@@ -1266,17 +1759,54 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             </Group>
           ))}
         </Layer>
-    </Stage>
-    
-    {/* Token Configuration Modal */}
-    <TokenConfigModal
-      opened={tokenModalOpened}
-      onClose={() => {
-        setTokenModalOpened(false);
-        setTokenPlacementPosition(null);
-      }}
-      onSubmit={handleTokenSubmit}
-    />
-  </div>
-);
+      </Stage>
+      
+      {/* Polygon tool hint overlay */}
+      {selectedTool === 'draw-polygon' && polygonPoints.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            pointerEvents: 'none',
+            zIndex: 1000,
+          }}
+        >
+          {polygonPoints.length} point{polygonPoints.length !== 1 ? 's' : ''} •
+          {polygonPoints.length >= 3
+            ? ' Press Enter or double-click to finish'
+            : ` Add ${3 - polygonPoints.length} more point${3 - polygonPoints.length !== 1 ? 's' : ''}`}
+        </div>
+      )}
+      
+      {/* Token Configuration Modal */}
+      <TokenConfigModal
+        opened={tokenModalOpened}
+        onClose={() => {
+          setTokenModalOpened(false);
+          setTokenPlacementPosition(null);
+        }}
+        onSubmit={handleTokenSubmit}
+      />
+      
+      {/* Text Input Modal */}
+      <TextInputModal
+        opened={textModalOpened}
+        onClose={() => {
+          setTextModalOpened(false);
+          setTextEditPosition(null);
+          setTextEditContent('');
+          setEditingTextId(null);
+        }}
+        onSubmit={handleTextSubmit}
+        initialText={textEditContent}
+      />
+    </div>
+  );
 }

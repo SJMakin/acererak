@@ -225,6 +225,15 @@ export default function SettingsModal({ opened, onClose }: SettingsModalProps) {
                 updateLocal({ snapToGridByDefault: e.currentTarget.checked })
               }
             />
+
+            <Switch
+              label="Show Token Metadata"
+              description="Display HP bars, AC, and conditions on tokens"
+              checked={localSettings.showTokenMetadata}
+              onChange={(e) =>
+                updateLocal({ showTokenMetadata: e.currentTarget.checked })
+              }
+            />
           </Stack>
         </Tabs.Panel>
       </Tabs>

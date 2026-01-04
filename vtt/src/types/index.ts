@@ -24,7 +24,14 @@ export interface StyleProps {
   lineWidth?: number;
   fontSize?: number;
   fontFamily?: string;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
   opacity?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  // Text box specific
+  backgroundEnabled?: boolean;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
 }
 
 // Base element all canvas objects inherit from
@@ -62,16 +69,18 @@ export interface ImageElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
-  shapeType: 'freehand' | 'line' | 'rectangle' | 'circle' | 'polygon';
-  points: Point[];       // for freehand/polygon
-  width?: number;        // for rectangle/circle
-  height?: number;       // for rectangle/circle
+  shapeType: 'freehand' | 'line' | 'rectangle' | 'circle' | 'ellipse' | 'polygon' | 'arrow';
+  points: Point[];       // for freehand/polygon/arrow
+  width?: number;        // for rectangle/circle/ellipse
+  height?: number;       // for rectangle/circle/ellipse
   style: StyleProps;
 }
 
 export interface TextElement extends BaseElement {
   type: 'text';
   content: string;
+  width?: number;  // Text box width for wrapping
+  height?: number; // Text box height (auto-calculated based on content)
   style: StyleProps;
 }
 
@@ -204,13 +213,16 @@ export interface SceneExport {
 }
 
 // Tool types for the canvas
-export type ToolType = 
+export type ToolType =
   | 'select'
   | 'pan'
   | 'draw-freehand'
   | 'draw-line'
   | 'draw-rectangle'
   | 'draw-circle'
+  | 'draw-ellipse'
+  | 'draw-polygon'
+  | 'draw-arrow'
   | 'token'
   | 'text'
   | 'measure'
@@ -260,6 +272,7 @@ export interface Settings {
   showPlayerCursors: boolean;
   showGridByDefault: boolean;
   snapToGridByDefault: boolean;
+  showTokenMetadata: boolean; // Show HP bars, AC, conditions on tokens
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -273,6 +286,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showPlayerCursors: true,
   showGridByDefault: true,
   snapToGridByDefault: true,
+  showTokenMetadata: true,
 };
 
 // Combat Tracker types

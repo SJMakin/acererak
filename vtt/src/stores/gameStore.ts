@@ -9,7 +9,6 @@ import type {
   Player,
   ToolType,
   Point,
-  DEFAULT_GRID_SETTINGS,
   CombatTracker,
   Combatant,
   TokenElement,
@@ -60,6 +59,15 @@ function saveSettings(settings: Settings) {
   }
 }
 
+interface LayerVisibility {
+  grid: boolean;
+  map: boolean;
+  tokens: boolean;
+  drawings: boolean;
+  text: boolean;
+  fog: boolean;
+}
+
 interface GameStore {
   // Game state
   game: GameState | null;
@@ -74,8 +82,18 @@ interface GameStore {
   viewportOffset: Point;
   viewportScale: number;
 
+  // Drawing style state
+  drawingStrokeColor: string;
+  drawingFillColor: string;
+  drawingFillEnabled: boolean;
+  drawingStrokeWidth: number;
+
   // Settings state
   settings: Settings;
+
+  // DM Layer visibility and preview mode
+  layerVisibility: LayerVisibility;
+  previewAsPlayer: boolean;
 
   // Actions - Game management
   createGame: (name: string, playerName: string) => void;
@@ -131,19 +149,21 @@ interface GameStore {
   panViewport: (delta: Point) => void;
   zoomViewport: (delta: number, center: Point) => void;
 
+  // Actions - Drawing Style
+  setDrawingStrokeColor: (color: string) => void;
+  setDrawingFillColor: (color: string) => void;
+  setDrawingFillEnabled: (enabled: boolean) => void;
+  setDrawingStrokeWidth: (width: number) => void;
+
   // Actions - Undo/Redo
   performUndo: () => void;
   performRedo: () => void;
-}
 
-const DEFAULT_GRID: GridSettings = {
-  cellSize: 50,
-  width: 30,
-  height: 30,
-  showGrid: true,
-  snapToGrid: true,
-  gridColor: 'rgba(255, 255, 255, 0.2)',
-};
+  // Actions - Layer Visibility
+  toggleLayerVisibility: (layer: keyof LayerVisibility) => void;
+  setLayerVisibility: (layer: keyof LayerVisibility, visible: boolean) => void;
+  setPreviewAsPlayer: (preview: boolean) => void;
+}
 
 export const useGameStore = create<GameStore>((set, get) => ({
   // Initial state
@@ -153,9 +173,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isDM: false,
   selectedTool: 'select',
   selectedElementId: null,
+  selectedElementIds: [],
   viewportOffset: { x: 0, y: 0 },
   viewportScale: 1,
+  drawingStrokeColor: '#ffffff',
+  drawingFillColor: '#3b82f6',
+  drawingFillEnabled: false,
+  drawingStrokeWidth: 3,
   settings: loadSettings(),
+  layerVisibility: {
+    grid: true,
+    map: true,
+    tokens: true,
+    drawings: true,
+    text: true,
+    fog: true,
+  },
+  previewAsPlayer: false,
 
   // Game management
   createGame: (name, playerName) => {
@@ -304,7 +338,79 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   selectElement: (id) => {
-    set({ selectedElementId: id });
+    set({ selectedElementId: id, selectedElementIds: id ? [id] : [] });
+  },
+
+  selectElements: (ids) => {
+    set({ selectedElementIds: ids, selectedElementId: ids.length === 1 ? ids[0] : null });
+  },
+
+  toggleElementSelection: (id) => {
+    set((state) => {
+      const isSelected = state.selectedElementIds.includes(id);
+      const newIds = isSelected
+        ? state.selectedElementIds.filter(eid => eid !== id)
+        : [...state.selectedElementIds, id];
+      return {
+        selectedElementIds: newIds,
+        selectedElementId: newIds.length === 1 ? newIds[0] : null,
+      };
+    });
+  },
+
+  addToSelection: (id) => {
+    set((state) => {
+      if (state.selectedElementIds.includes(id)) return state;
+      const newIds = [...state.selectedElementIds, id];
+      return {
+        selectedElementIds: newIds,
+        selectedElementId: newIds.length === 1 ? newIds[0] : null,
+      };
+    });
+  },
+
+  clearSelection: () => {
+    set({ selectedElementIds: [], selectedElementId: null });
+  },
+
+  addElements: (elementsData) => {
+    const ids: string[] = [];
+    set((state) => {
+      if (!state.game) return state;
+      
+      const newElements = elementsData.map(elementData => {
+        const id = nanoid(10);
+        ids.push(id);
+        return { ...elementData, id } as CanvasElement;
+      });
+      
+      const updatedGame = {
+        ...state.game,
+        elements: [...state.game.elements, ...newElements],
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return { game: updatedGame };
+    });
+    return ids;
+  },
+
+  deleteElements: (ids) => {
+    set((state) => {
+      if (!state.game) return state;
+      
+      const updatedGame = {
+        ...state.game,
+        elements: state.game.elements.filter((el) => !ids.includes(el.id)),
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return {
+        game: updatedGame,
+        selectedElementId: ids.includes(state.selectedElementId || '') ? null : state.selectedElementId,
+        selectedElementIds: state.selectedElementIds.filter(id => !ids.includes(id)),
+      };
+    });
   },
 
   // Player management
@@ -689,6 +795,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
+  // Drawing style actions
+  setDrawingStrokeColor: (color) => {
+    set({ drawingStrokeColor: color });
+  },
+
+  setDrawingFillColor: (color) => {
+    set({ drawingFillColor: color });
+  },
+
+  setDrawingFillEnabled: (enabled) => {
+    set({ drawingFillEnabled: enabled });
+  },
+
+  setDrawingStrokeWidth: (width) => {
+    set({ drawingStrokeWidth: Math.max(1, Math.min(10, width)) });
+  },
+
   // Undo/Redo actions
   performUndo: () => {
     const action = useHistoryStore.getState().undo();
@@ -722,5 +845,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       },
     });
+  },
+
+  // Layer visibility actions
+  toggleLayerVisibility: (layer) => {
+    set((state) => ({
+      layerVisibility: {
+        ...state.layerVisibility,
+        [layer]: !state.layerVisibility[layer],
+      },
+    }));
+  },
+
+  setLayerVisibility: (layer, visible) => {
+    set((state) => ({
+      layerVisibility: {
+        ...state.layerVisibility,
+        [layer]: visible,
+      },
+    }));
+  },
+
+  setPreviewAsPlayer: (preview) => {
+    set({ previewAsPlayer: preview });
   },
 }));

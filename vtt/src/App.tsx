@@ -10,7 +10,7 @@ import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 
 function App() {
-  const { game, performUndo, performRedo, selectElement } = useGameStore();
+  const { game, performUndo, performRedo, selectElement, selectedElementId } = useGameStore();
   const room = useRoom();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -23,7 +23,10 @@ function App() {
       performRedo();
     },
     onDelete: () => {
-      // Deletion is handled directly in the hook
+      // Broadcast deletion to other players
+      if (selectedElementId) {
+        room.broadcastElementDelete(selectedElementId);
+      }
     },
     onSave: () => {
       // Save notification could be added here

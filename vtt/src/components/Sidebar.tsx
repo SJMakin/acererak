@@ -11,17 +11,16 @@ import {
   ScrollArea,
   Badge,
   NumberInput,
-  ColorInput,
   Select,
   Divider,
   Checkbox,
   FileButton,
+  Switch,
 } from '@mantine/core';
-import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import type { TokenElement, CanvasElement, GameExport, Visibility, DiceRoll } from '../types';
-import CombatTracker from './CombatTracker';
 import DiceRoller from './DiceRoller';
+import PropertyInspector from './PropertyInspector';
 
 interface SidebarProps {
   room: {
@@ -37,13 +36,15 @@ export default function Sidebar({ room }: SidebarProps) {
   const {
     game,
     selectedElementId,
-    selectedElementIds,
     isDM,
     addElement,
     updateElement,
     deleteElement,
-    deleteElements,
     selectElement,
+    layerVisibility,
+    previewAsPlayer,
+    toggleLayerVisibility,
+    setPreviewAsPlayer,
   } = useGameStore();
 
   const [activeTab, setActiveTab] = useState<string | null>('tokens');
@@ -152,6 +153,7 @@ export default function Sidebar({ room }: SidebarProps) {
           <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
+          {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
           {isDM && <Tabs.Tab value="dm">DM Tools</Tabs.Tab>}
         </Tabs.List>
 
@@ -271,6 +273,10 @@ export default function Sidebar({ room }: SidebarProps) {
             <DiceRoller onRoll={handleDiceRoll} />
           </Tabs.Panel>
 
+          <Tabs.Panel value="properties">
+            <PropertyInspector room={room} />
+          </Tabs.Panel>
+
           {isDM && (
             <Tabs.Panel value="dm">
               <Stack>
@@ -319,6 +325,59 @@ export default function Sidebar({ room }: SidebarProps) {
                     </Stack>
                   </Paper>
                 )}
+
+                <Divider label="Layer Visibility" labelPosition="center" />
+
+                <Paper p="sm" withBorder>
+                  <Stack gap="xs">
+                    <Checkbox
+                      label="🗺️ Grid"
+                      size="xs"
+                      checked={layerVisibility.grid}
+                      onChange={() => toggleLayerVisibility('grid')}
+                    />
+                    <Checkbox
+                      label="🖼️ Map Images"
+                      size="xs"
+                      checked={layerVisibility.map}
+                      onChange={() => toggleLayerVisibility('map')}
+                    />
+                    <Checkbox
+                      label="👤 Tokens"
+                      size="xs"
+                      checked={layerVisibility.tokens}
+                      onChange={() => toggleLayerVisibility('tokens')}
+                    />
+                    <Checkbox
+                      label="✏️ Drawings"
+                      size="xs"
+                      checked={layerVisibility.drawings}
+                      onChange={() => toggleLayerVisibility('drawings')}
+                    />
+                    <Checkbox
+                      label="📝 Text Labels"
+                      size="xs"
+                      checked={layerVisibility.text}
+                      onChange={() => toggleLayerVisibility('text')}
+                    />
+                    <Checkbox
+                      label="🌫️ Fog of War"
+                      size="xs"
+                      checked={layerVisibility.fog}
+                      onChange={() => toggleLayerVisibility('fog')}
+                    />
+                    <Divider my="xs" />
+                    <Switch
+                      label="Preview as Player"
+                      size="xs"
+                      checked={previewAsPlayer}
+                      onChange={(e) => setPreviewAsPlayer(e.currentTarget.checked)}
+                    />
+                    <Text size="xs" c="dimmed">
+                      See what players see (hides DM-only elements)
+                    </Text>
+                  </Stack>
+                </Paper>
 
                 <Divider label="Fog of War" labelPosition="center" />
 

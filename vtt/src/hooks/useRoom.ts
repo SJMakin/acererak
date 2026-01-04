@@ -7,7 +7,6 @@ import type {
   CanvasElement,
   Player,
   Point,
-  P2PMessage,
   CombatTracker,
   DiceRoll,
 } from '../types';
@@ -21,7 +20,6 @@ interface RoomState {
 }
 
 type ActionSender<T> = (data: T, targetPeers?: string[]) => void;
-type ActionReceiver<T> = (callback: (data: T, peerId: string) => void) => void;
 
 export function useRoom() {
   const roomRef = useRef<Room | null>(null);
@@ -57,13 +55,10 @@ export function useRoom() {
     updatePlayer,
     setConnected,
     myPeerId,
-    isDM,
     addDiceRoll,
   } = useGameStore();
   
-  const { revealFog, hideFog, toggleFog } = useGameStore((state) => ({
-    revealFog: state.revealFog,
-    hideFog: state.hideFog,
+  const { toggleFog } = useGameStore((state) => ({
     toggleFog: state.toggleFog,
   }));
 

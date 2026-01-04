@@ -1,5 +1,4 @@
 import { useCallback, useRef } from 'react';
-import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import type { CanvasElement, Point } from '../types';
 

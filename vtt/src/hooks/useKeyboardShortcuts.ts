@@ -20,12 +20,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     setTool,
     selectedTool,
     deleteElement,
-    deleteElements,
     selectedElementId,
     selectedElementIds,
     game,
     isDM,
-    clearSelection,
   } = useGameStore();
   const { undo, redo, canUndo, canRedo } = useHistoryStore();
   const spacePressed = useRef(false);
