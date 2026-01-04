@@ -1,0 +1,51 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #1A1B1E;
+  color: #C1C2C5;
+}
+
+/* Canvas container */
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  background-color: #141517;
+}
+
+/* Cursor styles for different tools */
+.tool-pan { cursor: grab; }
+.tool-pan:active { cursor: grabbing; }
+.tool-draw { cursor: crosshair; }
+.tool-select { cursor: default; }
+.tool-text { cursor: text; }
+.tool-measure { cursor: crosshair; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #25262b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5c5f66;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #909296;
+}

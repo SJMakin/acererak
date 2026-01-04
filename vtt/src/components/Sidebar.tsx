@@ -1,0 +1,346 @@
+import { useState } from 'react';
+import {
+  Stack,
+  Tabs,
+  TextInput,
+  Button,
+  Paper,
+  Text,
+  Group,
+  ActionIcon,
+  ScrollArea,
+  Badge,
+  NumberInput,
+  ColorInput,
+  Select,
+  Divider,
+  Checkbox,
+  FileButton,
+} from '@mantine/core';
+import { nanoid } from 'nanoid';
+import { useGameStore } from '../stores/gameStore';
+import type { TokenElement, CanvasElement, GameExport, Visibility } from '../types';
+
+interface SidebarProps {
+  room: {
+    broadcastElementUpdate: (element: CanvasElement) => void;
+    broadcastElementDelete: (elementId: string) => void;
+    broadcastSync: () => void;
+  };
+}
+
+export default function Sidebar({ room }: SidebarProps) {
+  const {
+    game,
+    selectedElementId,
+    isDM,
+    addElement,
+    updateElement,
+    deleteElement,
+    selectElement,
+  } = useGameStore();
+
+  const [activeTab, setActiveTab] = useState<string | null>('tokens');
+  
+  // Token creation form
+  const [newTokenName, setNewTokenName] = useState('');
+  const [newTokenUrl, setNewTokenUrl] = useState('');
+  const [newTokenSize, setNewTokenSize] = useState(1);
+
+  // Get selected element
+  const selectedElement = game?.elements.find(e => e.id === selectedElementId);
+
+  const handleAddToken = () => {
+    if (!newTokenName.trim()) return;
+
+    const token: Omit<TokenElement, 'id'> = {
+      type: 'token',
+      layer: 'token',
+      name: newTokenName,
+      imageUrl: newTokenUrl || '',
+      x: 100,
+      y: 100,
+      width: newTokenSize,
+      height: newTokenSize,
+      visibleTo: 'all',
+      locked: false,
+      zIndex: game?.elements.length || 0,
+    };
+
+    const id = addElement(token);
+    const fullToken = { ...token, id } as TokenElement;
+    room.broadcastElementUpdate(fullToken);
+
+    // Reset form
+    setNewTokenName('');
+    setNewTokenUrl('');
+    setNewTokenSize(1);
+  };
+
+  const handleDeleteElement = (elementId: string) => {
+    deleteElement(elementId);
+    room.broadcastElementDelete(elementId);
+    if (selectedElementId === elementId) {
+      selectElement(null);
+    }
+  };
+
+  const handleUpdateVisibility = (elementId: string, visibility: Visibility) => {
+    const element = game?.elements.find(e => e.id === elementId);
+    if (!element) return;
+    
+    updateElement(elementId, { visibleTo: visibility });
+    room.broadcastElementUpdate({ ...element, visibleTo: visibility });
+  };
+
+  const handleExportGame = () => {
+    if (!game) return;
+
+    const exportData: GameExport = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      game,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${game.name.replace(/\s+/g, '-').toLowerCase()}.vtt.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportGame = (file: File | null) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string) as GameExport;
+        if (data.version === 1 && data.game) {
+          useGameStore.getState().loadGame(data.game);
+          room.broadcastSync();
+        }
+      } catch (err) {
+        console.error('Failed to import game:', err);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Get tokens and other elements
+  const tokens = game?.elements.filter(e => e.type === 'token') || [];
+  const players = game ? Object.values(game.players) : [];
+
+  return (
+    <Stack h="100%">
+      <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs.List>
+          <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
+          <Tabs.Tab value="players">Players</Tabs.Tab>
+          {isDM && <Tabs.Tab value="dm">DM Tools</Tabs.Tab>}
+        </Tabs.List>
+
+        <ScrollArea h="calc(100vh - 180px)" mt="md">
+          <Tabs.Panel value="tokens">
+            <Stack>
+              {/* Add token form */}
+              <Paper p="sm" withBorder>
+                <Text size="sm" fw={500} mb="xs">Add Token</Text>
+                <Stack gap="xs">
+                  <TextInput
+                    placeholder="Token name"
+                    value={newTokenName}
+                    onChange={(e) => setNewTokenName(e.currentTarget.value)}
+                    size="xs"
+                  />
+                  <TextInput
+                    placeholder="Image URL (optional)"
+                    value={newTokenUrl}
+                    onChange={(e) => setNewTokenUrl(e.currentTarget.value)}
+                    size="xs"
+                  />
+                  <Group gap="xs">
+                    <NumberInput
+                      placeholder="Size"
+                      value={newTokenSize}
+                      onChange={(val) => setNewTokenSize(Number(val) || 1)}
+                      min={1}
+                      max={10}
+                      size="xs"
+                      style={{ flex: 1 }}
+                    />
+                    <Button size="xs" onClick={handleAddToken}>
+                      Add
+                    </Button>
+                  </Group>
+                </Stack>
+              </Paper>
+
+              <Divider label="Tokens on Map" labelPosition="center" />
+
+              {/* Token list */}
+              {tokens.map((token) => (
+                <Paper 
+                  key={token.id} 
+                  p="xs" 
+                  withBorder
+                  style={{ 
+                    borderColor: selectedElementId === token.id ? '#7c3aed' : undefined,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => selectElement(token.id)}
+                >
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <Text size="sm" fw={500}>
+                        {(token as TokenElement).name || 'Unnamed'}
+                      </Text>
+                      {token.visibleTo === 'dm' && (
+                        <Badge size="xs" color="violet">DM Only</Badge>
+                      )}
+                    </Group>
+                    <ActionIcon 
+                      size="xs" 
+                      color="red" 
+                      variant="subtle"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteElement(token.id);
+                      }}
+                    >
+                      🗑️
+                    </ActionIcon>
+                  </Group>
+                  {(token as TokenElement).hp && (
+                    <Text size="xs" c="dimmed">
+                      HP: {(token as TokenElement).hp?.current}/{(token as TokenElement).hp?.max}
+                    </Text>
+                  )}
+                </Paper>
+              ))}
+
+              {tokens.length === 0 && (
+                <Text size="sm" c="dimmed" ta="center">
+                  No tokens on map
+                </Text>
+              )}
+            </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="players">
+            <Stack>
+              {players.map((player) => (
+                <Paper key={player.id} p="sm" withBorder>
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <div
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: player.color,
+                        }}
+                      />
+                      <Text size="sm" fw={500}>{player.name}</Text>
+                    </Group>
+                    {player.isDM && (
+                      <Badge size="xs" color="violet">DM</Badge>
+                    )}
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          </Tabs.Panel>
+
+          {isDM && (
+            <Tabs.Panel value="dm">
+              <Stack>
+                {/* Selected element properties */}
+                {selectedElement && (
+                  <Paper p="sm" withBorder>
+                    <Text size="sm" fw={500} mb="xs">Selected Element</Text>
+                    <Stack gap="xs">
+                      <Select
+                        label="Visibility"
+                        size="xs"
+                        value={
+                          selectedElement.visibleTo === 'all' ? 'all' : 
+                          selectedElement.visibleTo === 'dm' ? 'dm' : 'specific'
+                        }
+                        onChange={(val) => {
+                          if (val === 'all' || val === 'dm') {
+                            handleUpdateVisibility(selectedElement.id, val);
+                          }
+                        }}
+                        data={[
+                          { value: 'all', label: 'Visible to All' },
+                          { value: 'dm', label: 'DM Only' },
+                        ]}
+                      />
+                      <Checkbox
+                        label="Locked"
+                        size="xs"
+                        checked={selectedElement.locked}
+                        onChange={(e) => {
+                          updateElement(selectedElement.id, { locked: e.currentTarget.checked });
+                          room.broadcastElementUpdate({ 
+                            ...selectedElement, 
+                            locked: e.currentTarget.checked 
+                          });
+                        }}
+                      />
+                      <Button 
+                        size="xs" 
+                        color="red" 
+                        variant="light"
+                        onClick={() => handleDeleteElement(selectedElement.id)}
+                      >
+                        Delete Element
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
+
+                <Divider label="Fog of War" labelPosition="center" />
+
+                <Paper p="sm" withBorder>
+                  <Stack gap="xs">
+                    <Checkbox
+                      label="Enable Fog of War"
+                      checked={game?.fogOfWar.enabled}
+                      onChange={(e) => {
+                        useGameStore.getState().toggleFog(e.currentTarget.checked);
+                      }}
+                    />
+                    <Text size="xs" c="dimmed">
+                      Use Reveal/Hide tools to control visibility
+                    </Text>
+                  </Stack>
+                </Paper>
+
+                <Divider label="Import/Export" labelPosition="center" />
+
+                <Paper p="sm" withBorder>
+                  <Stack gap="xs">
+                    <Button size="xs" variant="light" onClick={handleExportGame}>
+                      Export Game
+                    </Button>
+                    <FileButton onChange={handleImportGame} accept=".json,.vtt.json">
+                      {(props) => (
+                        <Button size="xs" variant="light" {...props}>
+                          Import Game
+                        </Button>
+                      )}
+                    </FileButton>
+                  </Stack>
+                </Paper>
+              </Stack>
+            </Tabs.Panel>
+          )}
+        </ScrollArea>
+      </Tabs>
+    </Stack>
+  );
+}
