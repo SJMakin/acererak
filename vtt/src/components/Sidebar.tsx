@@ -18,9 +18,11 @@ import {
   Switch,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
+import { useLibraryStore } from '../stores/libraryStore';
 import type { TokenElement, CanvasElement, GameExport, Visibility, DiceRoll } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
+import LibraryPanel from './LibraryPanel';
 
 interface SidebarProps {
   room: {
@@ -146,11 +148,18 @@ export default function Sidebar({ room }: SidebarProps) {
     }
   };
 
+  const { addTokenToLibrary } = useLibraryStore();
+
+  const handleAddToLibrary = async (token: TokenElement) => {
+    await addTokenToLibrary(token, undefined, undefined, []);
+  };
+
   return (
     <Stack h="100%">
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
+          <Tabs.Tab value="library">Library</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
           {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
@@ -216,17 +225,31 @@ export default function Sidebar({ room }: SidebarProps) {
                         <Badge size="xs" color="violet">DM Only</Badge>
                       )}
                     </Group>
-                    <ActionIcon 
-                      size="xs" 
-                      color="red" 
-                      variant="subtle"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteElement(token.id);
-                      }}
-                    >
-                      🗑️
-                    </ActionIcon>
+                    <Group gap={4}>
+                      <ActionIcon
+                        size="xs"
+                        color="blue"
+                        variant="subtle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToLibrary(token as TokenElement);
+                        }}
+                        title="Save to Library"
+                      >
+                        📚
+                      </ActionIcon>
+                      <ActionIcon
+                        size="xs"
+                        color="red"
+                        variant="subtle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteElement(token.id);
+                        }}
+                      >
+                        🗑️
+                      </ActionIcon>
+                    </Group>
                   </Group>
                   {(token as TokenElement).hp && (
                     <Text size="xs" c="dimmed">
@@ -242,6 +265,10 @@ export default function Sidebar({ room }: SidebarProps) {
                 </Text>
               )}
             </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="library">
+            <LibraryPanel room={room} />
           </Tabs.Panel>
 
           <Tabs.Panel value="players">

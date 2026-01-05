@@ -48,6 +48,7 @@ function Token({
   isSelected,
   isCurrentTurn,
   onSelect,
+  onShiftSelect,
   onDragEnd,
   isDM,
   showMetadata = true,
@@ -56,7 +57,8 @@ function Token({
   cellSize: number;
   isSelected: boolean;
   isCurrentTurn?: boolean;
-  onSelect: (e?: any) => void;
+  onSelect: () => void;
+  onShiftSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
   showMetadata?: boolean;
@@ -81,12 +83,21 @@ function Token({
   const badgeSize = 20 * scale;
   const conditionBadgeSize = 16 * scale;
 
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const evt = e.evt;
+    if (evt.shiftKey) {
+      onShiftSelect();
+    } else {
+      onSelect();
+    }
+  };
+
   return (
     <Group
       x={element.x}
       y={element.y}
       draggable={!element.locked}
-      onClick={onSelect}
+      onClick={handleClick}
       onTap={onSelect}
       onDragEnd={(e) => {
         const node = e.target;
@@ -317,33 +328,44 @@ function Token({
   );
 }
 
-// Map image component  
-function MapImage({ 
-  element, 
+// Map image component
+function MapImage({
+  element,
   isSelected,
   onSelect,
+  onShiftSelect,
   onDragEnd,
   isDM,
-}: { 
+}: {
   element: ImageElement;
   isSelected: boolean;
   onSelect: () => void;
+  onShiftSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
 }) {
   const [image] = useImage(element.imageUrl);
 
-  const visible = element.visibleTo === 'all' || 
+  const visible = element.visibleTo === 'all' ||
     (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
 
   if (!visible || !image) return null;
+
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const evt = e.evt;
+    if (evt.shiftKey) {
+      onShiftSelect();
+    } else {
+      onSelect();
+    }
+  };
 
   return (
     <Group
       x={element.x}
       y={element.y}
       draggable={!element.locked}
-      onClick={onSelect}
+      onClick={handleClick}
       onTap={onSelect}
       onDragEnd={(e) => {
         const node = e.target;
@@ -376,12 +398,14 @@ function Shape({
   element,
   isSelected,
   onSelect,
+  onShiftSelect,
   onDragEnd,
   isDM,
 }: {
   element: ShapeElement;
   isSelected: boolean;
   onSelect: () => void;
+  onShiftSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
 }) {
@@ -423,12 +447,21 @@ function Shape({
     boundsHeight = radius * 2;
   }
 
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const evt = e.evt;
+    if (evt.shiftKey) {
+      onShiftSelect();
+    } else {
+      onSelect();
+    }
+  };
+
   return (
     <Group
       x={element.x}
       y={element.y}
       draggable={!element.locked}
-      onClick={onSelect}
+      onClick={handleClick}
       onTap={onSelect}
       onDragEnd={(e) => {
         const node = e.target;
@@ -514,6 +547,7 @@ function TextLabel({
   element,
   isSelected,
   onSelect,
+  onShiftSelect,
   onDragEnd,
   onDoubleClick,
   isDM,
@@ -521,6 +555,7 @@ function TextLabel({
   element: TextElement;
   isSelected: boolean;
   onSelect: () => void;
+  onShiftSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
   onDoubleClick: () => void;
   isDM: boolean;
@@ -554,12 +589,21 @@ function TextLabel({
     konvaFontStyle = 'bold';
   }
 
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const evt = e.evt;
+    if (evt.shiftKey) {
+      onShiftSelect();
+    } else {
+      onSelect();
+    }
+  };
+
   return (
     <Group
       x={element.x}
       y={element.y}
       draggable={!element.locked}
-      onClick={onSelect}
+      onClick={handleClick}
       onTap={onSelect}
       onDblClick={onDoubleClick}
       onDblTap={onDoubleClick}
@@ -685,6 +729,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   
   // Mouse position for paste
   const mousePosition = useRef<Point>({ x: 0, y: 0 });
+  
+  // Marquee selection state
+  const [marqueeStart, setMarqueeStart] = useState<Point | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<Point | null>(null);
+  const isMarqueeSelecting = useRef(false);
+  
+  // Multi-drag state (for future use)
+  const [_dragStartPositions, _setDragStartPositions] = useState<Record<string, Point>>({});
 
   const {
     game,
@@ -703,6 +755,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     layerVisibility,
     previewAsPlayer,
     selectElement,
+    selectElements,
+    toggleElementSelection,
     updateElement,
     addElement,
     panViewport,
@@ -952,9 +1006,28 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     
     // Only draw when using a drawing tool and clicking on stage
     if (!isDrawingTool) {
-      // Handle selection deselect
-      if (e.target === e.target.getStage()) {
-        selectElement(null);
+      // Handle marquee selection in select mode
+      if (selectedTool === 'select' && e.target === e.target.getStage()) {
+        const stage = stageRef.current;
+        if (stage) {
+          const pointer = stage.getPointerPosition();
+          if (pointer) {
+            const x = (pointer.x - viewportOffset.x) / viewportScale;
+            const y = (pointer.y - viewportOffset.y) / viewportScale;
+            
+            // Start marquee selection
+            isMarqueeSelecting.current = true;
+            setMarqueeStart({ x, y });
+            setMarqueeEnd({ x, y });
+            
+            // Only clear selection if not shift-clicking
+            const evt = e.evt as MouseEvent;
+            if (!evt.shiftKey) {
+              selectElement(null);
+            }
+          }
+        }
+        return;
       }
       // Handle measure tool
       if (selectedTool === 'measure' && e.target === e.target.getStage()) {
@@ -1054,6 +1127,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       if (pointer) {
         room.broadcastCursor(pointer);
         
+        // Update marquee selection end point
+        if (isMarqueeSelecting.current && marqueeStart) {
+          const x = (pointer.x - viewportOffset.x) / viewportScale;
+          const y = (pointer.y - viewportOffset.y) / viewportScale;
+          setMarqueeEnd({ x, y });
+          return;
+        }
+        
         // Update measure tool end point
         if (selectedTool === 'measure' && measureStart) {
           const x = (pointer.x - viewportOffset.x) / viewportScale;
@@ -1086,6 +1167,70 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle mouse up for drawing
   const handleMouseUp = useCallback(() => {
+    // Handle marquee selection finalization
+    if (isMarqueeSelecting.current && marqueeStart && marqueeEnd) {
+      isMarqueeSelecting.current = false;
+      
+      // Calculate selection rectangle
+      const minX = Math.min(marqueeStart.x, marqueeEnd.x);
+      const maxX = Math.max(marqueeStart.x, marqueeEnd.x);
+      const minY = Math.min(marqueeStart.y, marqueeEnd.y);
+      const maxY = Math.max(marqueeStart.y, marqueeEnd.y);
+      
+      // Only select if the marquee is big enough (not just a click)
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        // Find all elements within the marquee rectangle
+        const selectedIds = (game?.elements || [])
+          .filter(el => {
+            // Get element bounds
+            let elMinX = el.x;
+            let elMinY = el.y;
+            let elMaxX = el.x;
+            let elMaxY = el.y;
+            
+            if (el.type === 'token') {
+              const token = el as TokenElement;
+              const cellSize = game?.gridSettings.cellSize || 50;
+              elMaxX = el.x + token.width * cellSize;
+              elMaxY = el.y + token.height * cellSize;
+            } else if (el.type === 'shape') {
+              const shape = el as ShapeElement;
+              if (shape.width && shape.height) {
+                elMaxX = el.x + shape.width;
+                elMaxY = el.y + shape.height;
+              } else if (shape.points.length > 0) {
+                const xs = shape.points.map(p => p.x);
+                const ys = shape.points.map(p => p.y);
+                elMinX = Math.min(...xs);
+                elMinY = Math.min(...ys);
+                elMaxX = Math.max(...xs);
+                elMaxY = Math.max(...ys);
+              }
+            } else if (el.type === 'text') {
+              const text = el as TextElement;
+              elMaxX = el.x + (text.width || 200);
+              elMaxY = el.y + (text.height || 30);
+            } else if (el.type === 'image') {
+              const img = el as ImageElement;
+              elMaxX = el.x + img.width;
+              elMaxY = el.y + img.height;
+            }
+            
+            // Check if element bounds intersect with marquee
+            return !(elMaxX < minX || elMinX > maxX || elMaxY < minY || elMinY > maxY);
+          })
+          .map(el => el.id);
+        
+        if (selectedIds.length > 0) {
+          selectElements(selectedIds);
+        }
+      }
+      
+      setMarqueeStart(null);
+      setMarqueeEnd(null);
+      return;
+    }
+    
     // Clear measure tool on mouse up
     if (selectedTool === 'measure') {
       setMeasureStart(null);
@@ -1409,8 +1554,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               <MapImage
                 key={el.id}
                 element={el as ImageElement}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1422,8 +1568,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               <Shape
                 key={el.id}
                 element={el as ShapeElement}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1435,8 +1582,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               <TextLabel
                 key={el.id}
                 element={el as TextElement}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
                 isDM={effectiveIsDM}
@@ -1450,8 +1598,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 key={el.id}
                 element={el as TokenElement}
                 cellSize={gridSettings.cellSize}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
@@ -1505,8 +1654,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               <Shape
                 key={el.id}
                 element={el as ShapeElement}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1518,8 +1668,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
               <TextLabel
                 key={el.id}
                 element={el as TextElement}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
                 isDM={effectiveIsDM}
@@ -1533,8 +1684,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 key={el.id}
                 element={el as TokenElement}
                 cellSize={gridSettings.cellSize}
-                isSelected={selectedElementId === el.id}
+                isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
+                onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
@@ -1648,6 +1800,20 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 />
               )}
             </>
+          )}
+
+          {/* Marquee Selection Rectangle */}
+          {marqueeStart && marqueeEnd && isMarqueeSelecting.current && (
+            <Rect
+              x={Math.min(marqueeStart.x, marqueeEnd.x)}
+              y={Math.min(marqueeStart.y, marqueeEnd.y)}
+              width={Math.abs(marqueeEnd.x - marqueeStart.x)}
+              height={Math.abs(marqueeEnd.y - marqueeStart.y)}
+              fill="rgba(34, 197, 94, 0.1)"
+              stroke="#22c55e"
+              strokeWidth={1}
+              dash={[5, 5]}
+            />
           )}
 
           {/* Pings */}

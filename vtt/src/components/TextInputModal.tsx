@@ -1,4 +1,4 @@
-import { Modal, TextInput, Stack, Group, Button, Textarea } from '@mantine/core';
+import { Modal, Stack, Group, Button, Textarea } from '@mantine/core';
 import { useState, useEffect } from 'react';
 
 interface TextInputModalProps {

@@ -212,6 +212,32 @@ export interface SceneExport {
   fogOfWar: FogOfWar;
 }
 
+// Library types for reusable tokens/maps/scenes
+export type LibraryItemType = 'token' | 'map' | 'scene';
+
+// Template data types (without id, position, zIndex - assigned when placed)
+export type TokenTemplateData = Omit<TokenElement, 'id'>;
+export type ImageTemplateData = Omit<ImageElement, 'id'>;
+
+export interface LibraryItem {
+  id: string;
+  type: LibraryItemType;
+  name: string;
+  description?: string;
+  notes?: string;  // Markdown content
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  // Data stored depends on type - templates don't have id yet
+  data: TokenTemplateData | ImageTemplateData | SceneExport;
+}
+
+export interface LibraryExport {
+  version: 1;
+  exportedAt: string;
+  items: LibraryItem[];
+}
+
 // Tool types for the canvas
 export type ToolType =
   | 'select'
