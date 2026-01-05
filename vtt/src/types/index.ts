@@ -65,6 +65,8 @@ export interface ImageElement extends BaseElement {
   imageUrl: string;
   width: number;         // in pixels
   height: number;        // in pixels
+  notes?: string;        // Markdown content
+  name?: string;         // Optional name for the map/image
 }
 
 export interface ShapeElement extends BaseElement {
@@ -100,6 +102,18 @@ export interface Player {
   cursor?: Point;        // live cursor position
 }
 
+// Campaign Journal Note (standalone notes not attached to elements)
+export interface CampaignNote {
+  id: string;
+  title: string;
+  content: string;       // Markdown content
+  category?: string;     // e.g., "Session", "NPC", "Location", "Lore", "Plot"
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  visibleTo: Visibility; // 'all' | 'dm' | specific peer IDs
+}
+
 export interface GameState {
   id: string;
   name: string;
@@ -112,6 +126,7 @@ export interface GameState {
   dmPeerId?: string;     // who is the DM
   combat?: CombatTracker; // combat encounter state
   diceRolls?: DiceRoll[]; // dice roll history
+  campaignNotes?: CampaignNote[]; // Campaign journal notes
 }
 
 // P2P message types

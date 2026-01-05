@@ -91,7 +91,7 @@ This is a **decentralized P2P VTT** - design decisions must respect:
 
 ## 🚀 Phase 2: Asset Management & Persistence
 
-### Priority 1: Token & Map Library
+### ✅ Priority 1: Token & Map Library - COMPLETE
 
 **Problem:** No way to reuse tokens/maps across sessions.
 
@@ -118,38 +118,40 @@ interface Library {
 }
 ```
 
-**Tasks:**
-- [ ] Create `libraryStore.ts` for library state management
-- [ ] Add IndexedDB table for library items
-- [ ] Library panel in sidebar (new tab)
-- [ ] Add to library from canvas (right-click or button)
-- [ ] Drag from library to canvas
-- [ ] Token templates with pre-configured stats
+**Completed Tasks:**
+- [x] Create `libraryStore.ts` for library state management
+- [x] Add IndexedDB table for library items (database v2)
+- [x] Library panel in sidebar (new tab)
+- [x] Add to library from canvas (Save to Library button)
+- [x] Place from library to canvas
+- [x] Token templates with pre-configured stats (8 defaults: Goblin, Orc, Skeleton, Zombie, Bandit, Guard, Wolf, Giant Spider)
 
-### Priority 2: Markdown Notes System
+### ✅ Priority 2: Markdown Notes System - COMPLETE
 
 **Problem:** No way to store character backstory, DM notes, session summaries.
 
 **Solution:** Rich markdown notes on any element, plus standalone notes.
 
-**Features:**
-- [ ] Notes field on tokens (markdown with preview)
-- [ ] Notes field on maps/scenes
-- [ ] Standalone notes panel (campaign journal)
-- [ ] Simple WYSIWYG markdown editor component
-- [ ] Collapsible notes display in property inspector
+**Completed Tasks:**
+- [x] Notes field on tokens (markdown with preview)
+- [x] Notes field on maps/images
+- [x] Standalone notes panel (campaign journal)
+- [x] Simple markdown editor component with edit/preview modes
+- [x] Collapsible notes display in property inspector
 
 **Implementation:**
 ```typescript
-// Add to TokenElement, ImageElement, etc:
+// TokenElement and ImageElement support notes:
 notes?: string;  // Markdown content
 
-// Standalone notes for campaign journal
+// Campaign Notes for standalone journal entries
 interface CampaignNote {
   id: string;
   title: string;
   content: string;  // Markdown
+  category?: string; // Session, NPC, Location, Lore, Plot, etc.
   tags?: string[];
+  visibleTo: Visibility; // DM-only or all players
   createdAt: string;
   updatedAt: string;
 }
@@ -222,12 +224,13 @@ The store already has `layerVisibility` state - UI now implemented!
 **Future Enhancement: Layer Assignment UI**
 - [ ] Add layer dropdown to Property Inspector to manually move elements between layers
 
-### Priority 5: Selection Improvements
+### ✅ Priority 5: Selection Improvements - COMPLETE
 
-- [ ] Marquee/box selection (drag to select multiple)
-- [ ] Shift+click to add to selection
-- [ ] Move multiple selected elements together
-- [ ] Delete multiple selected elements
+- [x] Marquee/box selection (drag to select multiple)
+- [x] Shift+click to add to/toggle selection
+- [x] All element types support multi-select display (Token, Shape, MapImage, TextLabel)
+- [ ] Move multiple selected elements together (deferred - infrastructure ready)
+- [ ] Delete multiple selected elements (deferred)
 
 ## 📋 Phase 3: Canvas & Tools Enhancements
 
@@ -347,17 +350,28 @@ These features don't fit the decentralized design:
 - Layer visibility controls UI (toggle grid, map, tokens, drawings, text, fog)
 - Preview as Player mode for DMs
 
-### v1.1.0 (Next - Asset Management)
-- Token & Map Library
-- Markdown notes system
-- Enhanced export/import dialog
+### v1.1.0 (Asset Management)
+- Token & Map Library (8 default templates)
+- Save tokens to library
+- Library panel with search, filter, edit, delete
+- Marquee selection (box select multiple elements)
+- Shift+click multi-select support
 
-### v1.2.0 (Planned)
-- Selection improvements
+### v1.2.0 (Current - Notes System)
+- Markdown notes system (campaign journal)
+- Notes on tokens and images with edit/preview modes
+- MarkdownEditor component with basic syntax support
+- CampaignNote type with categories (Session, NPC, Location, Lore, Plot, etc.)
+- Notes tab in sidebar for campaign journal management
+- Collapsible notes in Property Inspector
+
+### v1.3.0 (Next)
+- Enhanced export/import dialog
+- Multi-element move/delete
 - Grid variants (hex, gridless)
 - Area effect templates
 
-### v1.3.0 (Planned)
+### v1.4.0 (Planned)
 - Enhanced measurement
 - Mobile optimization
 - Performance improvements

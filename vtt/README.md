@@ -79,6 +79,10 @@ vtt/
 │   │   ├── TokenConfigModal.tsx   # Token placement configuration UI
 │   │   ├── CombatTracker.tsx      # Initiative and turn tracking
 │   │   ├── DiceRoller.tsx         # Dice rolling interface
+│   │   ├── MarkdownEditor.tsx     # Edit/preview markdown content
+│   │   ├── NotesPanel.tsx         # Campaign journal tab
+│   │   ├── PropertyInspector.tsx  # Element properties editor
+│   │   ├── LibraryPanel.tsx       # Token/map library management
 │   │   ├── App.tsx                # Main app shell
 │   │   └── ...
 │   ├── hooks/
@@ -178,6 +182,16 @@ vtt/
 - Export game as `.vtt.json` file
 - Import game from file
 - Full game state serialization
+
+### ✅ Campaign Notes
+- **Notes System** (📝) - ✅ Fully working
+- Markdown notes on tokens (with edit/preview mode)
+- Markdown notes on map images
+- Campaign Journal for standalone notes
+- Note categories (Session, NPC, Location, Lore, Plot, etc.)
+- DM-only or public visibility
+- Search and filter notes
+- Simple markdown editor with syntax hints
 
 ### ✅ P2P Sync
 - Broadcast element updates

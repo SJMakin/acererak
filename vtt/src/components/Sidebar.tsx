@@ -14,15 +14,15 @@ import {
   Select,
   Divider,
   Checkbox,
-  FileButton,
   Switch,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useLibraryStore } from '../stores/libraryStore';
-import type { TokenElement, CanvasElement, GameExport, Visibility, DiceRoll } from '../types';
+import type { TokenElement, CanvasElement, Visibility, DiceRoll } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
 import LibraryPanel from './LibraryPanel';
+import NotesPanel from './NotesPanel';
 
 interface SidebarProps {
   room: {
@@ -102,42 +102,6 @@ export default function Sidebar({ room }: SidebarProps) {
     room.broadcastElementUpdate({ ...element, visibleTo: visibility });
   };
 
-  const handleExportGame = () => {
-    if (!game) return;
-
-    const exportData: GameExport = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      game,
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${game.name.replace(/\s+/g, '-').toLowerCase()}.vtt.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportGame = (file: File | null) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string) as GameExport;
-        if (data.version === 1 && data.game) {
-          useGameStore.getState().loadGame(data.game);
-          room.broadcastSync();
-        }
-      } catch (err) {
-        console.error('Failed to import game:', err);
-      }
-    };
-    reader.readAsText(file);
-  };
-
   // Get tokens and other elements
   const tokens = game?.elements.filter(e => e.type === 'token') || [];
   const players = game ? Object.values(game.players) : [];
@@ -160,6 +124,7 @@ export default function Sidebar({ room }: SidebarProps) {
         <Tabs.List>
           <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
           <Tabs.Tab value="library">Library</Tabs.Tab>
+          <Tabs.Tab value="notes">Notes</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
           {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
@@ -269,6 +234,10 @@ export default function Sidebar({ room }: SidebarProps) {
 
           <Tabs.Panel value="library">
             <LibraryPanel room={room} />
+          </Tabs.Panel>
+
+          <Tabs.Panel value="notes">
+            <NotesPanel />
           </Tabs.Panel>
 
           <Tabs.Panel value="players">
@@ -420,23 +389,6 @@ export default function Sidebar({ room }: SidebarProps) {
                     <Text size="xs" c="dimmed">
                       Use Reveal/Hide tools to control visibility
                     </Text>
-                  </Stack>
-                </Paper>
-
-                <Divider label="Import/Export" labelPosition="center" />
-
-                <Paper p="sm" withBorder>
-                  <Stack gap="xs">
-                    <Button size="xs" variant="light" onClick={handleExportGame}>
-                      Export Game
-                    </Button>
-                    <FileButton onChange={handleImportGame} accept=".json,.vtt.json">
-                      {(props) => (
-                        <Button size="xs" variant="light" {...props}>
-                          Import Game
-                        </Button>
-                      )}
-                    </FileButton>
                   </Stack>
                 </Paper>
               </Stack>

@@ -35,6 +35,7 @@ import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
 import type { ToolType } from '../types';
 import SettingsModal from './SettingsModal';
+import ExportImportModal from './ExportImportModal';
 
 interface ToolbarProps {
   sidebarOpen: boolean;
@@ -100,6 +101,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   } = useGameStore();
   const { canUndo, canRedo } = useHistoryStore();
   const [settingsOpened, setSettingsOpened] = useState(false);
+  const [exportImportOpened, setExportImportOpened] = useState(false);
+  const [exportImportMode, setExportImportMode] = useState<'export' | 'import'>('export');
 
   const handleZoom = (factor: number) => {
     const newScale = Math.min(Math.max(viewportScale * factor, 0.25), 3);
@@ -430,11 +433,17 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
 
           <Menu.Dropdown>
             <Menu.Label>Game</Menu.Label>
-            <Menu.Item onClick={() => {}}>
-              💾 Export Game (Ctrl+S)
+            <Menu.Item onClick={() => {
+              setExportImportMode('export');
+              setExportImportOpened(true);
+            }}>
+              💾 Export Game...
             </Menu.Item>
-            <Menu.Item onClick={() => {}}>
-              📥 Import Scene
+            <Menu.Item onClick={() => {
+              setExportImportMode('import');
+              setExportImportOpened(true);
+            }}>
+              📥 Import...
             </Menu.Item>
             
             {room.roomId && (
@@ -458,6 +467,13 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
 
       {/* Settings Modal */}
       <SettingsModal opened={settingsOpened} onClose={() => setSettingsOpened(false)} />
+      
+      {/* Export/Import Modal */}
+      <ExportImportModal
+        opened={exportImportOpened}
+        onClose={() => setExportImportOpened(false)}
+        mode={exportImportMode}
+      />
     </Group>
   );
 }

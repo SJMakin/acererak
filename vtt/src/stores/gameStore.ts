@@ -14,6 +14,7 @@ import type {
   TokenElement,
   DiceRoll,
   Settings,
+  CampaignNote,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
@@ -138,6 +139,11 @@ interface GameStore {
   // Actions - Dice
   addDiceRoll: (roll: DiceRoll) => void;
   clearDiceHistory: () => void;
+
+  // Actions - Campaign Notes
+  addCampaignNote: (note: Omit<CampaignNote, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateCampaignNote: (id: string, updates: Partial<CampaignNote>) => void;
+  deleteCampaignNote: (id: string) => void;
 
   // Actions - Settings
   updateSettings: (settings: Partial<Settings>) => void;
@@ -742,6 +748,63 @@ export const useGameStore = create<GameStore>((set, get) => ({
           diceRolls: [],
         },
       };
+    });
+  },
+
+  // Campaign Notes actions
+  addCampaignNote: (noteData) => {
+    const id = nanoid(10);
+    const now = new Date().toISOString();
+    const note: CampaignNote = {
+      ...noteData,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => {
+      if (!state.game) return state;
+      const campaignNotes = state.game.campaignNotes || [];
+      const updatedGame = {
+        ...state.game,
+        campaignNotes: [...campaignNotes, note],
+        updatedAt: now,
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return { game: updatedGame };
+    });
+
+    return id;
+  },
+
+  updateCampaignNote: (id, updates) => {
+    set((state) => {
+      if (!state.game) return state;
+      const campaignNotes = state.game.campaignNotes || [];
+      const now = new Date().toISOString();
+      const updatedGame = {
+        ...state.game,
+        campaignNotes: campaignNotes.map((note) =>
+          note.id === id ? { ...note, ...updates, updatedAt: now } : note
+        ),
+        updatedAt: now,
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return { game: updatedGame };
+    });
+  },
+
+  deleteCampaignNote: (id) => {
+    set((state) => {
+      if (!state.game) return state;
+      const campaignNotes = state.game.campaignNotes || [];
+      const updatedGame = {
+        ...state.game,
+        campaignNotes: campaignNotes.filter((note) => note.id !== id),
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return { game: updatedGame };
     });
   },
 

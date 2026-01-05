@@ -15,9 +15,12 @@ import {
   Badge,
   ActionIcon,
   Box,
+  Collapse,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { useGameStore } from '../stores/gameStore';
 import type { CanvasElement, TokenElement, ShapeElement, TextElement, ImageElement, Visibility } from '../types';
+import MarkdownEditor from './MarkdownEditor';
 
 interface PropertyInspectorProps {
   room: {
@@ -34,6 +37,9 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
 
   // Local state for condition input
   const [newCondition, setNewCondition] = useState('');
+
+  // Collapsible notes state
+  const [notesOpened, { toggle: toggleNotes }] = useDisclosure(false);
 
   // Auto-clear condition input when element changes
   useEffect(() => {
@@ -337,6 +343,27 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
                 </Badge>
               ))}
             </Group>
+
+            {/* Notes Section */}
+            <Divider label="Notes" labelPosition="center" />
+            <Button
+              size="xs"
+              variant="subtle"
+              onClick={toggleNotes}
+              fullWidth
+            >
+              {notesOpened ? '▼ Hide Notes' : '▶ Show Notes'}
+              {(selectedElement as TokenElement).notes && ' 📝'}
+            </Button>
+            <Collapse in={notesOpened}>
+              <MarkdownEditor
+                value={(selectedElement as TokenElement).notes || ''}
+                onChange={(val) => handleUpdate({ notes: val })}
+                placeholder="Character backstory, abilities, DM notes..."
+                minRows={3}
+                maxRows={8}
+              />
+            </Collapse>
           </Stack>
         </Paper>
       )}
@@ -548,6 +575,14 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
             </Text>
 
             <TextInput
+              label="Name"
+              size="xs"
+              value={(selectedElement as ImageElement).name || ''}
+              onChange={(e) => handleUpdate({ name: e.currentTarget.value })}
+              placeholder="Map name..."
+            />
+
+            <TextInput
               label="Image URL"
               size="xs"
               value={(selectedElement as ImageElement).imageUrl}
@@ -570,6 +605,27 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
                 min={1}
               />
             </Group>
+
+            {/* Notes Section */}
+            <Divider label="Notes" labelPosition="center" />
+            <Button
+              size="xs"
+              variant="subtle"
+              onClick={toggleNotes}
+              fullWidth
+            >
+              {notesOpened ? '▼ Hide Notes' : '▶ Show Notes'}
+              {(selectedElement as ImageElement).notes && ' 📝'}
+            </Button>
+            <Collapse in={notesOpened}>
+              <MarkdownEditor
+                value={(selectedElement as ImageElement).notes || ''}
+                onChange={(val) => handleUpdate({ notes: val })}
+                placeholder="Map description, room details, DM notes..."
+                minRows={3}
+                maxRows={8}
+              />
+            </Collapse>
           </Stack>
         </Paper>
       )}
