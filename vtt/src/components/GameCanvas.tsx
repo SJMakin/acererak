@@ -49,6 +49,7 @@ function Token({
   isCurrentTurn,
   onSelect,
   onShiftSelect,
+  onDragStart,
   onDragEnd,
   isDM,
   showMetadata = true,
@@ -59,6 +60,7 @@ function Token({
   isCurrentTurn?: boolean;
   onSelect: () => void;
   onShiftSelect: () => void;
+  onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
   showMetadata?: boolean;
@@ -99,6 +101,7 @@ function Token({
       draggable={!element.locked}
       onClick={handleClick}
       onTap={onSelect}
+      onDragStart={onDragStart}
       onDragEnd={(e) => {
         const node = e.target;
         onDragEnd(node.x(), node.y());
@@ -334,6 +337,7 @@ function MapImage({
   isSelected,
   onSelect,
   onShiftSelect,
+  onDragStart,
   onDragEnd,
   isDM,
 }: {
@@ -341,6 +345,7 @@ function MapImage({
   isSelected: boolean;
   onSelect: () => void;
   onShiftSelect: () => void;
+  onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
 }) {
@@ -367,6 +372,7 @@ function MapImage({
       draggable={!element.locked}
       onClick={handleClick}
       onTap={onSelect}
+      onDragStart={onDragStart}
       onDragEnd={(e) => {
         const node = e.target;
         onDragEnd(node.x(), node.y());
@@ -399,6 +405,7 @@ function Shape({
   isSelected,
   onSelect,
   onShiftSelect,
+  onDragStart,
   onDragEnd,
   isDM,
 }: {
@@ -406,6 +413,7 @@ function Shape({
   isSelected: boolean;
   onSelect: () => void;
   onShiftSelect: () => void;
+  onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   isDM: boolean;
 }) {
@@ -463,6 +471,7 @@ function Shape({
       draggable={!element.locked}
       onClick={handleClick}
       onTap={onSelect}
+      onDragStart={onDragStart}
       onDragEnd={(e) => {
         const node = e.target;
         onDragEnd(node.x(), node.y());
@@ -548,6 +557,7 @@ function TextLabel({
   isSelected,
   onSelect,
   onShiftSelect,
+  onDragStart,
   onDragEnd,
   onDoubleClick,
   isDM,
@@ -556,6 +566,7 @@ function TextLabel({
   isSelected: boolean;
   onSelect: () => void;
   onShiftSelect: () => void;
+  onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   onDoubleClick: () => void;
   isDM: boolean;
@@ -607,6 +618,7 @@ function TextLabel({
       onTap={onSelect}
       onDblClick={onDoubleClick}
       onDblTap={onDoubleClick}
+      onDragStart={onDragStart}
       onDragEnd={(e) => {
         const node = e.target;
         onDragEnd(node.x(), node.y());
@@ -654,16 +666,16 @@ function TextLabel({
   );
 }
 
-// Grid component
-function Grid({ 
-  width, 
-  height, 
-  cellSize, 
-  color 
-}: { 
-  width: number; 
-  height: number; 
-  cellSize: number; 
+// Square Grid component
+function SquareGrid({
+  width,
+  height,
+  cellSize,
+  color
+}: {
+  width: number;
+  height: number;
+  cellSize: number;
   color: string;
 }) {
   const lines = [];
@@ -697,6 +709,97 @@ function Grid({
   return <>{lines}</>;
 }
 
+// Hex Grid component (flat-top hexagons)
+function HexGrid({
+  width,
+  height,
+  cellSize,
+  color
+}: {
+  width: number;
+  height: number;
+  cellSize: number;
+  color: string;
+}) {
+  const hexagons = [];
+  
+  // Hex dimensions for flat-top hexagons
+  // cellSize represents the width of the hex
+  const hexWidth = cellSize;
+  const hexHeight = (Math.sqrt(3) / 2) * hexWidth;
+  
+  // Spacing between hex centers
+  const horizSpacing = hexWidth * 0.75;
+  const vertSpacing = hexHeight;
+  
+  // Calculate number of hexagons needed
+  const totalWidth = width * cellSize;
+  const totalHeight = height * cellSize;
+  const cols = Math.ceil(totalWidth / horizSpacing) + 1;
+  const rows = Math.ceil(totalHeight / vertSpacing) + 1;
+  
+  // Generate hexagon points for flat-top orientation
+  const getHexPoints = (cx: number, cy: number): number[] => {
+    const points: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      const x = cx + (hexWidth / 2) * Math.cos(angle);
+      const y = cy + (hexWidth / 2) * Math.sin(angle);
+      points.push(x, y);
+    }
+    return points;
+  };
+  
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      // Offset every other column
+      const xOffset = col * horizSpacing;
+      const yOffset = row * vertSpacing + (col % 2 === 1 ? vertSpacing / 2 : 0);
+      
+      // Only draw if within bounds
+      if (xOffset <= totalWidth + hexWidth && yOffset <= totalHeight + hexHeight) {
+        hexagons.push(
+          <Line
+            key={`hex-${row}-${col}`}
+            points={getHexPoints(xOffset, yOffset)}
+            stroke={color}
+            strokeWidth={1}
+            closed={true}
+            listening={false}
+          />
+        );
+      }
+    }
+  }
+  
+  return <>{hexagons}</>;
+}
+
+// Grid dispatcher component
+function Grid({
+  gridType = 'square',
+  width,
+  height,
+  cellSize,
+  color
+}: {
+  gridType?: 'square' | 'hex' | 'none';
+  width: number;
+  height: number;
+  cellSize: number;
+  color: string;
+}) {
+  if (gridType === 'none') {
+    return null;
+  }
+  
+  if (gridType === 'hex') {
+    return <HexGrid width={width} height={height} cellSize={cellSize} color={color} />;
+  }
+  
+  return <SquareGrid width={width} height={height} cellSize={cellSize} color={color} />;
+}
+
 export default function GameCanvas({ room }: GameCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -713,9 +816,10 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Ping state for visualization
   const [pings, setPings] = useState<Array<{ id: string; x: number; y: number; color: string; timestamp: number }>>([]);
   
-  // Measure tool state
-  const [measureStart, setMeasureStart] = useState<Point | null>(null);
-  const [measureEnd, setMeasureEnd] = useState<Point | null>(null);
+  // Measure tool state - Enhanced with waypoints
+  const [measureWaypoints, setMeasureWaypoints] = useState<Point[]>([]);
+  const [measureCurrentPoint, setMeasureCurrentPoint] = useState<Point | null>(null);
+  const [measureDifficultTerrain, setMeasureDifficultTerrain] = useState(false);
   
   // Token placement state
   const [tokenModalOpened, setTokenModalOpened] = useState(false);
@@ -735,8 +839,9 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const [marqueeEnd, setMarqueeEnd] = useState<Point | null>(null);
   const isMarqueeSelecting = useRef(false);
   
-  // Multi-drag state (for future use)
-  const [_dragStartPositions, _setDragStartPositions] = useState<Record<string, Point>>({});
+  // Multi-drag state - track initial positions when drag starts
+  const dragStartPositions = useRef<Record<string, Point>>({});
+  const isDraggingMultiple = useRef(false);
 
   const {
     game,
@@ -758,6 +863,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     selectElements,
     toggleElementSelection,
     updateElement,
+    updateElements,
     addElement,
     panViewport,
     zoomViewport,
@@ -780,13 +886,21 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     : [];
   
   // Check if current tool is a drawing tool or fog tool
-  const isDrawingTool = selectedTool.startsWith('draw-') || selectedTool === 'fog-reveal' || selectedTool === 'fog-hide';
+  const isDrawingTool = selectedTool.startsWith('draw-') || selectedTool === 'fog-reveal' || selectedTool === 'fog-hide' || selectedTool.startsWith('aoe-');
   const isFogTool = selectedTool === 'fog-reveal' || selectedTool === 'fog-hide';
 
   // Clear polygon points when switching away from polygon tool
   useEffect(() => {
     if (selectedTool !== 'draw-polygon') {
       setPolygonPoints([]);
+    }
+  }, [selectedTool]);
+
+  // Clear measure waypoints when switching away from measure tool
+  useEffect(() => {
+    if (selectedTool !== 'measure') {
+      setMeasureWaypoints([]);
+      setMeasureCurrentPoint(null);
     }
   }, [selectedTool]);
 
@@ -830,6 +944,26 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     panViewport({ x: pos.x - viewportOffset.x, y: pos.y - viewportOffset.y });
   }, [selectedTool, panViewport, viewportOffset]);
 
+  // Handle element drag start - record initial positions for multi-select move
+  const handleElementDragStart = useCallback((elementId: string) => {
+    // Check if dragging an element that's part of a multi-selection
+    if (selectedElementIds.length > 1 && selectedElementIds.includes(elementId)) {
+      isDraggingMultiple.current = true;
+      // Record initial positions of all selected elements
+      const positions: Record<string, Point> = {};
+      selectedElementIds.forEach(id => {
+        const el = game?.elements.find(e => e.id === id);
+        if (el) {
+          positions[id] = { x: el.x, y: el.y };
+        }
+      });
+      dragStartPositions.current = positions;
+    } else {
+      isDraggingMultiple.current = false;
+      dragStartPositions.current = {};
+    }
+  }, [selectedElementIds, game]);
+
   // Handle element drag end
   const handleElementDragEnd = useCallback((elementId: string, x: number, y: number) => {
     const element = game?.elements.find(e => e.id === elementId);
@@ -845,9 +979,55 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       finalY = Math.round(y / cellSize) * cellSize;
     }
 
-    updateElement(elementId, { x: finalX, y: finalY });
-    room.broadcastElementUpdate({ ...element, x: finalX, y: finalY });
-  }, [game, updateElement, room]);
+    // Check if we're moving multiple elements
+    if (isDraggingMultiple.current && selectedElementIds.length > 1) {
+      // Calculate delta from the dragged element's original position
+      const startPos = dragStartPositions.current[elementId];
+      if (startPos) {
+        const deltaX = finalX - startPos.x;
+        const deltaY = finalY - startPos.y;
+
+        // Build updates for all selected elements
+        const updates: Array<{ id: string; updates: Partial<CanvasElement> }> = [];
+        const updatedElements: CanvasElement[] = [];
+
+        selectedElementIds.forEach(id => {
+          const el = game?.elements.find(e => e.id === id);
+          const originalPos = dragStartPositions.current[id];
+          if (el && originalPos) {
+            let newX = originalPos.x + deltaX;
+            let newY = originalPos.y + deltaY;
+
+            // Snap each element to grid
+            if (game?.gridSettings.snapToGrid) {
+              const cellSize = game.gridSettings.cellSize;
+              newX = Math.round(newX / cellSize) * cellSize;
+              newY = Math.round(newY / cellSize) * cellSize;
+            }
+
+            updates.push({ id, updates: { x: newX, y: newY } });
+            updatedElements.push({ ...el, x: newX, y: newY });
+          }
+        });
+
+        // Batch update all elements
+        updateElements(updates);
+
+        // Broadcast all updates
+        updatedElements.forEach(el => {
+          room.broadcastElementUpdate(el);
+        });
+      }
+
+      // Reset multi-drag state
+      isDraggingMultiple.current = false;
+      dragStartPositions.current = {};
+    } else {
+      // Single element move
+      updateElement(elementId, { x: finalX, y: finalY });
+      room.broadcastElementUpdate({ ...element, x: finalX, y: finalY });
+    }
+  }, [game, updateElement, updateElements, room, selectedElementIds]);
 
   // Handle token configuration submission
   const handleTokenSubmit = useCallback((config: TokenConfig) => {
@@ -1029,7 +1209,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         }
         return;
       }
-      // Handle measure tool
+      // Handle measure tool - waypoint-based click to add points
       if (selectedTool === 'measure' && e.target === e.target.getStage()) {
         const stage = stageRef.current;
         if (stage) {
@@ -1038,10 +1218,19 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             // Transform to canvas coordinates
             const x = (pointer.x - viewportOffset.x) / viewportScale;
             const y = (pointer.y - viewportOffset.y) / viewportScale;
-            setMeasureStart({ x, y });
-            setMeasureEnd({ x, y });
+            
+            // Right-click clears measurement
+            const isRightClick = (e.evt as MouseEvent).button === 2;
+            if (isRightClick) {
+              setMeasureWaypoints([]);
+              setMeasureCurrentPoint(null);
+            } else {
+              // Left-click adds a waypoint
+              setMeasureWaypoints(prev => [...prev, { x, y }]);
+            }
           }
         }
+        return;
       }
       // Handle ping tool
       if (selectedTool === 'ping') {
@@ -1135,11 +1324,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           return;
         }
         
-        // Update measure tool end point
-        if (selectedTool === 'measure' && measureStart) {
+        // Update measure tool current point for live preview
+        if (selectedTool === 'measure' && measureWaypoints.length > 0) {
           const x = (pointer.x - viewportOffset.x) / viewportScale;
           const y = (pointer.y - viewportOffset.y) / viewportScale;
-          setMeasureEnd({ x, y });
+          setMeasureCurrentPoint({ x, y });
         }
       }
     }
@@ -1163,7 +1352,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       // Line/Rectangle/Circle: update end point only (preserves start point)
       setCurrentLine([drawStartPoint.x, drawStartPoint.y, x, y]);
     }
-  }, [isDrawingTool, selectedTool, drawStartPoint, measureStart, room, viewportOffset, viewportScale]);
+  }, [isDrawingTool, selectedTool, drawStartPoint, measureWaypoints, room, viewportOffset, viewportScale]);
 
   // Handle mouse up for drawing
   const handleMouseUp = useCallback(() => {
@@ -1231,10 +1420,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       return;
     }
     
-    // Clear measure tool on mouse up
+    // Don't clear measure tool on mouse up - it uses click-based waypoints
     if (selectedTool === 'measure') {
-      setMeasureStart(null);
-      setMeasureEnd(null);
       return;
     }
     
@@ -1404,6 +1591,152 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             lineWidth: drawingStrokeWidth,
           },
         };
+      } else if (selectedTool === 'aoe-circle') {
+        // AOE Circle: center + radius (like Fireball)
+        const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'circle',
+          x: startX,
+          y: startY,
+          width: radius * 2,
+          height: radius * 2,
+          points: [],
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: '#f97316', // Orange for AOE
+            fillColor: 'rgba(249, 115, 22, 0.3)', // Semi-transparent orange
+            lineWidth: 3,
+          },
+        };
+      } else if (selectedTool === 'aoe-cone') {
+        // AOE Cone: origin point with direction and curved arc edge (fan shape)
+        const angle = Math.atan2(endY - startY, endX - startX);
+        const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        const coneAngle = Math.PI / 3; // 60 degree cone
+        
+        // Generate points along the arc for a smooth curve
+        const arcSegments = 12; // Number of segments for the arc
+        const points: Point[] = [{ x: startX, y: startY }]; // Start with origin
+        
+        // Generate arc points from left edge to right edge
+        for (let i = 0; i <= arcSegments; i++) {
+          const segmentAngle = angle - coneAngle / 2 + (coneAngle * i) / arcSegments;
+          points.push({
+            x: startX + Math.cos(segmentAngle) * length,
+            y: startY + Math.sin(segmentAngle) * length,
+          });
+        }
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'polygon',
+          x: 0,
+          y: 0,
+          points,
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: '#ef4444', // Red for cone
+            fillColor: 'rgba(239, 68, 68, 0.3)', // Semi-transparent red
+            lineWidth: 3,
+          },
+        };
+      } else if (selectedTool === 'aoe-triangle') {
+        // AOE Triangle: simple triangle cone (D&D RAW interpretation)
+        const angle = Math.atan2(endY - startY, endX - startX);
+        const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        const coneAngle = Math.PI / 3; // 60 degree cone
+        
+        // Simple 3-point triangle
+        const point1X = startX;
+        const point1Y = startY;
+        const point2X = startX + Math.cos(angle - coneAngle / 2) * length;
+        const point2Y = startY + Math.sin(angle - coneAngle / 2) * length;
+        const point3X = startX + Math.cos(angle + coneAngle / 2) * length;
+        const point3Y = startY + Math.sin(angle + coneAngle / 2) * length;
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'polygon',
+          x: 0,
+          y: 0,
+          points: [
+            { x: point1X, y: point1Y },
+            { x: point2X, y: point2Y },
+            { x: point3X, y: point3Y },
+          ],
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: '#f97316', // Orange for triangle
+            fillColor: 'rgba(249, 115, 22, 0.3)', // Semi-transparent orange
+            lineWidth: 3,
+          },
+        };
+      } else if (selectedTool === 'aoe-line') {
+        // AOE Line: 5ft wide line from start to end (like Lightning Bolt)
+        const angle = Math.atan2(endY - startY, endX - startX);
+        const perpAngle = angle + Math.PI / 2;
+        const halfWidth = 12; // 5ft wide represented as ~12px
+        
+        // Calculate rectangle points for the line
+        const points: Point[] = [
+          { x: startX + Math.cos(perpAngle) * halfWidth, y: startY + Math.sin(perpAngle) * halfWidth },
+          { x: startX - Math.cos(perpAngle) * halfWidth, y: startY - Math.sin(perpAngle) * halfWidth },
+          { x: endX - Math.cos(perpAngle) * halfWidth, y: endY - Math.sin(perpAngle) * halfWidth },
+          { x: endX + Math.cos(perpAngle) * halfWidth, y: endY + Math.sin(perpAngle) * halfWidth },
+        ];
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'polygon',
+          x: 0,
+          y: 0,
+          points,
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: '#3b82f6', // Blue for line
+            fillColor: 'rgba(59, 130, 246, 0.3)', // Semi-transparent blue
+            lineWidth: 3,
+          },
+        };
+      } else if (selectedTool === 'aoe-square') {
+        // AOE Square: corner to corner (like Cloud of Daggers)
+        const x = Math.min(startX, endX);
+        const y = Math.min(startY, endY);
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
+        
+        newElement = {
+          type: 'shape' as const,
+          layer: 'drawing' as const,
+          shapeType: 'rectangle',
+          x,
+          y,
+          width,
+          height,
+          points: [],
+          visibleTo: 'all' as const,
+          locked: false,
+          zIndex: game?.elements.length || 0,
+          style: {
+            strokeColor: '#8b5cf6', // Purple for square AOE
+            fillColor: 'rgba(139, 92, 246, 0.3)', // Semi-transparent purple
+            lineWidth: 3,
+          },
+        };
       } else {
         // Fallback to freehand
         const points: Point[] = [];
@@ -1438,7 +1771,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     
     setCurrentLine([]);
     setDrawStartPoint(null);
-  }, [isDrawingTool, currentLine, selectedTool, drawStartPoint, game, addElement, room, setMeasureStart, setMeasureEnd]);
+  }, [isDrawingTool, currentLine, selectedTool, drawStartPoint, game, addElement, room]);
 
   // Keyboard shortcuts integration
   useEffect(() => {
@@ -1459,6 +1792,29 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         return;
       }
 
+      // Measure tool keyboard shortcuts
+      if (selectedTool === 'measure') {
+        // Escape clears measurement
+        if (key === 'escape') {
+          e.preventDefault();
+          setMeasureWaypoints([]);
+          setMeasureCurrentPoint(null);
+          return;
+        }
+        // D toggles difficult terrain modifier
+        if (key === 'd') {
+          e.preventDefault();
+          setMeasureDifficultTerrain(prev => !prev);
+          return;
+        }
+        // Backspace removes last waypoint
+        if (key === 'backspace' && measureWaypoints.length > 0) {
+          e.preventDefault();
+          setMeasureWaypoints(prev => prev.slice(0, -1));
+          return;
+        }
+      }
+
       if (ctrl && key === 'c' && selectedElementIds.length > 0) {
         clipboard.copySelected();
       } else if (ctrl && key === 'x' && selectedElementIds.length > 0) {
@@ -1470,7 +1826,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, clipboard, selectedTool, polygonPoints, finishPolygon]);
+  }, [selectedElementIds, clipboard, selectedTool, polygonPoints, finishPolygon, measureWaypoints]);
 
   // Cleanup old pings and force re-render for animation
   const [, setPingTick] = useState(0);
@@ -1537,6 +1893,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           />
           {layerVisibility.grid && gridSettings.showGrid && (
             <Grid
+              gridType={gridSettings.gridType || 'square'}
               width={gridSettings.width}
               height={gridSettings.height}
               cellSize={gridSettings.cellSize}
@@ -1557,6 +1914,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1571,6 +1929,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1585,6 +1944,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
                 isDM={effectiveIsDM}
@@ -1601,6 +1961,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
@@ -1657,6 +2018,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
               />
@@ -1671,6 +2033,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
                 isDM={effectiveIsDM}
@@ -1687,6 +2050,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
                 onSelect={() => selectElement(el.id)}
                 onShiftSelect={() => toggleElementSelection(el.id)}
+                onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 isDM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
@@ -1762,6 +2126,109 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                   fill={drawingStrokeColor}
                   pointerLength={Math.max(10, drawingStrokeWidth * 3)}
                   pointerWidth={Math.max(8, drawingStrokeWidth * 2.5)}
+                />
+              )}
+              {/* AOE Circle preview */}
+              {selectedTool === 'aoe-circle' && currentLine.length >= 4 && drawStartPoint && (
+                <Circle
+                  x={drawStartPoint.x}
+                  y={drawStartPoint.y}
+                  radius={Math.sqrt(
+                    Math.pow(currentLine[2] - drawStartPoint.x, 2) +
+                    Math.pow(currentLine[3] - drawStartPoint.y, 2)
+                  )}
+                  stroke="#f97316"
+                  strokeWidth={3}
+                  fill="rgba(249, 115, 22, 0.3)"
+                />
+              )}
+              {/* AOE Cone preview (curved arc) */}
+              {selectedTool === 'aoe-cone' && currentLine.length >= 4 && drawStartPoint && (() => {
+                const endX = currentLine[2];
+                const endY = currentLine[3];
+                const angle = Math.atan2(endY - drawStartPoint.y, endX - drawStartPoint.x);
+                const length = Math.sqrt(Math.pow(endX - drawStartPoint.x, 2) + Math.pow(endY - drawStartPoint.y, 2));
+                const coneAngle = Math.PI / 3; // 60 degree cone
+                const arcSegments = 12;
+                
+                // Generate arc points
+                const points: number[] = [drawStartPoint.x, drawStartPoint.y];
+                for (let i = 0; i <= arcSegments; i++) {
+                  const segmentAngle = angle - coneAngle / 2 + (coneAngle * i) / arcSegments;
+                  points.push(
+                    drawStartPoint.x + Math.cos(segmentAngle) * length,
+                    drawStartPoint.y + Math.sin(segmentAngle) * length
+                  );
+                }
+                
+                return (
+                  <Line
+                    points={points}
+                    stroke="#ef4444"
+                    strokeWidth={3}
+                    fill="rgba(239, 68, 68, 0.3)"
+                    closed={true}
+                  />
+                );
+              })()}
+              {/* AOE Triangle preview (simple triangle) */}
+              {selectedTool === 'aoe-triangle' && currentLine.length >= 4 && drawStartPoint && (() => {
+                const endX = currentLine[2];
+                const endY = currentLine[3];
+                const angle = Math.atan2(endY - drawStartPoint.y, endX - drawStartPoint.x);
+                const length = Math.sqrt(Math.pow(endX - drawStartPoint.x, 2) + Math.pow(endY - drawStartPoint.y, 2));
+                const coneAngle = Math.PI / 3; // 60 degree cone
+                
+                const point2X = drawStartPoint.x + Math.cos(angle - coneAngle / 2) * length;
+                const point2Y = drawStartPoint.y + Math.sin(angle - coneAngle / 2) * length;
+                const point3X = drawStartPoint.x + Math.cos(angle + coneAngle / 2) * length;
+                const point3Y = drawStartPoint.y + Math.sin(angle + coneAngle / 2) * length;
+                
+                return (
+                  <Line
+                    points={[drawStartPoint.x, drawStartPoint.y, point2X, point2Y, point3X, point3Y]}
+                    stroke="#f97316"
+                    strokeWidth={3}
+                    fill="rgba(249, 115, 22, 0.3)"
+                    closed={true}
+                  />
+                );
+              })()}
+              {/* AOE Line preview */}
+              {selectedTool === 'aoe-line' && currentLine.length >= 4 && drawStartPoint && (() => {
+                const endX = currentLine[2];
+                const endY = currentLine[3];
+                const angle = Math.atan2(endY - drawStartPoint.y, endX - drawStartPoint.x);
+                const perpAngle = angle + Math.PI / 2;
+                const halfWidth = 12;
+                
+                const points = [
+                  drawStartPoint.x + Math.cos(perpAngle) * halfWidth, drawStartPoint.y + Math.sin(perpAngle) * halfWidth,
+                  drawStartPoint.x - Math.cos(perpAngle) * halfWidth, drawStartPoint.y - Math.sin(perpAngle) * halfWidth,
+                  endX - Math.cos(perpAngle) * halfWidth, endY - Math.sin(perpAngle) * halfWidth,
+                  endX + Math.cos(perpAngle) * halfWidth, endY + Math.sin(perpAngle) * halfWidth,
+                ];
+                
+                return (
+                  <Line
+                    points={points}
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    fill="rgba(59, 130, 246, 0.3)"
+                    closed={true}
+                  />
+                );
+              })()}
+              {/* AOE Square preview */}
+              {selectedTool === 'aoe-square' && currentLine.length >= 4 && drawStartPoint && (
+                <Rect
+                  x={Math.min(drawStartPoint.x, currentLine[2])}
+                  y={Math.min(drawStartPoint.y, currentLine[3])}
+                  width={Math.abs(currentLine[2] - drawStartPoint.x)}
+                  height={Math.abs(currentLine[3] - drawStartPoint.y)}
+                  stroke="#8b5cf6"
+                  strokeWidth={3}
+                  fill="rgba(139, 92, 246, 0.3)"
                 />
               )}
             </>
@@ -1840,58 +2307,128 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             );
           })}
 
-          {/* Measure Tool */}
-          {measureStart && measureEnd && (
-            <>
-              {/* Measure line */}
-              <Line
-                points={[measureStart.x, measureStart.y, measureEnd.x, measureEnd.y]}
-                stroke="#22c55e"
-                strokeWidth={2}
-                dash={[10, 5]}
-                lineCap="round"
-              />
-              
-              {/* Distance label */}
-              {(() => {
-                const dx = measureEnd.x - measureStart.x;
-                const dy = measureEnd.y - measureStart.y;
-                const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-                const gridDistance = pixelDistance / gridSettings.cellSize;
-                const distanceText = `${gridDistance.toFixed(1)} ft`;
+          {/* Enhanced Measure Tool with Waypoints */}
+          {measureWaypoints.length > 0 && (() => {
+            // Build all points including current mouse position for preview
+            const allPoints = measureCurrentPoint
+              ? [...measureWaypoints, measureCurrentPoint]
+              : measureWaypoints;
+            
+            // Calculate segment distances
+            const segments: { start: Point; end: Point; distance: number }[] = [];
+            let totalDistance = 0;
+            
+            for (let i = 1; i < allPoints.length; i++) {
+              const start = allPoints[i - 1];
+              const end = allPoints[i];
+              const dx = end.x - start.x;
+              const dy = end.y - start.y;
+              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+              const gridDistance = pixelDistance / gridSettings.cellSize;
+              // Apply difficult terrain modifier (2x distance)
+              const effectiveDistance = measureDifficultTerrain ? gridDistance * 2 : gridDistance;
+              segments.push({ start, end, distance: effectiveDistance });
+              totalDistance += effectiveDistance;
+            }
+            
+            const measureColor = measureDifficultTerrain ? '#f59e0b' : '#22c55e';
+            
+            return (
+              <>
+                {/* Draw all segment lines */}
+                {segments.map((segment, index) => (
+                  <Line
+                    key={`segment-${index}`}
+                    points={[segment.start.x, segment.start.y, segment.end.x, segment.end.y]}
+                    stroke={measureColor}
+                    strokeWidth={2}
+                    dash={[10, 5]}
+                    lineCap="round"
+                  />
+                ))}
                 
-                // Position label at midpoint
-                const midX = (measureStart.x + measureEnd.x) / 2;
-                const midY = (measureStart.y + measureEnd.y) / 2;
+                {/* Draw waypoint markers */}
+                {measureWaypoints.map((point, index) => (
+                  <Group key={`waypoint-${index}`} x={point.x} y={point.y}>
+                    <Circle
+                      radius={8}
+                      fill={index === 0 ? measureColor : '#3b82f6'}
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    />
+                    <Text
+                      x={-4}
+                      y={-5}
+                      text={String(index + 1)}
+                      fontSize={10}
+                      fill="#ffffff"
+                      fontStyle="bold"
+                    />
+                  </Group>
+                ))}
                 
-                return (
-                  <Group x={midX} y={midY}>
+                {/* Draw per-segment distance labels on committed segments */}
+                {segments.slice(0, measureWaypoints.length - 1).map((segment, index) => {
+                  const midX = (segment.start.x + segment.end.x) / 2;
+                  const midY = (segment.start.y + segment.end.y) / 2;
+                  
+                  return (
+                    <Group key={`label-${index}`} x={midX} y={midY - 20}>
+                      <Rect
+                        x={-25}
+                        y={-10}
+                        width={50}
+                        height={20}
+                        fill="rgba(31, 41, 55, 0.9)"
+                        stroke={measureColor}
+                        strokeWidth={1}
+                        cornerRadius={3}
+                      />
+                      <Text
+                        text={`${segment.distance.toFixed(0)}ft`}
+                        fontSize={11}
+                        fill={measureColor}
+                        fontStyle="bold"
+                        align="center"
+                        width={50}
+                        x={-25}
+                        y={-6}
+                      />
+                    </Group>
+                  );
+                })}
+                
+                {/* Total distance label at final point */}
+                {allPoints.length >= 2 && (
+                  <Group
+                    x={allPoints[allPoints.length - 1].x + 15}
+                    y={allPoints[allPoints.length - 1].y - 10}
+                  >
                     <Rect
-                      x={-30}
-                      y={-15}
-                      width={60}
-                      height={30}
+                      x={0}
+                      y={-12}
+                      width={85}
+                      height={24}
                       fill="#1f2937"
-                      stroke="#22c55e"
+                      stroke={measureColor}
                       strokeWidth={2}
                       cornerRadius={4}
                     />
                     <Text
-                      text={distanceText}
-                      fontSize={14}
-                      fill="#22c55e"
+                      text={`Total: ${totalDistance.toFixed(0)}ft`}
+                      fontSize={12}
+                      fill={measureColor}
                       fontStyle="bold"
                       align="center"
-                      verticalAlign="middle"
-                      width={60}
-                      x={-30}
+                      width={85}
+                      x={0}
                       y={-7}
                     />
                   </Group>
-                );
-              })()}
-            </>
-          )}
+                )}
+              </>
+            );
+          })()}
 
           {/* Player Cursors */}
           {otherPlayerCursors.map(player => (
@@ -1948,6 +2485,36 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           {polygonPoints.length >= 3
             ? ' Press Enter or double-click to finish'
             : ` Add ${3 - polygonPoints.length} more point${3 - polygonPoints.length !== 1 ? 's' : ''}`}
+        </div>
+      )}
+      
+      {/* Measure tool hint overlay */}
+      {selectedTool === 'measure' && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            pointerEvents: 'none',
+            zIndex: 1000,
+          }}
+        >
+          {measureWaypoints.length === 0
+            ? 'Click to start measuring'
+            : `${measureWaypoints.length} waypoint${measureWaypoints.length !== 1 ? 's' : ''}`}
+          {measureWaypoints.length > 0 && ' • Click to add waypoint • '}
+          {measureWaypoints.length > 0 && (
+            <span style={{ color: measureDifficultTerrain ? '#f59e0b' : '#86efac' }}>
+              [D] Terrain: {measureDifficultTerrain ? '2×' : '1×'}
+            </span>
+          )}
+          {measureWaypoints.length > 0 && ' • [Backspace] Undo • [Esc] Clear'}
         </div>
       )}
       

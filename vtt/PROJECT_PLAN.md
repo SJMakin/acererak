@@ -157,50 +157,32 @@ interface CampaignNote {
 }
 ```
 
-### Priority 3: Enhanced Export/Import Dialog
+### ✅ Priority 3: Enhanced Export/Import Dialog - COMPLETE
 
 **Problem:** Current export dumps everything, import replaces everything.
 
 **Solution:** Selective export/import with tree-based UI.
 
-**Export Dialog:**
-```
-📁 Export Selection
-├── ☑️ Game Settings
-│   ├── ☑️ Grid configuration
-│   └── ☑️ Fog of War state
-├── ☑️ Elements (15 total)
-│   ├── ☑️ Tokens (8)
-│   │   ├── ☑️ Goblin Scout
-│   │   ├── ☑️ Orc Warrior
-│   │   └── ...
-│   ├── ☑️ Drawings (5)
-│   └── ☑️ Text Labels (2)
-├── ☑️ Library Items
-│   ├── ☑️ Token Templates (12)
-│   └── ☑️ Saved Maps (3)
-└── ☑️ Campaign Notes (4)
+**Completed Tasks:**
+- [x] Create `ExportImportModal.tsx` component
+- [x] Tree view/checkbox UI for category selection
+- [x] Selective JSON serialization (v2 format)
+- [x] Merge vs replace import modes
+- [x] Individual element selection within categories
+- [x] File format versioning (detects v1 legacy and v2 formats)
+- [x] Available in Game menu (⋮) for all users (not DM-only)
 
-[Export Selected] [Select All] [Select None]
-```
+**Export Features:**
+- Checkbox-based category selection (tokens, map images, shapes, text, notes, library items)
+- Expandable categories to select individual elements
+- File naming with game name and timestamp
+- V2 format with selective data support
 
-**Import Dialog:**
-```
-📁 Import from file.vtt.json
-├── ☐ Merge with existing (vs Replace)
-├── Preview tree (same as export)
-└── Conflict resolution options
-
-[Import Selected] [Cancel]
-```
-
-**Tasks:**
-- [ ] Create `ExportImportModal.tsx` component
-- [ ] Tree view component for selection
-- [ ] Selective JSON serialization
-- [ ] Merge vs replace logic
-- [ ] Conflict detection and resolution UI
-- [ ] File format versioning
+**Import Features:**
+- Merge vs Replace mode selection
+- Format auto-detection (v1/v2)
+- Preview of importable categories
+- Library items can be imported separately
 
 ### ✅ Priority 4: Layer Controls - COMPLETE
 
@@ -229,34 +211,38 @@ The store already has `layerVisibility` state - UI now implemented!
 - [x] Marquee/box selection (drag to select multiple)
 - [x] Shift+click to add to/toggle selection
 - [x] All element types support multi-select display (Token, Shape, MapImage, TextLabel)
-- [ ] Move multiple selected elements together (deferred - infrastructure ready)
-- [ ] Delete multiple selected elements (deferred)
+- [x] Move multiple selected elements together (batch drag)
+- [x] Delete multiple selected elements (batch delete)
 
 ## 📋 Phase 3: Canvas & Tools Enhancements
 
-### Grid Enhancements
+### ✅ Grid Enhancements - COMPLETE
 
-- [ ] Hex grid option (rendering already uses Konva)
-- [ ] Gridless mode
-- [ ] Grid opacity slider
-- [ ] Custom grid colors in toolbar
+- [x] Hex grid option (flat-top hexagons with proper spacing)
+- [x] Gridless mode (no grid rendering)
+- [x] Grid opacity
+- [x] Custom grid colors
+- [x] Grid type selector in Settings Modal
 
-### Area Effect Templates
+### ✅ Area Effect Templates - COMPLETE
 
 Visual-only templates for spell effects (no server needed):
 
-- [ ] Circle template (radius)
-- [ ] Cone template (angle + length)
-- [ ] Line template (width + length)
-- [ ] Rectangle template (width + height)
-- [ ] Template placement tool
-- [ ] Configurable colors/opacity
+- [x] Circle template (drag to set radius) - Orange
+- [x] Cone template (curved arc fan shape) - Red
+- [x] Triangle template (simple 3-point, D&D RAW) - Orange
+- [x] Line template (5ft wide path) - Blue
+- [x] Square/Rectangle template (drag to set dimensions) - Purple
+- [x] AOE dropdown in toolbar with all templates
+- [x] Semi-transparent fills with distinct colors per type
 
-### Enhanced Measurement
+### ✅ Enhanced Measurement - COMPLETE
 
-- [ ] Waypoint measurement (click multiple points)
-- [ ] Show path distance as you measure
-- [ ] Optional: difficulty terrain modifier
+- [x] Waypoint measurement (click to add multiple points)
+- [x] Show path distance as you measure (segment + total distances)
+- [x] Difficult terrain modifier (toggle with D key for 2× multiplier)
+- [x] Keyboard shortcuts: Escape (clear), D (toggle terrain), Backspace (undo waypoint)
+- [x] Numbered waypoints with color-coded display (green normal, amber difficult)
 
 ## 📋 Phase 3: Quality of Life
 
@@ -357,7 +343,7 @@ These features don't fit the decentralized design:
 - Marquee selection (box select multiple elements)
 - Shift+click multi-select support
 
-### v1.2.0 (Current - Notes System)
+### v1.2.0 (Notes System)
 - Markdown notes system (campaign journal)
 - Notes on tokens and images with edit/preview modes
 - MarkdownEditor component with basic syntax support
@@ -365,16 +351,38 @@ These features don't fit the decentralized design:
 - Notes tab in sidebar for campaign journal management
 - Collapsible notes in Property Inspector
 
-### v1.3.0 (Next)
-- Enhanced export/import dialog
-- Multi-element move/delete
-- Grid variants (hex, gridless)
-- Area effect templates
+### v1.3.0 (Export/Import)
+- Enhanced export/import dialog with selective data
+- ExportImportModal component with tree selection UI
+- V2 export format with category-based selection
+- Merge vs replace import modes
+- Available in Game menu for all users
 
-### v1.4.0 (Planned)
-- Enhanced measurement
-- Mobile optimization
-- Performance improvements
+### v1.4.0 (Current - Canvas & Selection)
+- **Multi-element operations**: Batch move/delete for multiple selected elements
+- **Grid variants**: Square grid, hex grid (flat-top), gridless mode
+- **Grid type selector**: Added to Settings Modal under Grid tab
+- **Area Effect Templates**: Full AOE toolkit in toolbar dropdown
+  - Circle AOE (orange, drag for radius)
+  - Cone AOE (red, curved arc fan shape with 12 segments)
+  - Triangle AOE (orange, simple 3-point D&D RAW interpretation)
+  - Line AOE (blue, 5ft wide rectangular path)
+  - Square AOE (purple, drag for dimensions)
+- **Improved selection**: Drag any selected element to move all selected elements together
+
+### v1.5.0 (Current - Enhanced Measurement)
+- **Enhanced Measurement Tool**: Complete rewrite with waypoint-based path measurement
+  - Click to add waypoints along a path
+  - Shows per-segment and cumulative total distances in feet
+  - Difficult terrain modifier (D key toggles 2× distance multiplier)
+  - Numbered waypoints with visual color coding (green/amber)
+  - Keyboard shortcuts: Escape (clear), Backspace (undo), D (toggle terrain)
+  - Interactive hint bar showing controls and current state
+
+### v1.6.0 (Next)
+- Mobile optimization (touch gestures, responsive UI)
+- Performance improvements (virtual rendering, debouncing)
+- Canvas QoL (minimap, fit-to-content, alignment guides)
 
 ### v2.0.0 (Future)
 - Acererak integration
