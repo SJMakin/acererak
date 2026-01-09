@@ -48,6 +48,7 @@ export interface BaseElement {
   locked: boolean;
   zIndex: number;
   rotation?: number;
+  version?: number;  // Incremented on each update for conflict resolution
 }
 
 export interface TokenElement extends BaseElement {
@@ -130,6 +131,7 @@ export interface GameState {
   combat?: CombatTracker; // combat encounter state
   diceRolls?: DiceRoll[]; // dice roll history
   campaignNotes?: CampaignNote[]; // Campaign journal notes
+  chatMessages?: ChatMessage[]; // In-game chat messages
 }
 
 // P2P message types
@@ -190,6 +192,22 @@ export interface DiceRollMessage {
   roll: DiceRoll;
 }
 
+// Chat message types
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  timestamp: number;
+  content: string;
+  isDMOnly: boolean; // Whisper to DM only
+}
+
+export interface ChatMessageP2P {
+  type: 'chat';
+  message: ChatMessage;
+}
+
 export type P2PMessage =
   | SyncMessage
   | ElementUpdateMessage
@@ -199,7 +217,8 @@ export type P2PMessage =
   | PlayerJoinMessage
   | PlayerLeaveMessage
   | FogUpdateMessage
-  | DiceRollMessage;
+  | DiceRollMessage
+  | ChatMessageP2P;
 
 // Room/Session types
 export interface RoomConfig {

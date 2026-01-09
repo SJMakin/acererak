@@ -9,9 +9,31 @@ import type {
   Point,
   CombatTracker,
   DiceRoll,
+  GridSettings,
+  ChatMessage,
 } from '../types';
 
 const APP_ID = 'lychgate-vtt-v1';
+
+// Simple hash function for state comparison
+function hashGameState(game: GameState): string {
+  // Hash important game state fields for desync detection
+  const stateStr = JSON.stringify({
+    elementCount: game.elements.length,
+    elementIds: game.elements.map(e => e.id).sort(),
+    fogEnabled: game.fogOfWar.enabled,
+    fogRevealedCount: game.fogOfWar.revealed.length,
+    combatRound: game.combat?.round,
+    combatTurn: game.combat?.currentTurn,
+  });
+
+  // Simple djb2 hash
+  let hash = 5381;
+  for (let i = 0; i < stateStr.length; i++) {
+    hash = ((hash << 5) + hash) + stateStr.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 // ICE server configuration for WebRTC
 // Includes STUN servers for NAT traversal and free TURN servers for relay fallback
@@ -70,8 +92,14 @@ interface RoomState {
   roomId: string | null;
   peers: string[];
   isHost: boolean;
-  connectionState: 'disconnected' | 'connecting' | 'connected' | 'error';
+  connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
   error: string | null;
+  lastSyncedAt: number | null;
+  dmPeerId: string | null;
+  dmDisconnected: boolean;
+  localHash: string | null;
+  dmHash: string | null;
+  isDesynced: boolean;
 }
 
 type ActionSender<T> = (data: T, targetPeers?: string[]) => void;
@@ -84,6 +112,12 @@ export function useRoom() {
     isHost: false,
     connectionState: 'disconnected',
     error: null,
+    lastSyncedAt: null,
+    dmPeerId: null,
+    dmDisconnected: false,
+    localHash: null,
+    dmHash: null,
+    isDesynced: false,
   });
 
   // Store refs for actions
@@ -99,13 +133,15 @@ export function useRoom() {
     sendFogUpdate?: ActionSender<{ enabled: boolean; revealed: Point[][] }>;
     sendCombatUpdate?: ActionSender<CombatTracker>;
     sendDiceRoll?: ActionSender<DiceRoll>;
+    sendStateHash?: ActionSender<string>;
+    sendGridUpdate?: ActionSender<Partial<GridSettings>>;
+    sendChat?: ActionSender<ChatMessage>;
   }>({});
 
   const {
     game,
     loadGame,
-    addElement,
-    updateElement,
+    addOrUpdateElement,
     deleteElement,
     addPlayer,
     removePlayer,
@@ -113,10 +149,12 @@ export function useRoom() {
     setConnected,
     myPeerId,
     addDiceRoll,
+    addChatMessage,
   } = useGameStore();
-  
-  const { toggleFog } = useGameStore((state) => ({
+
+  const { toggleFog, updateGridSettings } = useGameStore((state) => ({
     toggleFog: state.toggleFog,
+    updateGridSettings: state.updateGridSettings,
   }));
 
   // Create a new room (as DM/host)
@@ -127,6 +165,8 @@ export function useRoom() {
       isHost: true,
       connectionState: 'connecting',
       error: null,
+      dmPeerId: myPeerId,
+      dmDisconnected: false,
     }));
 
     // Start async loading
@@ -241,6 +281,9 @@ export function useRoom() {
     const [sendRequestSync, onRequestSync] = room.makeAction<any>('reqSync');
     const [sendFogUpdate, onFogUpdate] = room.makeAction<any>('fogUpdate');
     const [sendDiceRoll, onDiceRoll] = room.makeAction<any>('diceRoll');
+    const [sendStateHash, onStateHash] = room.makeAction<any>('stateHash');
+    const [sendGridUpdate, onGridUpdate] = room.makeAction<any>('gridUpd');
+    const [sendChat, onChat] = room.makeAction<any>('chat');
 
     // Store senders
     actionsRef.current = {
@@ -254,6 +297,9 @@ export function useRoom() {
       sendRequestSync,
       sendFogUpdate,
       sendDiceRoll,
+      sendStateHash,
+      sendGridUpdate,
+      sendChat,
     };
 
     // Handle peer events
@@ -275,10 +321,27 @@ export function useRoom() {
 
     room.onPeerLeave((peerId: string) => {
       console.log('Peer left:', peerId);
+
+      // Check if the DM disconnected
+      const game = useGameStore.getState().game;
+      const dmPeerId = game?.dmPeerId;
+      const isDMLeaving = dmPeerId && peerId === dmPeerId;
+
       setRoomState((prev) => ({
         ...prev,
         peers: prev.peers.filter((p) => p !== peerId),
+        dmDisconnected: isDMLeaving ? true : prev.dmDisconnected,
       }));
+
+      if (isDMLeaving) {
+        notifications.show({
+          title: 'DM Disconnected',
+          message: 'The DM has left the game. The session is paused.',
+          color: 'red',
+          autoClose: false,
+        });
+      }
+
       removePlayer(peerId);
     });
 
@@ -286,18 +349,19 @@ export function useRoom() {
     onSync((gameState: GameState, peerId: string) => {
       console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
+      // Track sync time and DM peer ID
+      setRoomState(prev => ({
+        ...prev,
+        lastSyncedAt: Date.now(),
+        dmPeerId: gameState.dmPeerId || peerId,
+        connectionState: 'connected',
+      }));
       console.log('Game loaded, should now show canvas');
     });
 
     onElementUpdate((element: CanvasElement, _peerId: string) => {
-      // Check if element exists - use getState() to get current game
-      const currentGame = useGameStore.getState().game;
-      const existing = currentGame?.elements.find((e) => e.id === element.id);
-      if (existing) {
-        updateElement(element.id, element);
-      } else {
-        addElement(element);
-      }
+      // Use addOrUpdateElement to preserve incoming IDs (fixes duplication bug)
+      addOrUpdateElement(element, true); // skipHistory = true for P2P updates
     });
 
     onElementDelete((elementId: string, _peerId: string) => {
@@ -347,26 +411,34 @@ export function useRoom() {
       }
     });
 
-    onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, _peerId: string) => {
-      console.log('Received fog update');
+    onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, peerId: string) => {
+      console.log('Received fog update from:', peerId);
+
+      // Verify the update is from the DM (host) - enforce DM-only action
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      const dmPeerId = currentGame.dmPeerId;
+      if (dmPeerId && peerId !== dmPeerId && !isHost) {
+        console.warn('Ignoring fog update from non-DM peer:', peerId);
+        return;
+      }
+
       // Update fog of war state
       if (fogOfWar.enabled !== undefined) {
         toggleFog(fogOfWar.enabled);
       }
       // Update revealed areas by replacing them entirely
-      const currentGame = useGameStore.getState().game;
-      if (currentGame) {
-        useGameStore.setState({
-          game: {
-            ...currentGame,
-            fogOfWar: {
-              enabled: fogOfWar.enabled ?? currentGame.fogOfWar.enabled,
-              revealed: fogOfWar.revealed ?? currentGame.fogOfWar.revealed,
-            },
-            updatedAt: new Date().toISOString(),
+      useGameStore.setState({
+        game: {
+          ...currentGame,
+          fogOfWar: {
+            enabled: fogOfWar.enabled ?? currentGame.fogOfWar.enabled,
+            revealed: fogOfWar.revealed ?? currentGame.fogOfWar.revealed,
           },
-        });
-      }
+          updatedAt: new Date().toISOString(),
+        },
+      });
     });
 
     onDiceRoll((diceRoll: DiceRoll, _peerId: string) => {
@@ -380,7 +452,66 @@ export function useRoom() {
         autoClose: 4000,
       });
     });
-  }, [loadGame, addElement, updateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll]);
+
+    // Handle state hash for desync detection (DM broadcasts, players compare)
+    onStateHash((dmHash: string, _peerId: string) => {
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame || isHost) return; // DM doesn't need to check against itself
+
+      const localHash = hashGameState(currentGame);
+      const isDesynced = localHash !== dmHash;
+
+      setRoomState(prev => ({
+        ...prev,
+        localHash,
+        dmHash,
+        isDesynced,
+      }));
+
+      if (isDesynced) {
+        console.warn('State desync detected! Local:', localHash, 'DM:', dmHash);
+      }
+    });
+
+    // Handle grid settings update (DM only can broadcast)
+    onGridUpdate((gridSettings: Partial<GridSettings>, peerId: string) => {
+      console.log('Received grid update from:', peerId);
+
+      // Verify the update is from the DM (host) - enforce DM-only action
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      const dmPeerId = currentGame.dmPeerId;
+      if (dmPeerId && peerId !== dmPeerId && !isHost) {
+        console.warn('Ignoring grid update from non-DM peer:', peerId);
+        return;
+      }
+
+      // Apply grid settings update
+      updateGridSettings(gridSettings);
+    });
+
+    // Handle incoming chat messages
+    onChat((chatMessage: ChatMessage, peerId: string) => {
+      console.log('Received chat message from:', peerId);
+
+      // Check if DM-only message should be visible
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      // If message is DM-only, only DM should see it (or the sender)
+      if (chatMessage.isDMOnly) {
+        const isDM = currentGame.dmPeerId === useGameStore.getState().myPeerId;
+        const isSender = chatMessage.playerId === useGameStore.getState().myPeerId;
+        if (!isDM && !isSender) {
+          // Non-DM players shouldn't see DM-only messages (unless they sent it)
+          return;
+        }
+      }
+
+      addChatMessage(chatMessage);
+    });
+  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -425,6 +556,41 @@ export function useRoom() {
     }
   }, []);
 
+  // Request a full sync from the DM
+  const requestFullSync = useCallback(() => {
+    if (actionsRef.current.sendRequestSync) {
+      setRoomState(prev => ({
+        ...prev,
+        connectionState: 'syncing',
+        isDesynced: false,
+      }));
+      actionsRef.current.sendRequestSync(null);
+    }
+  }, []);
+
+  // Broadcast state hash (DM only) for desync detection
+  const broadcastStateHash = useCallback(() => {
+    const currentGame = useGameStore.getState().game;
+    if (actionsRef.current.sendStateHash && currentGame && roomState.isHost) {
+      const hash = hashGameState(currentGame);
+      actionsRef.current.sendStateHash(hash);
+    }
+  }, [roomState.isHost]);
+
+  // Broadcast grid settings (DM only)
+  const broadcastGridSettings = useCallback((gridSettings: Partial<GridSettings>) => {
+    if (actionsRef.current.sendGridUpdate && roomState.isHost) {
+      actionsRef.current.sendGridUpdate(gridSettings);
+    }
+  }, [roomState.isHost]);
+
+  // Broadcast chat message
+  const broadcastChat = useCallback((message: ChatMessage) => {
+    if (actionsRef.current.sendChat) {
+      actionsRef.current.sendChat(message);
+    }
+  }, []);
+
   // Leave room
   const leaveRoom = useCallback(() => {
     if (roomRef.current) {
@@ -440,6 +606,12 @@ export function useRoom() {
       isHost: false,
       connectionState: 'disconnected',
       error: null,
+      lastSyncedAt: null,
+      dmPeerId: null,
+      dmDisconnected: false,
+      localHash: null,
+      dmHash: null,
+      isDesynced: false,
     });
     setConnected(false);
   }, [myPeerId, setConnected]);
@@ -465,5 +637,9 @@ export function useRoom() {
     broadcastSync,
     broadcastFogUpdate,
     broadcastDiceRoll,
+    requestFullSync,
+    broadcastStateHash,
+    broadcastGridSettings,
+    broadcastChat,
   };
 }

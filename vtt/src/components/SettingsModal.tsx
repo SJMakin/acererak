@@ -13,14 +13,15 @@ import {
   Select,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import type { Settings, GridType } from '../types';
+import type { Settings, GridType, GridSettings } from '../types';
 
 interface SettingsModalProps {
   opened: boolean;
   onClose: () => void;
+  onBroadcastGridSettings?: (settings: Partial<GridSettings>) => void;
 }
 
-export default function SettingsModal({ opened, onClose }: SettingsModalProps) {
+export default function SettingsModal({ opened, onClose, onBroadcastGridSettings }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings, game, updateGridSettings } = useGameStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
 
@@ -137,7 +138,10 @@ export default function SettingsModal({ opened, onClose }: SettingsModalProps) {
                 value={game.gridSettings.gridType || 'square'}
                 onChange={(val) => {
                   if (val) {
-                    updateGridSettings({ gridType: val as GridType });
+                    const update = { gridType: val as GridType };
+                    updateGridSettings(update);
+                    // Broadcast to peers if connected
+                    onBroadcastGridSettings?.(update);
                   }
                 }}
                 data={[

@@ -18,11 +18,12 @@ import {
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useLibraryStore } from '../stores/libraryStore';
-import type { TokenElement, CanvasElement, Visibility, DiceRoll } from '../types';
+import type { TokenElement, CanvasElement, Visibility, DiceRoll, ChatMessage } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
 import LibraryPanel from './LibraryPanel';
 import NotesPanel from './NotesPanel';
+import ChatPanel from './ChatPanel';
 
 interface SidebarProps {
   room: {
@@ -31,6 +32,7 @@ interface SidebarProps {
     broadcastSync: () => void;
     broadcastCombat?: () => void;
     broadcastDiceRoll?: (roll: DiceRoll) => void;
+    broadcastChat?: (message: ChatMessage) => void;
   };
 }
 
@@ -125,6 +127,7 @@ export default function Sidebar({ room }: SidebarProps) {
           <Tabs.Tab value="tokens">Tokens</Tabs.Tab>
           <Tabs.Tab value="library">Library</Tabs.Tab>
           <Tabs.Tab value="notes">Notes</Tabs.Tab>
+          <Tabs.Tab value="chat">Chat</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
           {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
@@ -238,6 +241,16 @@ export default function Sidebar({ room }: SidebarProps) {
 
           <Tabs.Panel value="notes">
             <NotesPanel />
+          </Tabs.Panel>
+
+          <Tabs.Panel value="chat">
+            <ChatPanel
+              onSendMessage={(message) => {
+                if (room.broadcastChat) {
+                  room.broadcastChat(message);
+                }
+              }}
+            />
           </Tabs.Panel>
 
           <Tabs.Panel value="players">

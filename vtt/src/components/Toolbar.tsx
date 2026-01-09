@@ -40,6 +40,7 @@ import { useHistoryStore } from '../stores/historyStore';
 import type { ToolType } from '../types';
 import SettingsModal from './SettingsModal';
 import ExportImportModal from './ExportImportModal';
+import ConnectionStatus from './ConnectionStatus';
 
 interface ToolbarProps {
   sidebarOpen: boolean;
@@ -47,7 +48,14 @@ interface ToolbarProps {
   room: {
     roomId: string | null;
     peers: string[];
+    isHost: boolean;
+    connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
+    lastSyncedAt: number | null;
+    dmDisconnected: boolean;
+    isDesynced: boolean;
     leaveRoom: () => void;
+    requestFullSync: () => void;
+    broadcastGridSettings: (settings: Partial<import('../types').GridSettings>) => void;
   };
 }
 
@@ -458,16 +466,16 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
       {/* Right section - Connection info and settings */}
       <Group gap="md">
         {/* Connection status */}
-        {room.roomId && (
-          <Group gap="xs">
-            <Badge color="green" variant="light">
-              Connected
-            </Badge>
-            <Text size="sm" c="dimmed">
-              {room.peers.length + 1} players
-            </Text>
-          </Group>
-        )}
+        <ConnectionStatus
+          roomId={room.roomId}
+          peers={room.peers}
+          connectionState={room.connectionState}
+          lastSyncedAt={room.lastSyncedAt}
+          dmDisconnected={room.dmDisconnected}
+          isHost={room.isHost}
+          isDesynced={room.isDesynced}
+          onRequestSync={room.requestFullSync}
+        />
 
         {/* Settings button */}
         <Tooltip label="Settings" position="bottom">
@@ -519,7 +527,11 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
       </Group>
 
       {/* Settings Modal */}
-      <SettingsModal opened={settingsOpened} onClose={() => setSettingsOpened(false)} />
+      <SettingsModal
+        opened={settingsOpened}
+        onClose={() => setSettingsOpened(false)}
+        onBroadcastGridSettings={room.broadcastGridSettings}
+      />
       
       {/* Export/Import Modal */}
       <ExportImportModal

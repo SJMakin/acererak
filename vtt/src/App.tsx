@@ -8,6 +8,7 @@ import Lobby from './components/Lobby';
 import GameCanvas from './components/GameCanvas';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
+import DMDisconnectModal from './components/DMDisconnectModal';
 
 function App() {
   const { game, performUndo, performRedo, selectElement, selectedElementId } = useGameStore();
@@ -45,6 +46,21 @@ function App() {
     });
   }, []);
 
+  // Periodically broadcast state hash for desync detection (DM only)
+  useEffect(() => {
+    if (!room.isHost || room.peers.length === 0) return;
+
+    // Broadcast hash every 10 seconds when connected to peers
+    const interval = setInterval(() => {
+      room.broadcastStateHash();
+    }, 10000);
+
+    // Also broadcast immediately when peers change
+    room.broadcastStateHash();
+
+    return () => clearInterval(interval);
+  }, [room.isHost, room.peers.length, room.broadcastStateHash]);
+
   // Show lobby if no game is loaded
   if (!game) {
     return <Lobby room={room} />;
@@ -77,6 +93,12 @@ function App() {
       <AppShell.Aside p="md">
         <Sidebar room={room} />
       </AppShell.Aside>
+
+      {/* DM Disconnect Modal - only show for non-DM players */}
+      <DMDisconnectModal
+        opened={room.dmDisconnected && !room.isHost}
+        onLeaveGame={room.leaveRoom}
+      />
     </AppShell>
   );
 }

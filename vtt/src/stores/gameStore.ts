@@ -15,6 +15,7 @@ import type {
   DiceRoll,
   Settings,
   CampaignNote,
+  ChatMessage,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
@@ -104,6 +105,7 @@ interface GameStore {
   // Actions - Elements
   addElement: (element: Omit<CanvasElement, 'id'>, skipHistory?: boolean) => string;
   addElements: (elements: Omit<CanvasElement, 'id'>[]) => string[];
+  addOrUpdateElement: (element: CanvasElement, skipHistory?: boolean) => void;
   updateElement: (id: string, updates: Partial<CanvasElement>, skipHistory?: boolean) => void;
   updateElements: (updates: Array<{ id: string; updates: Partial<CanvasElement> }>, skipHistory?: boolean) => void;
   deleteElement: (id: string, skipHistory?: boolean) => void;
@@ -140,6 +142,10 @@ interface GameStore {
   // Actions - Dice
   addDiceRoll: (roll: DiceRoll) => void;
   clearDiceHistory: () => void;
+
+  // Actions - Chat
+  addChatMessage: (message: ChatMessage) => void;
+  clearChatMessages: () => void;
 
   // Actions - Campaign Notes
   addCampaignNote: (note: Omit<CampaignNote, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -244,11 +250,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Element management
   addElement: (elementData, skipHistory = false) => {
     const id = nanoid(10);
-    const element = { ...elementData, id } as CanvasElement;
+    // Initialize version to 1 for new elements
+    const element = { ...elementData, id, version: 1 } as CanvasElement;
 
     set((state) => {
       if (!state.game) return state;
-      
+
       // Track action in history
       if (!skipHistory) {
         useHistoryStore.getState().pushAction({
@@ -260,7 +267,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           description: `Added ${element.type}`,
         });
       }
-      
+
       const updatedGame = {
         ...state.game,
         elements: [...state.game.elements, element],
@@ -275,34 +282,83 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return id;
   },
 
+  addOrUpdateElement: (element, _skipHistory = false) => {
+    set((state) => {
+      if (!state.game) return state;
+
+      const existing = state.game.elements.find(e => e.id === element.id);
+
+      if (existing) {
+        // Version-based conflict resolution: only update if incoming version is >= local
+        const incomingVersion = element.version || 0;
+        const localVersion = existing.version || 0;
+
+        if (incomingVersion < localVersion) {
+          // Ignore stale updates
+          return state;
+        }
+
+        // Update existing element
+        const updatedElements = state.game.elements.map(el =>
+          el.id === element.id ? { ...el, ...element } : el
+        );
+
+        const updatedGame = {
+          ...state.game,
+          elements: updatedElements,
+          updatedAt: new Date().toISOString(),
+        };
+
+        debouncedSave(updatedGame, state.isDM);
+        return { game: updatedGame };
+      } else {
+        // Add new element with existing ID (P2P sync case)
+        // Ensure version is set
+        const elementWithVersion = { ...element, version: element.version || 1 };
+        const updatedGame = {
+          ...state.game,
+          elements: [...state.game.elements, elementWithVersion],
+          updatedAt: new Date().toISOString(),
+        };
+
+        debouncedSave(updatedGame, state.isDM);
+        return { game: updatedGame };
+      }
+    });
+  },
+
   updateElement: (id, updates, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
-      
+
       const oldElement = state.game.elements.find(el => el.id === id);
       if (!oldElement) return state;
-      
+
       // Track action in history (only for significant updates like position or properties)
       const isPositionUpdate = updates.x !== undefined || updates.y !== undefined;
       const isPropertyUpdate = 'hp' in updates && updates.hp !== undefined;
-      
+
+      // Increment version for conflict resolution
+      const newVersion = (oldElement.version || 0) + 1;
+      const updatedElement = { ...oldElement, ...updates, version: newVersion } as CanvasElement;
+
       if (!skipHistory && (isPositionUpdate || isPropertyUpdate)) {
         useHistoryStore.getState().pushAction({
           type: isPositionUpdate ? 'move' : 'update',
           timestamp: Date.now(),
           before: { elements: state.game.elements },
           after: { elements: state.game.elements.map((el) =>
-            el.id === id ? { ...el, ...updates } as CanvasElement : el
+            el.id === id ? updatedElement : el
           ) },
           elementId: id,
           description: `Updated ${oldElement.type}`,
         });
       }
-      
+
       const updatedGame: GameState = {
         ...state.game,
         elements: state.game.elements.map((el) =>
-          el.id === id ? { ...el, ...updates } as CanvasElement : el
+          el.id === id ? updatedElement : el
         ),
         updatedAt: new Date().toISOString(),
       };
@@ -799,6 +855,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
         game: {
           ...state.game,
           diceRolls: [],
+        },
+      };
+    });
+  },
+
+  // Chat actions
+  addChatMessage: (message) => {
+    set((state) => {
+      if (!state.game) return state;
+      const chatMessages = state.game.chatMessages || [];
+      // Keep only last 100 messages
+      const updatedMessages = [...chatMessages, message].slice(-100);
+      return {
+        game: {
+          ...state.game,
+          chatMessages: updatedMessages,
+        },
+      };
+    });
+  },
+
+  clearChatMessages: () => {
+    set((state) => {
+      if (!state.game) return state;
+      return {
+        game: {
+          ...state.game,
+          chatMessages: [],
         },
       };
     });

@@ -31,7 +31,7 @@ interface LobbyProps {
     joinRoom: (roomId: string, playerName: string, playerColor: string) => void;
     roomId: string | null;
     peers: string[];
-    connectionState: 'disconnected' | 'connecting' | 'connected' | 'error';
+    connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
     error: string | null;
   };
 }

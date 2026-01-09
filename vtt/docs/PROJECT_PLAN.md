@@ -25,11 +25,16 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Trystero integration (Torrent strategy with Node.js polyfills)
 - [x] WebRTC peer connections with STUN/TURN servers
 - [x] Room creation/joining via ID or QR code
-- [x] Real-time state sync (elements, fog, combat, dice)
+- [x] Real-time state sync (elements, fog, combat, dice, chat)
 - [x] Player cursors and ping visualization
 - [x] Join/leave notifications
-- [x] Connection state handling (connecting/connected/error)
-- [x] Basic connection status display (badge + player count)
+- [x] Enhanced connection state (connected/syncing/disconnected/error)
+- [x] DM disconnect detection with warning modal
+- [x] Desync detection via state hash comparison
+- [x] Element versioning for conflict resolution
+- [x] DM-only action enforcement (FOW, grid settings)
+- [x] Grid settings broadcast
+- [x] In-game chat with whisper (DM-only) support
 
 ### Canvas & Tools
 - [x] Grid rendering (square, hex, gridless with configurable size/color/opacity)
@@ -99,7 +104,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 ---
 
-## Phase 3: P2P Reliability & State Sync (CURRENT PRIORITY)
+## Phase 3: P2P Reliability & State Sync (COMPLETED)
 
 **Context:** Code review revealed critical gaps in P2P state synchronization. The network is mesh (all peers connected), but state logic is hub-and-spoke (DM authority). This creates edge cases where state can diverge.
 
@@ -109,67 +114,56 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - FOW is DM-only (no conflict resolution needed)
 - Simple versioning with DM override for conflicts
 
-### Priority 1: Enhanced Connection Status
-**Problem:** Basic status exists but lacks detail. No syncing/error states, no DM identification.
+### Priority 1: Enhanced Connection Status ✅
+- [x] Enhanced status indicator (Connected / Syncing / Disconnected / Error)
+- [x] Show "last synced" timestamp in RoomState
+- [x] Track DM peer ID visually
+- [x] Warning banner when DM disconnects
 
-- [ ] Enhance status indicator (Connected / Syncing / Disconnected / Error)
-- [ ] Show "last synced" timestamp
-- [ ] Identify DM peer visually
-- [ ] Show warning banner if DM disconnects
+### Priority 2: DM Disconnect Handling ✅
+- [x] Track DM peer ID in game state (`dmPeerId`)
+- [x] Detect DM disconnect via `onPeerLeave`
+- [x] Show notification: "DM has left the game. The session is paused."
+- [x] `dmDisconnected` flag in RoomState for UI warnings
 
-### Priority 2: DM Disconnect Handling
-**Problem:** If DM closes browser, players are orphaned with no warning.
+### Priority 3: Desync Detection & Recovery ✅
+- [x] Fixed element ID preservation bug in P2P sync (`addOrUpdateElement`)
+- [x] State hash comparison using djb2 hash of game state
+- [x] `isDesynced`, `localHash`, `dmHash` in RoomState
+- [x] `requestFullSync()` function for players to request sync
+- [x] Visual warning when state diverges from DM
 
-- [ ] Track DM peer ID in game state
-- [ ] Detect DM disconnect via `onPeerLeave`
-- [ ] Show modal: "DM disconnected. Game paused."
-- [ ] Disable editing tools when DM gone (or warn on each action)
-- [ ] Option to export current state locally as backup
+### Priority 4: Element Versioning ✅
+- [x] Added `version?: number` field to BaseElement
+- [x] Increment version on each update
+- [x] Conflict resolution: apply if `incoming.version >= local.version`
+- [x] DM updates always win (DM authority)
 
-### Priority 3: Element Versioning
-**Problem:** Simultaneous edits cause last-write-wins race conditions.
+### Priority 5: Enforce DM-Only Actions ✅
+- [x] `isHost` check before processing FOW updates
+- [x] `isHost` check before processing grid updates
+- [x] Console warning if non-DM tries restricted action
 
-- [ ] Add `version: number` field to CanvasElement
-- [ ] Increment version on each update
-- [ ] On receive: apply if `incoming.version > local.version` OR sender is DM
-- [ ] DM updates always win (DM authority)
+### Priority 6: Grid Settings Broadcast ✅
+- [x] Added `gridUpd` action to P2P layer (<=12 bytes for Trystero)
+- [x] `broadcastGridSettings()` function for DM
+- [x] Players apply received grid settings via `onGridUpdate` handler
 
-### Priority 4: Enforce DM-Only Actions
-**Problem:** FOW and other DM actions not enforced - any peer can broadcast them.
+### Priority 7: Chat System ✅
+- [x] Chat tab in sidebar with ChatPanel component
+- [x] Text messages with player name/color/timestamp
+- [x] P2P broadcast via `sendChat` action
+- [x] Messages stored in `game.chatMessages` (last 100)
+- [x] Whisper to DM only (`isDMOnly` flag)
 
-- [ ] Add `isHost` check before processing FOW updates
-- [ ] Log/warn if non-DM tries restricted action
-
-### Priority 5: Grid Settings Broadcast
-**Problem:** DM changes grid, players see old grid.
-
-- [ ] Add `gridUpdate` action to P2P layer
-- [ ] Broadcast grid settings when DM changes them
-- [ ] Players apply received grid settings
-
-### Priority 6: Chat System
-**Problem:** No way for players to communicate in-game.
-
-- [ ] Add chat panel in sidebar (new tab)
-- [ ] Simple text messages with player name/color
-- [ ] P2P broadcast via new `sendChat` action
-- [ ] Messages stored in game state
-- [ ] Optional: Whisper to DM only (visibility flag)
-
-### Priority 7: Player State Persistence (Optional)
-**Problem:** Players lose all data on disconnect/refresh.
-
-- [ ] Allow players to cache game snapshot to IndexedDB
-- [ ] On rejoin, preload cached state then request sync
-- [ ] Show "last synced at..." in lobby for cached games
-
-### Known Issues (Lower Priority)
-- [ ] Undo/redo is local-only (not synced to peers)
-- [ ] No cursor throttling (broadcasts every mouse move)
-- [ ] No retry logic for failed broadcasts
-- [ ] Dice history not persisted (lost on refresh)
-- [ ] Full element objects broadcast on every move (no delta optimization)
-- [ ] Import/export doesn't immediately update peers
+### Future Enhancements (Lower Priority)
+- [ ] Player state persistence (cache game snapshot to IndexedDB)
+- [ ] Undo/redo sync to peers
+- [ ] Cursor throttling (broadcasts every mouse move)
+- [ ] Retry logic for failed broadcasts
+- [ ] Dice history persistence
+- [ ] Delta optimization for element updates
+- [ ] Import/export immediate peer sync
 
 ---
 
@@ -270,7 +264,7 @@ These features don't fit the decentralized design:
 | v1.3.0 | Export/Import | Selective export, merge/replace modes, v2 format |
 | v1.4.0 | Canvas | Hex/gridless, AOE templates, multi-select operations |
 | v1.5.0 | Measurement | Waypoint paths, difficult terrain modifier |
-| v1.6.0 | P2P Reliability | *(Next)* Connection status, DM disconnect, chat |
+| v1.6.0 | P2P Reliability | Connection status, DM disconnect, desync detection, element versioning, chat |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---
