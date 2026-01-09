@@ -1,18 +1,21 @@
 {
-  "name": "acererak-vtt",
+  "name": "lychgate-vtt",
   "version": "0.1.0",
   "description": "Decentralized TTRPG Virtual Tabletop",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "prebuild": "node scripts/prebuild-streamx.mjs",
+    "build": "tsc && npm run prebuild && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:join": "playwright test tests/e2e/join-game.spec.ts --headed",
+    "test:e2e:deployed": "cross-env TEST_URL=https://lychgate.sammak.in playwright test tests/e2e/join-game.spec.ts --headed"
   },
   "dependencies": {
     "@mantine/core": "^7.11.0",
@@ -21,13 +24,13 @@
     "@tabler/icons-react": "^3.36.1",
     "dexie": "^4.0.4",
     "dexie-react-hooks": "^1.1.7",
-    "html5-qrcode": "^2.3.8",
     "konva": "^9.3.6",
     "nanoid": "^5.0.7",
     "qrcode.react": "^3.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-konva": "^18.2.10",
+    "readable-stream": "^4.7.0",
     "trystero": "^0.20.0",
     "zustand": "^4.5.2"
   },
@@ -38,6 +41,8 @@
     "@typescript-eslint/eslint-plugin": "^7.13.1",
     "@typescript-eslint/parser": "^7.13.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "cross-env": "^10.1.0",
+    "esbuild": "^0.27.2",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.7",
@@ -45,6 +50,7 @@
     "postcss-preset-mantine": "^1.15.0",
     "postcss-simple-vars": "^7.0.1",
     "typescript": "^5.5.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

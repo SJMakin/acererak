@@ -20,8 +20,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     setTool,
     selectedTool,
     deleteElement,
+    deleteElements,
     selectedElementId,
     selectedElementIds,
+    clearSelection,
     game,
     isDM,
   } = useGameStore();
@@ -104,10 +106,15 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       return;
     }
 
-    // Handle Delete key
-    if (key === 'delete' && selectedElementId) {
+    // Handle Delete key - delete all selected elements
+    if (key === 'delete' && selectedElementIds.length > 0) {
       e.preventDefault();
-      deleteElement(selectedElementId);
+      if (selectedElementIds.length > 1) {
+        deleteElements(selectedElementIds);
+      } else if (selectedElementId) {
+        deleteElement(selectedElementId);
+      }
+      clearSelection();
       if (options.onDelete) {
         options.onDelete();
       }
@@ -181,7 +188,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     setTool,
     selectedTool,
     deleteElement,
+    deleteElements,
     selectedElementId,
+    selectedElementIds,
+    clearSelection,
     game,
     isDM,
     undo,

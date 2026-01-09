@@ -10,9 +10,10 @@ import {
   Group,
   Text,
   Divider,
+  Select,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import type { Settings } from '../types';
+import type { Settings, GridType } from '../types';
 
 interface SettingsModalProps {
   opened: boolean;
@@ -20,7 +21,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ opened, onClose }: SettingsModalProps) {
-  const { settings, updateSettings, resetSettings } = useGameStore();
+  const { settings, updateSettings, resetSettings, game, updateGridSettings } = useGameStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
 
   // Sync local settings with store when modal opens
@@ -126,6 +127,30 @@ export default function SettingsModal({ opened, onClose }: SettingsModalProps) {
               onChange={(val) => updateLocal({ backgroundColor: val })}
               format="hex"
             />
+
+            <Divider label="Current Game Grid Type" />
+
+            {game ? (
+              <Select
+                label="Grid Type"
+                description="Choose the grid style for this game"
+                value={game.gridSettings.gridType || 'square'}
+                onChange={(val) => {
+                  if (val) {
+                    updateGridSettings({ gridType: val as GridType });
+                  }
+                }}
+                data={[
+                  { value: 'square', label: '⏹️ Square Grid' },
+                  { value: 'hex', label: '⬡ Hex Grid' },
+                  { value: 'none', label: '🚫 No Grid (Gridless)' },
+                ]}
+              />
+            ) : (
+              <Text size="sm" c="dimmed">
+                Grid type can be changed when a game is loaded
+              </Text>
+            )}
           </Stack>
         </Tabs.Panel>
 

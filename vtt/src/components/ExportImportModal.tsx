@@ -24,7 +24,6 @@ import type {
   LibraryItem,
   CampaignNote,
   GameExport,
-  LibraryExport,
 } from '../types';
 
 // Current export format version

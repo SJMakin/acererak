@@ -1,4 +1,5 @@
-import Dexie, { Table } from 'dexie';
+import Dexie from 'dexie';
+import type { Table } from 'dexie';
 import type { GameState, LibraryItem, LibraryItemType } from '../types';
 
 export interface SavedGame {
@@ -14,26 +15,23 @@ export interface SavedLibraryItem extends LibraryItem {
   // Additional DB-specific fields if needed
 }
 
-export class GameDatabase extends Dexie {
-  games!: Table<SavedGame, string>;
-  library!: Table<SavedLibraryItem, string>;
+// Use factory function pattern instead of class extension to avoid bundling issues
+const db = new Dexie('LychgateVTTDatabase') as Dexie & {
+  games: Table<SavedGame, string>;
+  library: Table<SavedLibraryItem, string>;
+};
 
-  constructor() {
-    super('AcerekVTTDatabase');
-    
-    this.version(1).stores({
-      games: 'id, name, lastUpdated, isDM',
-    });
-    
-    // Version 2: Add library table
-    this.version(2).stores({
-      games: 'id, name, lastUpdated, isDM',
-      library: 'id, type, name, *tags, createdAt, updatedAt',
-    });
-  }
-}
+db.version(1).stores({
+  games: 'id, name, lastUpdated, isDM',
+});
 
-export const db = new GameDatabase();
+// Version 2: Add library table
+db.version(2).stores({
+  games: 'id, name, lastUpdated, isDM',
+  library: 'id, type, name, *tags, createdAt, updatedAt',
+});
+
+export { db };
 
 // Database operations
 export async function saveGame(game: GameState, isDM: boolean): Promise<void> {

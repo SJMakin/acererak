@@ -30,6 +30,10 @@ import {
   IconEye,
   IconEyeOff,
   IconChevronDown,
+  IconTarget,
+  IconCone,
+  IconLine,
+  IconTriangle,
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
@@ -77,6 +81,15 @@ const dmTools: { id: ToolType; icon: React.ComponentType<any>; label: string }[]
   { id: 'fog-hide', icon: IconEyeOff, label: 'Hide Area' },
 ];
 
+// Area of Effect template tools
+const aoeTools: { id: ToolType; icon: React.ComponentType<any>; label: string; description: string }[] = [
+  { id: 'aoe-circle', icon: IconTarget, label: 'Circle AOE', description: 'Drag to set radius' },
+  { id: 'aoe-cone', icon: IconCone, label: 'Cone AOE', description: 'Fan shape with curved arc' },
+  { id: 'aoe-triangle', icon: IconTriangle, label: 'Triangle AOE', description: 'Simple triangle (D&D RAW)' },
+  { id: 'aoe-line', icon: IconLine, label: 'Line AOE', description: 'Drag to set path' },
+  { id: 'aoe-square', icon: IconSquare, label: 'Square AOE', description: 'Drag to set dimensions' },
+];
+
 export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarProps) {
   const {
     game,
@@ -109,8 +122,9 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     setViewport(viewportOffset, newScale);
   };
 
-  // Check if current tool is a drawing tool
+  // Check if current tool is a drawing tool or AOE tool
   const isDrawingTool = selectedTool.startsWith('draw-');
+  const isAoeTool = selectedTool.startsWith('aoe-');
 
   return (
     <Group h="100%" px="md" justify="space-between">
@@ -118,7 +132,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
       <Group gap="md">
         <Group gap="xs">
           <Text fw={600} size="lg">
-            🎲 {game?.name || 'Acererak VTT'}
+            🎲 {game?.name || 'Lychgate VTT'}
           </Text>
           
           {/* Preview Mode Indicator */}
@@ -243,6 +257,45 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
               </ActionIcon>
             </Tooltip>
           ))}
+
+          {/* Area of Effect tools dropdown */}
+          <Menu shadow="md" width={220}>
+            <Menu.Target>
+              <Tooltip label="Area of Effect Templates" position="bottom">
+                <ActionIcon
+                  variant={isAoeTool ? 'filled' : 'subtle'}
+                  color={isAoeTool ? 'orange' : 'gray'}
+                  size="lg"
+                >
+                  <Group gap={2}>
+                    {(() => {
+                      const currentAoeTool = aoeTools.find(t => t.id === selectedTool);
+                      const Icon = currentAoeTool?.icon || IconTarget;
+                      return <Icon size={18} />;
+                    })()}
+                    <IconChevronDown size={12} />
+                  </Group>
+                </ActionIcon>
+              </Tooltip>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Area of Effect Templates</Menu.Label>
+              {aoeTools.map((tool) => (
+                <Menu.Item
+                  key={tool.id}
+                  leftSection={<tool.icon size={16} />}
+                  onClick={() => setTool(tool.id)}
+                  color={selectedTool === tool.id ? 'orange' : undefined}
+                  bg={selectedTool === tool.id ? 'var(--mantine-color-orange-light)' : undefined}
+                >
+                  <Stack gap={0}>
+                    <Text size="sm">{tool.label}</Text>
+                    <Text size="xs" c="dimmed">{tool.description}</Text>
+                  </Stack>
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
 
           {/* DM-only tools */}
           {isDM && (

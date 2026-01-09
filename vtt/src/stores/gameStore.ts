@@ -105,8 +105,9 @@ interface GameStore {
   addElement: (element: Omit<CanvasElement, 'id'>, skipHistory?: boolean) => string;
   addElements: (elements: Omit<CanvasElement, 'id'>[]) => string[];
   updateElement: (id: string, updates: Partial<CanvasElement>, skipHistory?: boolean) => void;
+  updateElements: (updates: Array<{ id: string; updates: Partial<CanvasElement> }>, skipHistory?: boolean) => void;
   deleteElement: (id: string, skipHistory?: boolean) => void;
-  deleteElements: (ids: string[]) => void;
+  deleteElements: (ids: string[], skipHistory?: boolean) => void;
   selectElement: (id: string | null) => void;
   selectElements: (ids: string[]) => void;
   toggleElementSelection: (id: string) => void;
@@ -213,6 +214,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         showGrid: state.settings.showGridByDefault,
         snapToGrid: state.settings.snapToGridByDefault,
         gridColor: state.settings.gridColor,
+        gridType: 'square',
       },
       elements: [],
       fogOfWar: { enabled: false, revealed: [] },
@@ -302,6 +304,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: state.game.elements.map((el) =>
           el.id === id ? { ...el, ...updates } as CanvasElement : el
         ),
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isDM);
+      return {
+        game: updatedGame,
+      };
+    });
+  },
+
+  updateElements: (updates, skipHistory = false) => {
+    set((state) => {
+      if (!state.game) return state;
+      
+      // Build map of updates for efficient lookup
+      const updateMap = new Map(updates.map(u => [u.id, u.updates]));
+      
+      // Track action in history
+      const hasPositionUpdates = updates.some(u => u.updates.x !== undefined || u.updates.y !== undefined);
+      
+      if (!skipHistory && hasPositionUpdates) {
+        useHistoryStore.getState().pushAction({
+          type: 'move',
+          timestamp: Date.now(),
+          before: { elements: state.game.elements },
+          after: {
+            elements: state.game.elements.map((el) => {
+              const elUpdates = updateMap.get(el.id);
+              return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
+            })
+          },
+          description: `Moved ${updates.length} element${updates.length > 1 ? 's' : ''}`,
+        });
+      }
+      
+      const updatedGame: GameState = {
+        ...state.game,
+        elements: state.game.elements.map((el) => {
+          const elUpdates = updateMap.get(el.id);
+          return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
+        }),
         updatedAt: new Date().toISOString(),
       };
       debouncedSave(updatedGame, state.isDM);
@@ -401,9 +443,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return ids;
   },
 
-  deleteElements: (ids) => {
+  deleteElements: (ids, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      
+      // Track action in history
+      if (!skipHistory && ids.length > 0) {
+        useHistoryStore.getState().pushAction({
+          type: 'delete',
+          timestamp: Date.now(),
+          before: { elements: state.game.elements },
+          after: { elements: state.game.elements.filter((el) => !ids.includes(el.id)) },
+          description: `Deleted ${ids.length} element${ids.length > 1 ? 's' : ''}`,
+        });
+      }
       
       const updatedGame = {
         ...state.game,

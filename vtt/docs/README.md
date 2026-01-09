@@ -1,4 +1,4 @@
-# Acererak VTT - Decentralized Virtual Tabletop
+# Lychgate VTT - Decentralized Virtual Tabletop
 
 A peer-to-peer virtual tabletop for TTRPGs built with React, Konva.js, and Trystero. **No server needed** - all game data flows directly between players via WebRTC.
 
@@ -11,7 +11,7 @@ Create a fully client-side, decentralized VTT where:
 - Players can join via QR codes or room IDs
 - Everything works offline once peers are connected
 
-This is intended to eventually integrate with the main Acererak app (the choose-your-own-adventure story generator in the parent directory) but is being developed as a standalone module first.
+This is intended to eventually integrate with the main Acererak app (the choose-your-own-adventure story generator in the parent directory) but is being developed as a standalone module first. Note: While the parent project retains the "Acererak" name, the VTT has been rebranded to "Lychgate" to avoid trademark concerns.
 
 ## 🏗️ Architecture
 
@@ -427,7 +427,7 @@ Outputs to `dist/`
 - `dexie` ^4.0.4 (IndexedDB wrapper)
 - `dexie-react-hooks` ^1.1.7 (React integration)
 
-## 🔗 Integration with Main Acererak App
+## 🔗 Integration with Main App
 
 Future plans:
 - Import generated story scenes as map backgrounds
@@ -437,7 +437,7 @@ Future plans:
 
 ## 📝 License
 
-Part of the Acererak project.
+Part of the Lychgate project.
 
 ## 🤝 Contributing
 

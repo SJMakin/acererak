@@ -1,6 +1,6 @@
 # VTT E2E Test Coverage
 
-This document describes the comprehensive end-to-end test coverage for the Acererak VTT application using Playwright.
+This document describes the comprehensive end-to-end test coverage for the Lychgate VTT application using Playwright.
 
 ## Test Files
 

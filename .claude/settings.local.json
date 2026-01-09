@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(TEST_URL=https://lychgate.sammak.in npx playwright test:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:e2e:deployed:*)",
+      "Bash(npm run dev)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(start http://localhost:5174)",
+      "Bash(grep:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -40 \"\"{}\"\"')",
+      "Bash($env:TEST_URL=\"https://lychgate.sammak.in\")",
+      "Bash(npm ls:*)"
+    ]
+  }
+}

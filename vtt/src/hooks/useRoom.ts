@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { joinRoom, type Room } from 'trystero/torrent';
 import { notifications } from '@mantine/notifications';
+import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import type {
   GameState,
@@ -11,12 +11,67 @@ import type {
   DiceRoll,
 } from '../types';
 
-const APP_ID = 'acererak-vtt-v1';
+const APP_ID = 'lychgate-vtt-v1';
+
+// ICE server configuration for WebRTC
+// Includes STUN servers for NAT traversal and free TURN servers for relay fallback
+const rtcConfig: RTCConfiguration = {
+  iceServers: [
+    // Google STUN servers
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Open Relay TURN server (free, community-provided)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+  ],
+};
+
+// Trystero room configuration
+interface RoomConfig {
+  appId: string;
+  rtcConfig?: RTCConfiguration;
+}
+
+// Define Room type manually to match trystero
+interface Room {
+  leave: () => void;
+  onPeerJoin: (callback: (peerId: string) => void) => void;
+  onPeerLeave: (callback: (peerId: string) => void) => void;
+  makeAction: <T>(name: string) => [(data: T, targetPeers?: string[]) => void, (callback: (data: T, peerId: string) => void) => void, unknown];
+}
+
+// Cached trystero module
+let trysteroModule: { joinRoom: (config: RoomConfig, roomId: string) => Room } | null = null;
+
+// Load trystero dynamically
+// Using torrent strategy with proper polyfills
+async function loadTrystero(): Promise<{ joinRoom: (config: RoomConfig, roomId: string) => Room }> {
+  if (!trysteroModule) {
+    const mod = await import('trystero/torrent');
+    trysteroModule = mod as unknown as { joinRoom: (config: RoomConfig, roomId: string) => Room };
+  }
+  return trysteroModule;
+}
 
 interface RoomState {
   roomId: string | null;
   peers: string[];
   isHost: boolean;
+  connectionState: 'disconnected' | 'connecting' | 'connected' | 'error';
+  error: string | null;
 }
 
 type ActionSender<T> = (data: T, targetPeers?: string[]) => void;
@@ -27,6 +82,8 @@ export function useRoom() {
     roomId: null,
     peers: [],
     isHost: false,
+    connectionState: 'disconnected',
+    error: null,
   });
 
   // Store refs for actions
@@ -63,66 +120,112 @@ export function useRoom() {
   }));
 
   // Create a new room (as DM/host)
-  const createRoom = useCallback((roomId: string) => {
-    if (roomRef.current) {
-      roomRef.current.leave();
-    }
-
-    const room = joinRoom({ appId: APP_ID }, roomId);
-    roomRef.current = room;
-
-    setRoomState({
+  const createRoom = useCallback((roomId: string): string => {
+    setRoomState(prev => ({
+      ...prev,
       roomId,
-      peers: [],
       isHost: true,
-    });
+      connectionState: 'connecting',
+      error: null,
+    }));
 
-    setupRoomHandlers(room, true);
-    setConnected(true, myPeerId || undefined);
+    // Start async loading
+    (async () => {
+      try {
+        if (roomRef.current) {
+          roomRef.current.leave();
+        }
+
+        const trystero = await loadTrystero();
+        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig }, roomId);
+        roomRef.current = room;
+
+        setupRoomHandlers(room, true);
+
+        setRoomState(prev => ({
+          ...prev,
+          connectionState: 'connected',
+        }));
+
+        setConnected(true, myPeerId || undefined);
+      } catch (error) {
+        console.error('Failed to create room:', error);
+        setRoomState(prev => ({
+          ...prev,
+          connectionState: 'error',
+          error: error instanceof Error ? error.message : 'Failed to create room',
+        }));
+      }
+    })();
 
     return roomId;
   }, [myPeerId, setConnected]);
 
   // Join an existing room (as player)
-  const joinExistingRoom = useCallback((roomId: string, playerName: string, playerColor: string) => {
-    if (roomRef.current) {
-      roomRef.current.leave();
-    }
+  const joinExistingRoom = useCallback((roomId: string, playerName: string, playerColor: string): void => {
+    // Generate a unique peer ID for this player
+    const newPeerId = nanoid();
 
-    const room = joinRoom({ appId: APP_ID }, roomId);
-    roomRef.current = room;
-
-    setRoomState({
+    setRoomState(prev => ({
+      ...prev,
       roomId,
-      peers: [],
       isHost: false,
-    });
+      connectionState: 'connecting',
+      error: null,
+    }));
 
-    setupRoomHandlers(room, false);
+    // Start async loading
+    (async () => {
+      try {
+        if (roomRef.current) {
+          roomRef.current.leave();
+        }
 
-    // Wait for connection then send join message
-    room.onPeerJoin((peerId) => {
-      console.log('Connected to peer:', peerId);
-      
-      // Request sync from host
-      if (actionsRef.current.sendRequestSync) {
-        actionsRef.current.sendRequestSync(null);
-      }
+        const trystero = await loadTrystero();
+        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig }, roomId);
+        roomRef.current = room;
 
-      // Announce ourselves
-      if (actionsRef.current.sendPlayerJoin && myPeerId) {
-        actionsRef.current.sendPlayerJoin({
-          id: myPeerId,
-          name: playerName,
-          color: playerColor,
-          isDM: false,
-          controlledTokens: [],
+        setupRoomHandlers(room, false);
+
+        // Wait for connection then send join message
+        room.onPeerJoin((peerId: string) => {
+          console.log('Connected to peer:', peerId);
+
+          setRoomState(prev => ({
+            ...prev,
+            connectionState: 'connected',
+          }));
+
+          // Request sync from host
+          if (actionsRef.current.sendRequestSync) {
+            actionsRef.current.sendRequestSync(null);
+          }
+
+          // Announce ourselves with the generated peer ID
+          if (actionsRef.current.sendPlayerJoin) {
+            console.log('Sending player join:', playerName);
+            actionsRef.current.sendPlayerJoin({
+              id: newPeerId,
+              name: playerName,
+              color: playerColor,
+              isDM: false,
+              controlledTokens: [],
+            });
+          }
         });
-      }
-    });
 
-    setConnected(true, myPeerId || undefined);
-  }, [myPeerId, setConnected]);
+        setConnected(true, newPeerId);
+      } catch (error) {
+        console.error('Failed to join room:', error);
+        setRoomState(prev => ({
+          ...prev,
+          connectionState: 'error',
+          error: error instanceof Error ? error.message : 'Failed to join room',
+        }));
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setConnected]);
 
   // Setup room event handlers
   const setupRoomHandlers = useCallback((room: Room, isHost: boolean) => {
@@ -154,7 +257,7 @@ export function useRoom() {
     };
 
     // Handle peer events
-    room.onPeerJoin((peerId) => {
+    room.onPeerJoin((peerId: string) => {
       console.log('Peer joined:', peerId);
       setRoomState((prev) => ({
         ...prev,
@@ -162,12 +265,15 @@ export function useRoom() {
       }));
 
       // If we're host, send current game state to new peer
-      if (isHost && game) {
-        sendSync(game, [peerId]);
+      // Use getState() to get current game, not the closure-captured value
+      const currentGame = useGameStore.getState().game;
+      if (isHost && currentGame) {
+        console.log('Sending game sync to new peer:', peerId);
+        sendSync(currentGame, [peerId]);
       }
     });
 
-    room.onPeerLeave((peerId) => {
+    room.onPeerLeave((peerId: string) => {
       console.log('Peer left:', peerId);
       setRoomState((prev) => ({
         ...prev,
@@ -177,14 +283,16 @@ export function useRoom() {
     });
 
     // Handle incoming data
-    onSync((gameState, peerId) => {
-      console.log('Received sync from:', peerId);
+    onSync((gameState: GameState, peerId: string) => {
+      console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
+      console.log('Game loaded, should now show canvas');
     });
 
-    onElementUpdate((element, _peerId) => {
-      // Check if element exists
-      const existing = game?.elements.find((e) => e.id === element.id);
+    onElementUpdate((element: CanvasElement, _peerId: string) => {
+      // Check if element exists - use getState() to get current game
+      const currentGame = useGameStore.getState().game;
+      const existing = currentGame?.elements.find((e) => e.id === element.id);
       if (existing) {
         updateElement(element.id, element);
       } else {
@@ -192,21 +300,21 @@ export function useRoom() {
       }
     });
 
-    onElementDelete((elementId, _peerId) => {
+    onElementDelete((elementId: string, _peerId: string) => {
       deleteElement(elementId);
     });
 
-    onCursor((position, peerId) => {
+    onCursor((position: Point, peerId: string) => {
       updatePlayer(peerId, { cursor: position });
     });
 
-    onPing((data, peerId) => {
+    onPing((data: { position: Point; color: string }, peerId: string) => {
       // Handle ping visualization (emit event or update store)
       console.log('Ping from', peerId, 'at', data.position);
       // TODO: Add visual ping to canvas
     });
 
-    onPlayerJoin((player, _peerId) => {
+    onPlayerJoin((player: Player, _peerId: string) => {
       addPlayer(player);
       notifications.show({
         title: 'Player Joined',
@@ -216,7 +324,7 @@ export function useRoom() {
       });
     });
 
-    onPlayerLeave((playerId, _peerId) => {
+    onPlayerLeave((playerId: string, _peerId: string) => {
       // Get player name before removing
       const player = useGameStore.getState().game?.players[playerId];
       const playerName = player?.name || 'Unknown player';
@@ -229,14 +337,17 @@ export function useRoom() {
       });
     });
 
-    onRequestSync((_data, peerId) => {
+    onRequestSync((_data: null, peerId: string) => {
       // Send current state to requesting peer
-      if (isHost && game) {
-        sendSync(game, [peerId]);
+      // Use getState() to get current game, not the closure-captured value
+      const currentGame = useGameStore.getState().game;
+      if (isHost && currentGame) {
+        console.log('Sending game sync on request to peer:', peerId);
+        sendSync(currentGame, [peerId]);
       }
     });
 
-    onFogUpdate((fogOfWar, _peerId) => {
+    onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, _peerId: string) => {
       console.log('Received fog update');
       // Update fog of war state
       if (fogOfWar.enabled !== undefined) {
@@ -258,7 +369,7 @@ export function useRoom() {
       }
     });
 
-    onDiceRoll((diceRoll, _peerId) => {
+    onDiceRoll((diceRoll: DiceRoll, _peerId: string) => {
       console.log('Received dice roll from peer:', diceRoll);
       addDiceRoll(diceRoll);
       // Show notification
@@ -269,7 +380,7 @@ export function useRoom() {
         autoClose: 4000,
       });
     });
-  }, [game, loadGame, addElement, updateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll]);
+  }, [loadGame, addElement, updateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -327,6 +438,8 @@ export function useRoom() {
       roomId: null,
       peers: [],
       isHost: false,
+      connectionState: 'disconnected',
+      error: null,
     });
     setConnected(false);
   }, [myPeerId, setConnected]);

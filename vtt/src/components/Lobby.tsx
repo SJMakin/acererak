@@ -17,6 +17,8 @@ import {
   Tooltip,
   Card,
   Badge,
+  Alert,
+  Loader,
 } from '@mantine/core';
 import { QRCodeSVG } from 'qrcode.react';
 import { nanoid } from 'nanoid';
@@ -29,6 +31,8 @@ interface LobbyProps {
     joinRoom: (roomId: string, playerName: string, playerColor: string) => void;
     roomId: string | null;
     peers: string[];
+    connectionState: 'disconnected' | 'connecting' | 'connected' | 'error';
+    error: string | null;
   };
 }
 
@@ -40,6 +44,7 @@ export default function Lobby({ room }: LobbyProps) {
   const [gameName, setGameName] = useState('');
   const [dmName, setDmName] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
+  const [pendingGameData, setPendingGameData] = useState<{ name: string; dmName: string } | null>(null);
   
   // Join game form
   const [joinRoomId, setJoinRoomId] = useState('');
@@ -51,14 +56,22 @@ export default function Lobby({ room }: LobbyProps) {
 
   const handleCreateGame = () => {
     if (!gameName.trim() || !dmName.trim()) return;
-    
-    // Create local game state
-    createGame(gameName, dmName);
-    
-    // Create P2P room
+
+    // Create P2P room and store game data for later
     const roomId = nanoid(8);
     room.createRoom(roomId);
     setCreatedRoomId(roomId);
+
+    // Store the game data but don't create the game yet
+    // This allows the "Game Created!" message to show
+    setPendingGameData({ name: gameName, dmName: dmName });
+  };
+
+  const handleStartGame = () => {
+    // Now actually create the game, which will trigger the app to show the canvas
+    if (pendingGameData) {
+      createGame(pendingGameData.name, pendingGameData.dmName);
+    }
   };
 
   const handleJoinGame = () => {
@@ -120,7 +133,7 @@ export default function Lobby({ room }: LobbyProps) {
     <Container size="sm" py="xl">
       <Paper shadow="md" p="xl" radius="md" withBorder>
         <Title order={1} ta="center" mb="md">
-          🎲 Acererak VTT
+          🎲 Lychgate VTT
         </Title>
         <Text c="dimmed" ta="center" mb="xl">
           Decentralized Virtual Tabletop for TTRPG
@@ -186,6 +199,11 @@ export default function Lobby({ room }: LobbyProps) {
           <Tabs.Panel value="create">
             {!createdRoomId ? (
               <Stack>
+                {room.error && (
+                  <Alert color="red" title="Connection Error">
+                    {room.error}
+                  </Alert>
+                )}
                 <TextInput
                   label="Game Name"
                   placeholder="My Epic Campaign"
@@ -200,44 +218,64 @@ export default function Lobby({ room }: LobbyProps) {
                   onChange={(e) => setDmName(e.currentTarget.value)}
                   required
                 />
-                <Button 
-                  fullWidth 
-                  mt="md" 
+                <Button
+                  fullWidth
+                  mt="md"
                   onClick={handleCreateGame}
-                  disabled={!gameName.trim() || !dmName.trim()}
+                  disabled={!gameName.trim() || !dmName.trim() || room.connectionState === 'connecting'}
+                  leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
                 >
-                  Create Game
+                  {room.connectionState === 'connecting' ? 'Creating...' : 'Create Game'}
                 </Button>
               </Stack>
             ) : (
-              <Stack align="center">
-                <Text fw={500} size="lg">Game Created!</Text>
-                <Text c="dimmed" size="sm">
+              <Stack align="center" gap="xs">
+                {room.error && (
+                  <Alert color="red" title="Connection Error" style={{ width: '100%' }} py="xs">
+                    {room.error}
+                  </Alert>
+                )}
+                <Group gap="xs" justify="center">
+                  {room.connectionState === 'connecting' && (
+                    <Group gap="xs">
+                      <Loader size="xs" />
+                      <Text c="dimmed" size="xs">Connecting...</Text>
+                    </Group>
+                  )}
+                  {room.connectionState === 'connected' && (
+                    <Badge color="green" size="sm" variant="light">
+                      Connected
+                    </Badge>
+                  )}
+                  <Text fw={500}>Game Created!</Text>
+                </Group>
+                <Text c="dimmed" size="xs">
                   Share this QR code or link with your players
                 </Text>
-                
-                <Box 
-                  p="md" 
-                  bg="white" 
-                  style={{ borderRadius: 8 }}
+
+                <Box
+                  p="xs"
+                  bg="white"
+                  style={{ borderRadius: 6 }}
                 >
-                  <QRCodeSVG 
-                    value={getShareUrl()} 
-                    size={200}
+                  <QRCodeSVG
+                    value={getShareUrl()}
+                    size={140}
                     level="M"
                   />
                 </Box>
 
-                <Group gap="xs" align="center">
-                  <Code block style={{ flex: 1 }}>
+                <Group gap="xs" align="center" w="100%">
+                  <Code block style={{ flex: 1, fontSize: '0.75rem' }} data-testid="room-code">
                     {createdRoomId}
                   </Code>
                   <CopyButton value={createdRoomId}>
                     {({ copied, copy }) => (
                       <Tooltip label={copied ? 'Copied!' : 'Copy Room ID'}>
-                        <ActionIcon 
-                          color={copied ? 'teal' : 'gray'} 
+                        <ActionIcon
+                          color={copied ? 'teal' : 'gray'}
                           variant="subtle"
+                          size="sm"
                           onClick={copy}
                         >
                           {copied ? '✓' : '📋'}
@@ -249,28 +287,25 @@ export default function Lobby({ room }: LobbyProps) {
 
                 <CopyButton value={getShareUrl()}>
                   {({ copied, copy }) => (
-                    <Button 
-                      variant="light" 
+                    <Button
+                      variant="light"
                       color={copied ? 'teal' : 'blue'}
                       onClick={copy}
                       fullWidth
+                      size="xs"
                     >
                       {copied ? 'Link Copied!' : 'Copy Invite Link'}
                     </Button>
                   )}
                 </CopyButton>
 
-                <Text size="sm" c="dimmed" mt="md">
+                <Text size="xs" c="dimmed">
                   Waiting for players... ({room.peers.length} connected)
                 </Text>
 
-                <Button 
-                  fullWidth 
-                  mt="md"
-                  onClick={() => {
-                    // Game is already created, just close lobby
-                    // The App component will show GameCanvas since game exists
-                  }}
+                <Button
+                  fullWidth
+                  onClick={handleStartGame}
                 >
                   Start Game →
                 </Button>
@@ -280,12 +315,26 @@ export default function Lobby({ room }: LobbyProps) {
 
           <Tabs.Panel value="join">
             <Stack>
+              {room.error && (
+                <Alert color="red" title="Connection Error">
+                  {room.error}
+                </Alert>
+              )}
+              {room.connectionState === 'connecting' && (
+                <Alert color="blue" title="Connecting">
+                  <Group gap="xs">
+                    <Loader size="sm" />
+                    <Text size="sm">Establishing P2P connection... This may take up to 30 seconds.</Text>
+                  </Group>
+                </Alert>
+              )}
               <TextInput
                 label="Room ID"
                 placeholder="Enter room ID or scan QR"
                 value={joinRoomId}
                 onChange={(e) => setJoinRoomId(e.currentTarget.value)}
                 required
+                disabled={room.connectionState === 'connecting'}
               />
               <TextInput
                 label="Your Name"
@@ -293,23 +342,26 @@ export default function Lobby({ room }: LobbyProps) {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.currentTarget.value)}
                 required
+                disabled={room.connectionState === 'connecting'}
               />
               <ColorInput
                 label="Your Color"
                 value={playerColor}
                 onChange={setPlayerColor}
                 swatches={[
-                  '#3b82f6', '#ef4444', '#22c55e', '#f59e0b', 
+                  '#3b82f6', '#ef4444', '#22c55e', '#f59e0b',
                   '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'
                 ]}
+                disabled={room.connectionState === 'connecting'}
               />
-              <Button 
-                fullWidth 
-                mt="md" 
+              <Button
+                fullWidth
+                mt="md"
                 onClick={handleJoinGame}
-                disabled={!joinRoomId.trim() || !playerName.trim()}
+                disabled={!joinRoomId.trim() || !playerName.trim() || room.connectionState === 'connecting'}
+                leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
               >
-                Join Game
+                {room.connectionState === 'connecting' ? 'Joining...' : 'Join Game'}
               </Button>
             </Stack>
           </Tabs.Panel>

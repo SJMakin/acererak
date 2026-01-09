@@ -7,7 +7,7 @@ test.describe('Game Creation Flow', () => {
 
   test('should display lobby on initial load', async ({ page }) => {
     // Check for lobby title
-    await expect(page.getByRole('heading', { name: /Acererak VTT/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Lychgate VTT/i })).toBeVisible();
     
     // Check for tabs
     await expect(page.getByRole('tab', { name: /Recent Games/i })).toBeVisible();
@@ -18,59 +18,59 @@ test.describe('Game Creation Flow', () => {
   test('should create a new game as DM', async ({ page }) => {
     // Click on Create Game tab
     await page.getByRole('tab', { name: /Create Game/i }).click();
-    
+
     // Fill in game details
     await page.getByLabel(/Game Name/i).fill('Test Adventure');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('Test DM');
-    
+    await page.getByPlaceholder('Dungeon Master').fill('Test DM');
+
     // Create the game
     const createButton = page.getByRole('button', { name: /Create Game/i });
     await expect(createButton).toBeEnabled();
     await createButton.click();
-    
-    // Wait for game creation confirmation
-    await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
-    
+
+    // Wait for game creation confirmation (P2P room creation)
+    await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 30000 });
+
     // Check QR code is displayed
     await expect(page.locator('svg').first()).toBeVisible();
-    
-    // Check room ID is displayed
-    const roomCode = page.locator('code').first();
+
+    // Check room ID is displayed using test ID
+    const roomCode = page.getByTestId('room-code');
     await expect(roomCode).toBeVisible();
     const roomId = await roomCode.textContent();
     expect(roomId).toBeTruthy();
     expect(roomId?.length).toBeGreaterThan(0);
-    
+
     // Check copy buttons are visible
     await expect(page.getByRole('button', { name: /Copy Invite Link/i })).toBeVisible();
-    
+
     // Start the game
     await page.getByRole('button', { name: /Start Game/i }).click();
-    
+
     // Verify we're in the game canvas view
     await expect(page.getByText(/Test Adventure/i)).toBeVisible({ timeout: 5000 });
-    
-    // Check that DM controls are visible
-    await expect(page.locator('canvas')).toBeVisible();
+
+    // Check that DM controls are visible (use .first() as Konva creates multiple canvas layers)
+    await expect(page.locator('canvas').first()).toBeVisible();
   });
 
   test('should validate required fields', async ({ page }) => {
     await page.getByRole('tab', { name: /Create Game/i }).click();
-    
+
     const createButton = page.getByRole('button', { name: /Create Game/i });
-    
+
     // Button should be disabled when fields are empty
     await expect(createButton).toBeDisabled();
-    
+
     // Fill only game name
     await page.getByLabel(/Game Name/i).fill('Test Game');
     await expect(createButton).toBeDisabled();
-    
+
     // Fill only DM name (clear game name first)
     await page.getByLabel(/Game Name/i).clear();
-    await page.getByLabel(/Your Name \(DM\)/i).fill('Test DM');
+    await page.getByPlaceholder('Dungeon Master').fill('Test DM');
     await expect(createButton).toBeDisabled();
-    
+
     // Fill both fields
     await page.getByLabel(/Game Name/i).fill('Test Game');
     await expect(createButton).toBeEnabled();
@@ -108,21 +108,24 @@ test.describe('Game Creation Flow', () => {
 
   test('should validate join game form', async ({ page }) => {
     await page.getByRole('tab', { name: /Join Game/i }).click();
-    
+
+    // Wait for tab content
+    await expect(page.getByLabel(/Room ID/i)).toBeVisible();
+
     const joinButton = page.getByRole('button', { name: /Join Game/i });
-    
+
     // Button should be disabled when fields are empty
     await expect(joinButton).toBeDisabled();
-    
+
     // Fill only room ID
     await page.getByLabel(/Room ID/i).fill('TEST1234');
     await expect(joinButton).toBeDisabled();
-    
-    // Fill only player name
+
+    // Fill only player name - use specific placeholder
     await page.getByLabel(/Room ID/i).clear();
-    await page.getByLabel(/Your Name/i).fill('Test Player');
+    await page.getByPlaceholder('Player Name').fill('Test Player');
     await expect(joinButton).toBeDisabled();
-    
+
     // Fill both fields
     await page.getByLabel(/Room ID/i).fill('TEST1234');
     await expect(joinButton).toBeEnabled();
@@ -144,25 +147,25 @@ test.describe('Game Creation Flow', () => {
 test.describe('Game Canvas - Initial Load', () => {
   test('should load game canvas after creation', async ({ page }) => {
     await page.goto('/');
-    
+
     // Create game
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Canvas Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByPlaceholder('Dungeon Master').fill('DM');
     await page.getByRole('button', { name: /Create Game/i }).click();
-    
-    // Wait for game created screen
-    await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
-    
+
+    // Wait for game created screen (P2P room creation)
+    await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 30000 });
+
     // Start game
     await page.getByRole('button', { name: /Start Game/i }).click();
-    
-    // Verify canvas is loaded
-    await expect(page.locator('canvas')).toBeVisible({ timeout: 5000 });
-    
+
+    // Verify canvas is loaded (Konva creates multiple canvas layers)
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 5000 });
+
     // Verify toolbar is visible
     await expect(page.locator('[role="toolbar"]').or(page.getByText(/Canvas Test/i))).toBeVisible();
-    
+
     // Verify sidebar can be toggled
     const sidebarToggle = page.getByRole('button', { name: /sidebar/i }).or(
       page.locator('button').filter({ hasText: /◀|▶/ })
@@ -174,17 +177,21 @@ test.describe('Game Canvas - Initial Load', () => {
 
   test('should show DM controls in toolbar', async ({ page }) => {
     await page.goto('/');
-    
+
     // Create game as DM
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('DM Controls Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByPlaceholder('Dungeon Master').fill('DM');
     await page.getByRole('button', { name: /Create Game/i }).click();
+
+    // Wait for game created screen (P2P room creation)
+    await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 30000 });
+
     await page.getByRole('button', { name: /Start Game/i }).click();
-    
-    // Wait for canvas
-    await expect(page.locator('canvas')).toBeVisible({ timeout: 5000 });
-    
+
+    // Wait for canvas (Konva creates multiple canvas layers)
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 5000 });
+
     // Check for tool buttons (these should be visible as ActionIcons)
     // The toolbar should have multiple action icons for tools
     const actionIcons = page.locator('button[class*="ActionIcon"], [role="button"]');

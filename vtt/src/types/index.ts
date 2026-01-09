@@ -1,4 +1,4 @@
-// Core types for Acererak VTT
+// Core types for Lychgate VTT
 
 export type ElementType = 'token' | 'image' | 'shape' | 'text';
 export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
@@ -9,6 +9,8 @@ export interface Point {
   y: number;
 }
 
+export type GridType = 'square' | 'hex' | 'none';
+
 export interface GridSettings {
   cellSize: number;      // pixels per cell
   width: number;         // cells
@@ -16,6 +18,7 @@ export interface GridSettings {
   showGrid: boolean;
   snapToGrid: boolean;
   gridColor: string;
+  gridType: GridType;    // square, hex, or none (gridless)
 }
 
 export interface StyleProps {
@@ -269,7 +272,12 @@ export type ToolType =
   | 'measure'
   | 'ping'
   | 'fog-reveal'
-  | 'fog-hide';
+  | 'fog-hide'
+  | 'aoe-circle'     // Area of Effect: Circle (e.g., Fireball)
+  | 'aoe-cone'       // Area of Effect: Cone with curved arc edge (fan shape)
+  | 'aoe-triangle'   // Area of Effect: Triangle/Cone (D&D RAW - simple triangle)
+  | 'aoe-line'       // Area of Effect: Line (e.g., Lightning Bolt)
+  | 'aoe-square';    // Area of Effect: Square (e.g., Cloud of Daggers)
 
 // Default values
 export const DEFAULT_GRID_SETTINGS: GridSettings = {
@@ -279,6 +287,7 @@ export const DEFAULT_GRID_SETTINGS: GridSettings = {
   showGrid: true,
   snapToGrid: true,
   gridColor: 'rgba(255, 255, 255, 0.2)',
+  gridType: 'square',
 };
 
 export const DEFAULT_STYLE: StyleProps = {
