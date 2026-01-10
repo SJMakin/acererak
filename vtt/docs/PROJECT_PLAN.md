@@ -123,117 +123,103 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 ---
 
-## Phase 3.5: P2P Polish & Optimization (NEXT)
+## Phase 3.5: P2P Polish & Bug Fixes ✅ COMPLETED
 
-**Context:** Phase 3 established the foundation for reliable P2P sync. These enhancements improve resilience, performance, and user experience for edge cases.
+**Summary:** Fixed P2P broadcast gaps and improved cursor performance.
 
-### Priority 1: Player State Persistence
-**Problem:** Players lose everything on disconnect/refresh - must wait for DM to resync.
+**Key Deliverables:**
+- Undo/Redo now broadcasts full state sync to peers
+- Copy/Cut/Paste operations broadcast element updates/deletions
+- Cursor broadcasts throttled (10Hz max, 5px min delta)
+- Client-side cursor interpolation for smooth movement
 
-**Approach:**
-- Cache game snapshot to IndexedDB on each sync received
-- Store with `roomId` as key, include `lastSyncedAt` timestamp
-- On rejoin same room, preload cached state immediately (faster perceived load)
-- Then request fresh sync from DM to get latest changes
-- Show "Cached from [timestamp]" indicator until fresh sync arrives
-- Auto-expire cached games after 7 days
+### Bug Fix 1: Undo/Redo P2P Sync
+**Problem:** Undo/redo changes game state but doesn't broadcast to peers - players see inconsistent state.
+
+**Root Cause:** `performUndo` and `performRedo` in `gameStore.ts` modify game state directly without calling any broadcast function. Currently called from `App.tsx` and `Toolbar.tsx` without follow-up sync.
+
+**Fix:**
+- After `performUndo`/`performRedo`, call `broadcastSync()` to push full state
+- Simple approach since undo can affect multiple elements at once
+- Only DM has undo authority, so DM-side broadcast is sufficient
 
 **Files to modify:**
-- `src/db/database.ts` - Add `saveCachedGame()`, `getCachedGame()`, `cleanupExpiredCaches()`
-- `src/hooks/useRoom.ts` - Cache on `onSync`, preload on `joinExistingRoom`
-- `src/components/Lobby.tsx` - Show cached games with "rejoin" option
+- `src/App.tsx` - Add `room.broadcastSync()` after `performUndo`/`performRedo`
+- `src/components/Toolbar.tsx` - Same fix if undo/redo triggered from toolbar
 
-**Complexity:** Medium (new IndexedDB operations, UI for cached games)
+**Complexity:** Low (single broadcast call after each operation)
 
-### Priority 2: Cursor Throttling
-**Problem:** Cursor broadcasts on every mouse move, flooding the network.
+### Bug Fix 2: Copy/Cut/Paste P2P Sync
+**Problem:** Cut deletes elements and paste adds elements without broadcasting to peers.
+
+**Root Cause:** `useClipboard.ts` calls `deleteElements` (line 49) and `addElements` (line 128) directly without any broadcast mechanism. The hook doesn't have access to the room.
+
+**Fix:**
+- Option A: Pass broadcast callbacks to `useClipboard` hook
+- Option B: Add return values and handle broadcast at call site
+- Option B is cleaner - return the affected element IDs/objects from cut/paste, then broadcast in the component that uses the hook
+
+**Files to modify:**
+- `src/hooks/useClipboard.ts` - Return cut element IDs and pasted elements
+- `src/App.tsx` or `src/components/GameCanvas.tsx` - Handle broadcast after clipboard operations
+
+**Complexity:** Medium (callback wiring through hook)
+
+### Enhancement 1: Cursor Throttling & Smoothing
+**Problem:** Cursor broadcasts on every mouse move (network flooding) and movements appear jerky on clients.
 
 **Approach:**
 - Throttle cursor broadcasts to max 10Hz (100ms interval)
-- Use `requestAnimationFrame` or `setTimeout` throttle pattern
 - Only broadcast if position changed significantly (>5px delta)
-- Consider reducing broadcast rate when many peers connected (>4 peers → 5Hz)
+- Add client-side interpolation for received cursor positions
+- Use lerp (linear interpolation) to smooth cursor movement between updates
+
+**Implementation:**
+```typescript
+// Throttle side (sender)
+const throttledBroadcastCursor = throttle((position) => {
+  if (distance(lastSent, position) > 5) {
+    broadcastCursor(position);
+    lastSent = position;
+  }
+}, 100);
+
+// Smoothing side (receiver)
+// Store target position and lerp current toward it each frame
+useAnimationFrame(() => {
+  currentPos = lerp(currentPos, targetPos, 0.2);
+});
+```
 
 **Files to modify:**
 - `src/hooks/useRoom.ts` - Add throttle wrapper around `broadcastCursor`
-- `src/components/Canvas.tsx` - Cursor position delta check before broadcast
+- `src/components/GameCanvas.tsx` - Add cursor interpolation for peer cursors, delta check before broadcast
 
-**Complexity:** Low (simple throttle pattern)
+**Complexity:** Medium (throttle + interpolation logic)
 
-### Priority 3: Retry Logic for Failed Broadcasts
-**Problem:** Network hiccups can cause lost updates with no recovery.
+### Deferred/Dropped Items
 
-**Approach:**
-- Wrap critical broadcasts (element updates, fog, combat) in retry logic
-- Use exponential backoff: 100ms, 200ms, 400ms, then give up
-- Track pending broadcasts in a queue
-- On peer reconnect, flush pending queue
-- Non-critical broadcasts (cursor, ping) don't need retry
+The following items from original Phase 3.5 planning were dropped or deferred:
 
-**Files to modify:**
-- `src/hooks/useRoom.ts` - Add `broadcastWithRetry()` wrapper, pending queue
+- **Player State Persistence** - DROPPED: Already auto-saves for both DM and players via IndexedDB
+- **Retry Logic for Failed Broadcasts** - DEFERRED: Hash comparison + "Request Full Sync" already provides recovery mechanism
+- **Delta Optimization** - DROPPED: Over-complicated for minimal gain; full element broadcasts are acceptable
+- **Import/Export Peer Sync** - ALREADY FIXED: `ExportImportModal.tsx` already calls `room.broadcastSync()` after import (line 607-608)
 
-**Complexity:** Medium (queue management, backoff timing)
+### Future Consideration: Dice/Chat Integration
+**Question:** Should dice rolls be displayed in chat instead of a separate panel?
 
-### Priority 4: Delta Optimization for Element Updates
-**Problem:** Full element objects broadcast on every move (wasteful for large tokens with notes).
+**Benefits:**
+- Single timeline of game events (rolls + conversation)
+- Natural context for rolls ("I attack the goblin" → roll → result)
+- Easier to review session history
 
-**Approach:**
-- For position-only updates, broadcast `{ id, x, y, version }` instead of full element
-- Create `sendElementDelta` action for partial updates
-- Full element sync only on property changes (name, HP, notes, etc.)
-- Receiver merges delta into local element
+**Implementation thoughts:**
+- Dice rolls could be a special `ChatMessage` type with `type: 'roll'`
+- Chat panel renders roll messages with formula/result formatting
+- DiceRoller panel could remain for quick-roll buttons but output to chat
 
-**Files to modify:**
-- `src/hooks/useRoom.ts` - Add `sendElDelta` action, `onElDelta` handler
-- `src/stores/gameStore.ts` - Add `applyElementDelta()` function
-
-**Complexity:** Medium (new action type, merge logic)
-
-### Priority 5: Undo/Redo P2P Sync
-**Problem:** Undo/redo is local-only - other players see inconsistent state.
-
-**Approach:**
-- When DM performs undo/redo, broadcast the resulting state change
-- Option A: Broadcast affected elements after undo (simpler)
-- Option B: Broadcast undo action itself (complex, requires history sync)
-- Start with Option A - after `performUndo`/`performRedo`, broadcast changed elements
-- Players don't have undo authority - only DM undos are synced
-
-**Files to modify:**
-- `src/stores/gameStore.ts` - Track changed elements in undo/redo
-- `src/hooks/useRoom.ts` - Broadcast changes after DM undo
-
-**Complexity:** Medium (tracking what changed in undo)
-
-### Priority 6: Dice History Persistence
-**Problem:** Dice roll history lost on refresh.
-
-**Approach:**
-- Persist `diceRolls` array to IndexedDB as part of game save
-- Already saved as part of GameState, but need to ensure it's included
-- Add "Clear History" button to dice panel
-- Consider separate "session log" that persists rolls + chat together
-
-**Files to modify:**
-- `src/db/database.ts` - Verify diceRolls included in save
-- `src/components/DiceRoller.tsx` - Add clear history button
-
-**Complexity:** Low (mostly verification, minor UI)
-
-### Priority 7: Import/Export Peer Sync
-**Problem:** When DM imports a game/scene, players don't see changes until manual sync.
-
-**Approach:**
-- After successful import, automatically call `broadcastSync()`
-- Show toast: "Game imported and synced to X players"
-- For scene imports (partial), broadcast only affected elements
-
-**Files to modify:**
-- `src/components/ExportImportDialog.tsx` - Add `room.broadcastSync()` after import
-- Pass room prop to dialog or use callback pattern
-
-**Complexity:** Low (single broadcast call after import)
+**Status:** Pending user decision - implement if desired after bug fixes
 
 ---
 
@@ -335,6 +321,7 @@ These features don't fit the decentralized design:
 | v1.4.0 | Canvas | Hex/gridless, AOE templates, multi-select operations |
 | v1.5.0 | Measurement | Waypoint paths, difficult terrain modifier |
 | v1.6.0 | P2P Reliability | Connection status, DM disconnect, desync detection, element versioning, chat |
+| v1.7.0 | P2P Polish | Undo/redo sync, clipboard sync, cursor throttling/interpolation |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---

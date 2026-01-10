@@ -19,9 +19,11 @@ function App() {
   useKeyboardShortcuts({
     onUndo: () => {
       performUndo();
+      room.broadcastSync();
     },
     onRedo: () => {
       performRedo();
+      room.broadcastSync();
     },
     onDelete: () => {
       // Broadcast deletion to other players

@@ -843,6 +843,12 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const dragStartPositions = useRef<Record<string, Point>>({});
   const isDraggingMultiple = useRef(false);
 
+  // Cursor broadcast throttling (10Hz max, 5px min delta)
+  const lastCursorBroadcast = useRef<{ time: number; position: Point }>({ time: 0, position: { x: 0, y: 0 } });
+
+  // Interpolated cursor positions for smooth rendering
+  const [interpolatedCursors, setInterpolatedCursors] = useState<Record<string, Point>>({});
+
   const {
     game,
     selectedTool,
@@ -903,6 +909,45 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       setMeasureCurrentPoint(null);
     }
   }, [selectedTool]);
+
+  // Interpolate cursor positions for smooth rendering (lerp toward target at 60fps)
+  useEffect(() => {
+    if (otherPlayerCursors.length === 0) return;
+
+    let animationFrameId: number;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+    const animate = () => {
+      setInterpolatedCursors(prev => {
+        const next: Record<string, Point> = { ...prev };
+        let changed = false;
+
+        for (const player of otherPlayerCursors) {
+          const target = player.cursor;
+          const current = prev[player.id] || target;
+
+          // Lerp factor of 0.2 gives smooth but responsive movement
+          const newX = lerp(current.x, target.x, 0.2);
+          const newY = lerp(current.y, target.y, 0.2);
+
+          // Only update if there's meaningful change (>0.5px)
+          const dx = Math.abs(newX - current.x);
+          const dy = Math.abs(newY - current.y);
+          if (dx > 0.5 || dy > 0.5) {
+            next[player.id] = { x: newX, y: newY };
+            changed = true;
+          }
+        }
+
+        return changed ? next : prev;
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [otherPlayerCursors]);
 
   // Handle window resize
   useEffect(() => {
@@ -1309,12 +1354,22 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle mouse/touch move for drawing
   const handleMouseMoveForDrawing = useCallback((_e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    // Broadcast cursor position
+    // Broadcast cursor position (throttled: 10Hz max, 5px min delta)
     const stage = stageRef.current;
     if (stage) {
       const pointer = stage.getPointerPosition();
       if (pointer) {
-        room.broadcastCursor(pointer);
+        const now = Date.now();
+        const last = lastCursorBroadcast.current;
+        const dx = pointer.x - last.position.x;
+        const dy = pointer.y - last.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Only broadcast if 100ms elapsed AND position changed by >5px
+        if (now - last.time >= 100 && distance > 5) {
+          room.broadcastCursor(pointer);
+          lastCursorBroadcast.current = { time: now, position: pointer };
+        }
         
         // Update marquee selection end point
         if (isMarqueeSelecting.current && marqueeStart) {
@@ -1818,15 +1873,23 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       if (ctrl && key === 'c' && selectedElementIds.length > 0) {
         clipboard.copySelected();
       } else if (ctrl && key === 'x' && selectedElementIds.length > 0) {
-        clipboard.cutSelected();
+        const result = clipboard.cutSelected();
+        if (result) {
+          // Broadcast deletion of cut elements to peers
+          result.deletedIds.forEach(id => room.broadcastElementDelete(id));
+        }
       } else if (ctrl && key === 'v' && clipboard.hasClipboard()) {
-        clipboard.pasteElements(mousePosition.current);
+        const result = clipboard.pasteElements(mousePosition.current);
+        if (result) {
+          // Broadcast pasted elements to peers
+          result.pastedElements.forEach(el => room.broadcastElementUpdate(el));
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, clipboard, selectedTool, polygonPoints, finishPolygon, measureWaypoints]);
+  }, [selectedElementIds, clipboard, selectedTool, polygonPoints, finishPolygon, measureWaypoints, room]);
 
   // Cleanup old pings and force re-render for animation
   const [, setPingTick] = useState(0);
@@ -2430,9 +2493,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             );
           })()}
 
-          {/* Player Cursors */}
-          {otherPlayerCursors.map(player => (
-            <Group key={player.id} x={player.cursor.x} y={player.cursor.y}>
+          {/* Player Cursors (with interpolation for smooth movement) */}
+          {otherPlayerCursors.map(player => {
+            const pos = interpolatedCursors[player.id] || player.cursor;
+            return (
+            <Group key={player.id} x={pos.x} y={pos.y}>
               {/* Cursor arrow */}
               <Path
                 data="M 0 0 L 4 14 L 0 11 L -4 14 Z"
@@ -2460,7 +2525,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 fontStyle="bold"
               />
             </Group>
-          ))}
+          );})}
+
         </Layer>
       </Stage>
       

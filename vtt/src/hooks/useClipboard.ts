@@ -36,7 +36,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     return elementsToCopy.length;
   }, [game, options]);
 
-  const cutElements = useCallback((elementIds: string[]) => {
+  const cutElements = useCallback((elementIds: string[]): { count: number; deletedIds: string[] } | undefined => {
     if (!game || elementIds.length === 0) return;
 
     const elementsToCut = game.elements.filter(el => elementIds.includes(el.id));
@@ -44,18 +44,18 @@ export function useClipboard(options: UseClipboardOptions = {}) {
 
     // Copy to clipboard
     clipboard.current = elementsToCut.map(el => ({ ...el }));
-    
+
     // Delete from canvas
     deleteElements(elementIds);
-    
+
     if (options.onCut) {
       options.onCut(elementsToCut.length);
     }
 
-    return elementsToCut.length;
+    return { count: elementsToCut.length, deletedIds: elementIds };
   }, [game, deleteElements, options]);
 
-  const pasteElements = useCallback((mousePosition?: Point) => {
+  const pasteElements = useCallback((mousePosition?: Point): { count: number; pastedElements: CanvasElement[] } | undefined => {
     if (!game || clipboard.current.length === 0) return;
 
     // Calculate paste position
@@ -104,7 +104,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     // Create new elements with updated positions and new IDs
     const newElements = clipboard.current.map((el) => {
       const { id, ...elementData } = el;
-      
+
       let newElement: Omit<CanvasElement, 'id'> = {
         ...elementData,
         x: el.x + finalOffsetX,
@@ -126,7 +126,13 @@ export function useClipboard(options: UseClipboardOptions = {}) {
 
     // Add elements to canvas
     const newIds = addElements(newElements);
-    
+
+    // Build the full elements with IDs for broadcasting
+    const pastedElements: CanvasElement[] = newIds.map((id, index) => ({
+      ...newElements[index],
+      id,
+    } as CanvasElement));
+
     // Select the newly pasted elements
     selectElements(newIds);
 
@@ -134,7 +140,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       options.onPaste(newIds.length);
     }
 
-    return newIds.length;
+    return { count: newIds.length, pastedElements };
   }, [game, addElements, selectElements, viewportOffset, viewportScale, options]);
 
   const hasClipboard = useCallback(() => {

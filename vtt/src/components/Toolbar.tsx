@@ -165,7 +165,10 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
             <ActionIcon
               variant="subtle"
               size="lg"
-              onClick={performUndo}
+              onClick={() => {
+                performUndo();
+                room.broadcastSync();
+              }}
               disabled={!canUndo()}
             >
               ↶
@@ -175,7 +178,10 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
             <ActionIcon
               variant="subtle"
               size="lg"
-              onClick={performRedo}
+              onClick={() => {
+                performRedo();
+                room.broadcastSync();
+              }}
               disabled={!canRedo()}
             >
               ↷
