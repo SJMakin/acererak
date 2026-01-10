@@ -59,7 +59,7 @@ E2E tests failing on deployed site - P2P signaling timeouts and race condition p
 - Added `pendingGameData` state to store game info without creating game
 - Split game creation into two phases:
   - Phase 1: Create P2P room and show "Game Created!" UI
-  - Phase 2: Create game state when DM clicks "Start Game →"
+  - Phase 2: Create game state when GM clicks "Start Game →"
 - Prevents premature component unmounting
 
 **3. Added Comprehensive Error Handling**
@@ -103,19 +103,19 @@ Comprehensive code review of P2P state synchronization revealed critical gaps.
 
 ### Key Findings
 
-1. **Network vs Logic Mismatch**: Trystero creates a full mesh network (all peers connected to each other), but the state sync logic is hub-and-spoke (only DM sends full state). Players CAN see each other's incremental updates, but new players can only get initial state from DM.
+1. **Network vs Logic Mismatch**: Trystero creates a full mesh network (all peers connected to each other), but the state sync logic is hub-and-spoke (only GM sends full state). Players CAN see each other's incremental updates, but new players can only get initial state from GM.
 
-2. **No Conflict Resolution**: Simultaneous edits cause last-write-wins race conditions. No versioning, no ordering guarantees. Element state becomes indeterminate if DM and player edit the same thing.
+2. **No Conflict Resolution**: Simultaneous edits cause last-write-wins race conditions. No versioning, no ordering guarantees. Element state becomes indeterminate if GM and player edit the same thing.
 
-3. **Basic Connection Status Exists**: Toolbar shows green "Connected" badge and player count, but lacks syncing/error states and DM disconnect detection.
+3. **Basic Connection Status Exists**: Toolbar shows green "Connected" badge and player count, but lacks syncing/error states and GM disconnect detection.
 
-4. **DM Disconnect = Orphaned Players**: If DM closes browser, players stay "connected" to each other but can't get state. New players joining receive nothing. No warning shown.
+4. **GM Disconnect = Orphaned Players**: If GM closes browser, players stay "connected" to each other but can't get state. New players joining receive nothing. No warning shown.
 
-5. **FOW Not DM-Only**: Any peer can broadcast fog updates. Should be restricted to DM.
+5. **FOW Not GM-Only**: Any peer can broadcast fog updates. Should be restricted to GM.
 
-6. **Grid Settings Not Synced**: DM changes grid, players see old grid. No P2P action for grid sync.
+6. **Grid Settings Not Synced**: GM changes grid, players see old grid. No P2P action for grid sync.
 
-7. **Players Lose State on Refresh**: Only DM saves to IndexedDB. Players must rejoin and wait for full sync.
+7. **Players Lose State on Refresh**: Only GM saves to IndexedDB. Players must rejoin and wait for full sync.
 
 ### Additional Concerns Identified
 
@@ -135,11 +135,11 @@ Comprehensive code review of P2P state synchronization revealed critical gaps.
 
 ### Design Decisions Made
 
-- **No CRDTs/Yjs needed**: DM authority model is correct for a VTT. Keep it simple.
-- **Game should pause if DM disconnects**: Not crash, just pause with warning. Still "unkillable" - just waiting at the gate.
-- **FOW is DM-only**: No conflict resolution needed, just enforce the restriction.
-- **Simple versioning**: Add `version` field to elements. DM's version always wins.
-- **State divergence not a major concern**: With DM authority, players always get corrected on next sync.
+- **No CRDTs/Yjs needed**: GM authority model is correct for a VTT. Keep it simple.
+- **Game should pause if GM disconnects**: Not crash, just pause with warning. Still "unkillable" - just waiting at the gate.
+- **FOW is GM-only**: No conflict resolution needed, just enforce the restriction.
+- **Simple versioning**: Add `version` field to elements. GM's version always wins.
+- **State divergence not a major concern**: With GM authority, players always get corrected on next sync.
 
 ### Priority Reordering
 

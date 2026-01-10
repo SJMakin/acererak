@@ -8,7 +8,7 @@ export interface SavedGame {
   gameState: GameState;
   lastUpdated: string;
   playerCount: number;
-  isDM: boolean;
+  isGM: boolean;
 }
 
 export interface SavedLibraryItem extends LibraryItem {
@@ -22,28 +22,28 @@ const db = new Dexie('LychgateVTTDatabase') as Dexie & {
 };
 
 db.version(1).stores({
-  games: 'id, name, lastUpdated, isDM',
+  games: 'id, name, lastUpdated, isGM',
 });
 
 // Version 2: Add library table
 db.version(2).stores({
-  games: 'id, name, lastUpdated, isDM',
+  games: 'id, name, lastUpdated, isGM',
   library: 'id, type, name, *tags, createdAt, updatedAt',
 });
 
 export { db };
 
 // Database operations
-export async function saveGame(game: GameState, isDM: boolean): Promise<void> {
+export async function saveGame(game: GameState, isGM: boolean): Promise<void> {
   const playerCount = Object.keys(game.players).length;
-  
+
   await db.games.put({
     id: game.id,
     name: game.name,
     gameState: game,
     lastUpdated: game.updatedAt,
     playerCount,
-    isDM,
+    isGM,
   });
 }
 
@@ -64,9 +64,9 @@ export async function getRecentGames(limit = 10): Promise<SavedGame[]> {
     .toArray();
 }
 
-export async function getDMGames(): Promise<SavedGame[]> {
+export async function getGMGames(): Promise<SavedGame[]> {
   return db.games
-    .where('isDM')
+    .where('isGM')
     .equals(1)
     .reverse()
     .sortBy('lastUpdated');

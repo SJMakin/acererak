@@ -25,7 +25,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     selectedElementIds,
     clearSelection,
     game,
-    isDM,
+    isGM,
   } = useGameStore();
   const { undo, redo, canUndo, canRedo } = useHistoryStore();
   const spacePressed = useRef(false);
@@ -95,8 +95,8 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     // Handle Ctrl+S for save
     if (ctrl && key === 's') {
       e.preventDefault();
-      if (game && isDM) {
-        saveGame(game, isDM).catch(err => {
+      if (game && isGM) {
+        saveGame(game, isGM).catch(err => {
           console.error('Failed to save game:', err);
         });
         if (options.onSave) {
@@ -193,7 +193,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     selectedElementIds,
     clearSelection,
     game,
-    isDM,
+    isGM,
     undo,
     redo,
     canUndo,

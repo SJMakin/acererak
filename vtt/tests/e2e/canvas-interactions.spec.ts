@@ -6,7 +6,7 @@ test.describe('Canvas Interactions', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Canvas Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -208,7 +208,7 @@ test.describe('Canvas Interactions', () => {
       page.locator('[class*="Badge"]').filter({ hasText: /Connected/i })
     );
     
-    // Should show at least the DM as connected
+    // Should show at least the GM as connected
     await page.waitForTimeout(1000);
     
     // Connection info might be visible
@@ -264,7 +264,7 @@ test.describe('Canvas - Grid Settings', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Grid Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();

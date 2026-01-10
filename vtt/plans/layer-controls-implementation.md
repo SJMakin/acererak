@@ -17,7 +17,7 @@ Implement UI controls for the layer visibility system that already exists in the
   - [`toggleLayerVisibility(layer)`](vtt/src/stores/gameStore.ts:851)
   - [`setLayerVisibility(layer, visible)`](vtt/src/stores/gameStore.ts:860)
   - [`setPreviewAsPlayer(preview)`](vtt/src/stores/gameStore.ts:869)
-- **State**: `previewAsPlayer: boolean` for DM preview mode
+- **State**: `previewAsPlayer: boolean` for GM preview mode
 
 ### Canvas Rendering Structure
 [`GameCanvas.tsx`](vtt/src/components/GameCanvas.tsx:1) has 5 Konva Layers:
@@ -31,7 +31,7 @@ Implement UI controls for the layer visibility system that already exists in the
 
 ### Step 1: Add Layer Controls UI to Sidebar
 
-**Location**: [`Sidebar.tsx`](vtt/src/components/Sidebar.tsx:1) → DM Tools tab
+**Location**: [`Sidebar.tsx`](vtt/src/components/Sidebar.tsx:1) → GM Tools tab
 
 **UI Design**:
 ```
@@ -101,7 +101,7 @@ Implement UI controls for the layer visibility system that already exists in the
    }
    ```
 
-6. **Fog of War** - Line 1458 (already has DM logic):
+6. **Fog of War** - Line 1458 (already has GM logic):
    ```typescript
    {game.fogOfWar.enabled && layerVisibility.fog && !isDM && (
      ...
@@ -111,9 +111,9 @@ Implement UI controls for the layer visibility system that already exists in the
 ### Step 3: Preview as Player Mode
 
 **Logic**:
-- When `previewAsPlayer` is true, temporarily treat DM as non-DM for visibility purposes
+- When `previewAsPlayer` is true, temporarily treat GM as non-GM for visibility purposes
 - Update visibility checks in Token, MapImage, Shape, and TextLabel components
-- Show DM-only elements with reduced opacity or outline to indicate they're hidden to players
+- Show GM-only elements with reduced opacity or outline to indicate they're hidden to players
 
 **Pass to Components**:
 ```typescript
@@ -132,7 +132,7 @@ const effectiveIsDM = isDM && !previewAsPlayer;
 ## File Changes Required
 
 1. **vtt/src/components/Sidebar.tsx**
-   - Add layer controls section to DM Tools tab
+   - Add layer controls section to GM Tools tab
    - Wire up toggles to gameStore actions
 
 2. **vtt/src/components/GameCanvas.tsx**

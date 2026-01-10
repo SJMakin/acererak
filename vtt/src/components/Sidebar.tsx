@@ -40,7 +40,7 @@ export default function Sidebar({ room }: SidebarProps) {
   const {
     game,
     selectedElementId,
-    isDM,
+    isGM,
     addElement,
     updateElement,
     deleteElement,
@@ -131,7 +131,7 @@ export default function Sidebar({ room }: SidebarProps) {
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
           {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
-          {isDM && <Tabs.Tab value="dm">DM Tools</Tabs.Tab>}
+          {isGM && <Tabs.Tab value="gm">GM Tools</Tabs.Tab>}
         </Tabs.List>
 
         <ScrollArea h="calc(100vh - 180px)" mt="md">
@@ -189,8 +189,8 @@ export default function Sidebar({ room }: SidebarProps) {
                       <Text size="sm" fw={500}>
                         {(token as TokenElement).name || 'Unnamed'}
                       </Text>
-                      {token.visibleTo === 'dm' && (
-                        <Badge size="xs" color="violet">DM Only</Badge>
+                      {token.visibleTo === 'gm' && (
+                        <Badge size="xs" color="violet">GM Only</Badge>
                       )}
                     </Group>
                     <Group gap={4}>
@@ -269,8 +269,8 @@ export default function Sidebar({ room }: SidebarProps) {
                       />
                       <Text size="sm" fw={500}>{player.name}</Text>
                     </Group>
-                    {player.isDM && (
-                      <Badge size="xs" color="violet">DM</Badge>
+                    {player.isGM && (
+                      <Badge size="xs" color="violet">GM</Badge>
                     )}
                   </Group>
                 </Paper>
@@ -286,8 +286,8 @@ export default function Sidebar({ room }: SidebarProps) {
             <PropertyInspector room={room} />
           </Tabs.Panel>
 
-          {isDM && (
-            <Tabs.Panel value="dm">
+          {isGM && (
+            <Tabs.Panel value="gm">
               <Stack>
                 {/* Selected element properties */}
                 {selectedElement && (
@@ -299,16 +299,16 @@ export default function Sidebar({ room }: SidebarProps) {
                         size="xs"
                         value={
                           selectedElement.visibleTo === 'all' ? 'all' : 
-                          selectedElement.visibleTo === 'dm' ? 'dm' : 'specific'
+                          selectedElement.visibleTo === 'gm' ? 'gm' : 'specific'
                         }
                         onChange={(val) => {
-                          if (val === 'all' || val === 'dm') {
+                          if (val === 'all' || val === 'gm') {
                             handleUpdateVisibility(selectedElement.id, val);
                           }
                         }}
                         data={[
                           { value: 'all', label: 'Visible to All' },
-                          { value: 'dm', label: 'DM Only' },
+                          { value: 'gm', label: 'GM Only' },
                         ]}
                       />
                       <Checkbox
@@ -383,7 +383,7 @@ export default function Sidebar({ room }: SidebarProps) {
                       onChange={(e) => setPreviewAsPlayer(e.currentTarget.checked)}
                     />
                     <Text size="xs" c="dimmed">
-                      See what players see (hides DM-only elements)
+                      See what players see (hides GM-only elements)
                     </Text>
                   </Stack>
                 </Paper>

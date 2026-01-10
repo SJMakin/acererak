@@ -2,12 +2,12 @@ import { Modal, Text, Button, Stack, Group, Alert } from '@mantine/core';
 import { IconAlertTriangle, IconDownload, IconDoorExit } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 
-interface DMDisconnectModalProps {
+interface GMDisconnectModalProps {
   opened: boolean;
   onLeaveGame: () => void;
 }
 
-export default function DMDisconnectModal({ opened, onLeaveGame }: DMDisconnectModalProps) {
+export default function GMDisconnectModal({ opened, onLeaveGame }: GMDisconnectModalProps) {
   const { game } = useGameStore();
 
   const handleExportBackup = () => {
@@ -41,7 +41,7 @@ export default function DMDisconnectModal({ opened, onLeaveGame }: DMDisconnectM
       title={
         <Group gap="xs">
           <IconAlertTriangle size={20} color="var(--mantine-color-red-6)" />
-          <Text fw={600}>DM Disconnected</Text>
+          <Text fw={600}>GM Disconnected</Text>
         </Group>
       }
       centered
@@ -49,13 +49,13 @@ export default function DMDisconnectModal({ opened, onLeaveGame }: DMDisconnectM
       <Stack gap="md">
         <Alert color="red" variant="light">
           <Text size="sm">
-            The DM has left the game. The session is paused until they reconnect.
+            The GMhas left the game. The session is paused until they reconnect.
           </Text>
         </Alert>
 
         <Text size="sm" c="dimmed">
           You can export a backup of the current game state or leave the game.
-          If the DM reconnects, you may need to rejoin the session.
+          If the GMreconnects, you may need to rejoin the session.
         </Text>
 
         <Group justify="flex-end" gap="sm">

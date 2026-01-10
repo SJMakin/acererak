@@ -42,9 +42,9 @@ export default function Lobby({ room }: LobbyProps) {
   
   // Create game form
   const [gameName, setGameName] = useState('');
-  const [dmName, setDmName] = useState('');
+  const [gmName, setGmName] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
-  const [pendingGameData, setPendingGameData] = useState<{ name: string; dmName: string } | null>(null);
+  const [pendingGameData, setPendingGameData] = useState<{ name: string; gmName: string } | null>(null);
   
   // Join game form
   const [joinRoomId, setJoinRoomId] = useState('');
@@ -55,7 +55,7 @@ export default function Lobby({ room }: LobbyProps) {
   const [recentGames, setRecentGames] = useState<SavedGame[]>([]);
 
   const handleCreateGame = () => {
-    if (!gameName.trim() || !dmName.trim()) return;
+    if (!gameName.trim() || !gmName.trim()) return;
 
     // Create P2P room and store game data for later
     const roomId = nanoid(8);
@@ -64,13 +64,13 @@ export default function Lobby({ room }: LobbyProps) {
 
     // Store the game data but don't create the game yet
     // This allows the "Game Created!" message to show
-    setPendingGameData({ name: gameName, dmName: dmName });
+    setPendingGameData({ name: gameName, gmName: gmName });
   };
 
   const handleStartGame = () => {
     // Now actually create the game, which will trigger the app to show the canvas
     if (pendingGameData) {
-      createGame(pendingGameData.name, pendingGameData.dmName);
+      createGame(pendingGameData.name, pendingGameData.gmName);
     }
   };
 
@@ -158,9 +158,9 @@ export default function Lobby({ room }: LobbyProps) {
                     <Group justify="space-between" mb="xs">
                       <Text fw={500}>{game.name}</Text>
                       <Group gap="xs">
-                        {game.isDM && (
+                        {game.isGM && (
                           <Badge color="violet" variant="light" size="sm">
-                            DM
+                            GM
                           </Badge>
                         )}
                         <Badge color="gray" variant="light" size="sm">
@@ -212,17 +212,17 @@ export default function Lobby({ room }: LobbyProps) {
                   required
                 />
                 <TextInput
-                  label="Your Name (DM)"
-                  placeholder="Dungeon Master"
-                  value={dmName}
-                  onChange={(e) => setDmName(e.currentTarget.value)}
+                  label="Your Name (GM)"
+                  placeholder="Game Master"
+                  value={gmName}
+                  onChange={(e) => setGmName(e.currentTarget.value)}
                   required
                 />
                 <Button
                   fullWidth
                   mt="md"
                   onClick={handleCreateGame}
-                  disabled={!gameName.trim() || !dmName.trim() || room.connectionState === 'connecting'}
+                  disabled={!gameName.trim() || !gmName.trim() || room.connectionState === 'connecting'}
                   leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
                 >
                   {room.connectionState === 'connecting' ? 'Creating...' : 'Create Game'}

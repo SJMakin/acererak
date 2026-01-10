@@ -2,7 +2,7 @@
 
 export type ElementType = 'token' | 'image' | 'shape' | 'text';
 export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
-export type Visibility = 'all' | 'dm' | string[]; // string[] = specific peer IDs
+export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer IDs
 
 export interface Point {
   x: number;
@@ -101,7 +101,7 @@ export interface Player {
   id: string;            // peer ID
   name: string;
   color: string;
-  isDM: boolean;
+  isGM: boolean;
   controlledTokens: string[]; // element IDs
   cursor?: Point;        // live cursor position
 }
@@ -115,7 +115,7 @@ export interface CampaignNote {
   tags?: string[];
   createdAt: string;
   updatedAt: string;
-  visibleTo: Visibility; // 'all' | 'dm' | specific peer IDs
+  visibleTo: Visibility; // 'all' | 'gm' | specific peer IDs
 }
 
 export interface GameState {
@@ -127,7 +127,7 @@ export interface GameState {
   elements: CanvasElement[];
   fogOfWar: FogOfWar;
   players: Record<string, Player>;
-  dmPeerId?: string;     // who is the DM
+  gmPeerId?: string;     // who is the GM
   combat?: CombatTracker; // combat encounter state
   diceRolls?: DiceRoll[]; // dice roll history
   campaignNotes?: CampaignNote[]; // Campaign journal notes
@@ -200,7 +200,7 @@ export interface ChatMessage {
   playerColor: string;
   timestamp: number;
   content: string;
-  isDMOnly: boolean; // Whisper to DM only
+  isGMOnly: boolean; // Whisper to GM only
 }
 
 export interface ChatMessageP2P {
@@ -230,7 +230,7 @@ export interface RoomConfig {
 export interface SessionInfo {
   roomId: string;
   gameName: string;
-  dmName: string;
+  gmName: string;
   playerCount: number;
 }
 

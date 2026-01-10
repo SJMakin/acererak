@@ -15,13 +15,13 @@ test.describe('Game Creation Flow', () => {
     await expect(page.getByRole('tab', { name: /Join Game/i })).toBeVisible();
   });
 
-  test('should create a new game as DM', async ({ page }) => {
+  test('should create a new game as GM', async ({ page }) => {
     // Click on Create Game tab
     await page.getByRole('tab', { name: /Create Game/i }).click();
 
     // Fill in game details
     await page.getByLabel(/Game Name/i).fill('Test Adventure');
-    await page.getByPlaceholder('Dungeon Master').fill('Test DM');
+    await page.getByPlaceholder('Game Master').fill('Test GM');
 
     // Create the game
     const createButton = page.getByRole('button', { name: /Create Game/i });
@@ -50,7 +50,7 @@ test.describe('Game Creation Flow', () => {
     // Verify we're in the game canvas view
     await expect(page.getByText(/Test Adventure/i)).toBeVisible({ timeout: 5000 });
 
-    // Check that DM controls are visible (use .first() as Konva creates multiple canvas layers)
+    // Check that GM controls are visible (use .first() as Konva creates multiple canvas layers)
     await expect(page.locator('canvas').first()).toBeVisible();
   });
 
@@ -66,9 +66,9 @@ test.describe('Game Creation Flow', () => {
     await page.getByLabel(/Game Name/i).fill('Test Game');
     await expect(createButton).toBeDisabled();
 
-    // Fill only DM name (clear game name first)
+    // Fill only GM name (clear game name first)
     await page.getByLabel(/Game Name/i).clear();
-    await page.getByPlaceholder('Dungeon Master').fill('Test DM');
+    await page.getByPlaceholder('Game Master').fill('Test GM');
     await expect(createButton).toBeDisabled();
 
     // Fill both fields
@@ -151,7 +151,7 @@ test.describe('Game Canvas - Initial Load', () => {
     // Create game
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Canvas Test');
-    await page.getByPlaceholder('Dungeon Master').fill('DM');
+    await page.getByPlaceholder('Game Master').fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
 
     // Wait for game created screen (P2P room creation)
@@ -175,13 +175,13 @@ test.describe('Game Canvas - Initial Load', () => {
     }
   });
 
-  test('should show DM controls in toolbar', async ({ page }) => {
+  test('should show GM controls in toolbar', async ({ page }) => {
     await page.goto('/');
 
-    // Create game as DM
+    // Create game as GM
     await page.getByRole('tab', { name: /Create Game/i }).click();
-    await page.getByLabel(/Game Name/i).fill('DM Controls Test');
-    await page.getByPlaceholder('Dungeon Master').fill('DM');
+    await page.getByLabel(/Game Name/i).fill('GM Controls Test');
+    await page.getByPlaceholder('Game Master').fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
 
     // Wait for game created screen (P2P room creation)

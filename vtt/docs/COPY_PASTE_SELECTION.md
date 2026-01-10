@@ -40,12 +40,12 @@ The VTT now supports advanced copy/paste functionality and improved element sele
 - ✅ Text elements
 - ✅ Images
 
-### 3. Bulk Operations (DM Only)
+### 3. Bulk Operations (GM Only)
 
-When multiple elements are selected, the DM Tools tab shows bulk action options:
+When multiple elements are selected, the GM Tools tab shows bulk action options:
 
 #### Available Bulk Actions
-- **Set Visibility**: Change visibility for all selected elements (All/DM Only)
+- **Set Visibility**: Change visibility for all selected elements (All/GM Only)
 - **Lock All**: Lock all selected elements to prevent movement
 - **Unlock All**: Unlock all selected elements
 - **Delete All Selected**: Remove all selected elements from canvas
@@ -128,9 +128,9 @@ When multiple elements are selected, the DM Tools tab shows bulk action options:
 
 1. **Bulk Visibility Change**
    - Select 3+ elements
-   - Open DM Tools tab
-   - Set visibility to "DM Only"
-   - **Expected**: All selected elements become DM-only
+   - Open GM Tools tab
+   - Set visibility to "GM Only"
+   - **Expected**: All selected elements become GM-only
 
 2. **Bulk Lock/Unlock**
    - Select multiple elements
@@ -142,7 +142,7 @@ When multiple elements are selected, the DM Tools tab shows bulk action options:
 
 3. **Bulk Delete**
    - Select multiple elements (use selection box)
-   - Click "Delete All Selected" in DM Tools
+   - Click "Delete All Selected" in GM Tools
    - **Expected**: All selected elements removed
 
 ### Test Cut Functionality
@@ -210,6 +210,6 @@ When multiple elements are selected, the DM Tools tab shows bulk action options:
 - Check console for errors
 
 **Bulk actions not available:**
-- Ensure you're logged in as DM
+- Ensure you're logged in as GM
 - Select 2+ elements (single element shows individual properties)
-- Open DM Tools tab in sidebar
+- Open GM Tools tab in sidebar

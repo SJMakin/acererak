@@ -19,9 +19,9 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
-  const { game, myPeerId, isDM, addChatMessage } = useGameStore();
+  const { game, myPeerId, isGM, addChatMessage } = useGameStore();
   const [messageText, setMessageText] = useState('');
-  const [isDMOnly, setIsDMOnly] = useState(false);
+  const [isGMOnly, setIsDMOnly] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Get current player info
@@ -49,7 +49,7 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
       playerColor,
       timestamp: Date.now(),
       content: messageText.trim(),
-      isDMOnly,
+      isGMOnly,
     };
 
     // Add to local state
@@ -98,7 +98,7 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
                   <Text size="xs" fw={600} style={{ color: msg.playerColor }}>
                     {msg.playerName}
                   </Text>
-                  {msg.isDMOnly && (
+                  {msg.isGMOnly && (
                     <Badge size="xs" color="violet" variant="light">
                       Whisper
                     </Badge>
@@ -140,14 +140,14 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
           <Group justify="space-between">
             <Switch
               size="xs"
-              label="Whisper to DM"
-              checked={isDMOnly}
+              label="Whisper to GM"
+              checked={isGMOnly}
               onChange={(e) => setIsDMOnly(e.currentTarget.checked)}
-              disabled={isDM} // DM doesn't need to whisper to themselves
+              disabled={isGM} // GM doesn't need to whisper to themselves
             />
-            {isDM && isDMOnly && (
+            {isGM && isGMOnly && (
               <Text size="xs" c="dimmed">
-                (You are the DM)
+                (You are the GM)
               </Text>
             )}
           </Group>

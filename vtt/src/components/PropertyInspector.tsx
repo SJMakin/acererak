@@ -30,7 +30,7 @@ interface PropertyInspectorProps {
 }
 
 export default function PropertyInspector({ room }: PropertyInspectorProps) {
-  const { game, selectedElementId, isDM, updateElement, deleteElement, selectElement } = useGameStore();
+  const { game, selectedElementId, isGM, updateElement, deleteElement, selectElement } = useGameStore();
 
   // Get selected element
   const selectedElement = game?.elements.find((e) => e.id === selectedElementId);
@@ -69,7 +69,7 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
   };
 
   const handleVisibilityChange = (value: string | null) => {
-    const visibility: Visibility = value === 'all' ? 'all' : 'dm';
+    const visibility: Visibility = value === 'all' ? 'all' : 'gm';
     handleUpdate({ visibleTo: visibility });
   };
 
@@ -162,13 +162,13 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
           <Select
             label="Visibility"
             size="xs"
-            value={selectedElement.visibleTo === 'all' ? 'all' : 'dm'}
+            value={selectedElement.visibleTo === 'all' ? 'all' : 'gm'}
             onChange={handleVisibilityChange}
             data={[
               { value: 'all', label: 'Visible to All' },
-              { value: 'dm', label: 'DM Only' },
+              { value: 'gm', label: 'GM Only' },
             ]}
-            disabled={!isDM}
+            disabled={!isGM}
           />
 
           <Checkbox
@@ -359,7 +359,7 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
               <MarkdownEditor
                 value={(selectedElement as TokenElement).notes || ''}
                 onChange={(val) => handleUpdate({ notes: val })}
-                placeholder="Character backstory, abilities, DM notes..."
+                placeholder="Character backstory, abilities, GM notes..."
                 minRows={3}
                 maxRows={8}
               />
@@ -621,7 +621,7 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
               <MarkdownEditor
                 value={(selectedElement as ImageElement).notes || ''}
                 onChange={(val) => handleUpdate({ notes: val })}
-                placeholder="Map description, room details, DM notes..."
+                placeholder="Map description, room details, GM notes..."
                 minRows={3}
                 maxRows={8}
               />

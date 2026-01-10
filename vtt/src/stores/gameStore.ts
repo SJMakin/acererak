@@ -23,15 +23,15 @@ import { DEFAULT_SETTINGS } from '../types';
 let saveTimeout: NodeJS.Timeout | null = null;
 const SAVE_DEBOUNCE_MS = 1000;
 
-function debouncedSave(game: GameState, isDM: boolean) {
-  if (!isDM) return; // Only save if current user is DM
-  
+function debouncedSave(game: GameState, isGM: boolean) {
+  if (!isGM) return; // Only save if current user is GM
+
   if (saveTimeout) {
     clearTimeout(saveTimeout);
   }
-  
+
   saveTimeout = setTimeout(() => {
-    saveGame(game, isDM).catch((err) => {
+    saveGame(game, isGM).catch((err) => {
       console.error('Failed to save game:', err);
     });
   }, SAVE_DEBOUNCE_MS);
@@ -75,7 +75,7 @@ interface GameStore {
   game: GameState | null;
   isConnected: boolean;
   myPeerId: string | null;
-  isDM: boolean;
+  isGM: boolean;
 
   // UI state
   selectedTool: ToolType;
@@ -93,7 +93,7 @@ interface GameStore {
   // Settings state
   settings: Settings;
 
-  // DM Layer visibility and preview mode
+  // GM Layer visibility and preview mode
   layerVisibility: LayerVisibility;
   previewAsPlayer: boolean;
 
@@ -183,7 +183,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   game: null,
   isConnected: false,
   myPeerId: null,
-  isDM: false,
+  isGM: false,
   selectedTool: 'select',
   selectedElementId: null,
   selectedElementIds: [],
@@ -229,13 +229,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
           id: peerId,
           name: playerName,
           color: '#7c3aed',
-          isDM: true,
+          isGM: true,
           controlledTokens: [],
         },
       },
-      dmPeerId: peerId,
+      gmPeerId: peerId,
     };
-    set({ game, myPeerId: peerId, isDM: true });
+    set({ game, myPeerId: peerId, isGM: true });
     debouncedSave(game, true);
   },
 
@@ -273,7 +273,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: [...state.game.elements, element],
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
       };
@@ -309,7 +309,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           updatedAt: new Date().toISOString(),
         };
 
-        debouncedSave(updatedGame, state.isDM);
+        debouncedSave(updatedGame, state.isGM);
         return { game: updatedGame };
       } else {
         // Add new element with existing ID (P2P sync case)
@@ -321,7 +321,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           updatedAt: new Date().toISOString(),
         };
 
-        debouncedSave(updatedGame, state.isDM);
+        debouncedSave(updatedGame, state.isGM);
         return { game: updatedGame };
       }
     });
@@ -362,7 +362,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ),
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
       };
@@ -402,7 +402,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }),
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
       };
@@ -432,7 +432,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: state.game.elements.filter((el) => el.id !== id),
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
         selectedElementId:
@@ -493,7 +493,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: [...state.game.elements, ...newElements],
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
     });
     return ids;
@@ -519,7 +519,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: state.game.elements.filter((el) => !ids.includes(el.id)),
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
         selectedElementId: ids.includes(state.selectedElementId || '') ? null : state.selectedElementId,
@@ -907,7 +907,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         campaignNotes: [...campaignNotes, note],
         updatedAt: now,
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
     });
 
@@ -926,7 +926,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ),
         updatedAt: now,
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
     });
   },
@@ -940,7 +940,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         campaignNotes: campaignNotes.filter((note) => note.id !== id),
         updatedAt: new Date().toISOString(),
       };
-      debouncedSave(updatedGame, state.isDM);
+      debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
     });
   },

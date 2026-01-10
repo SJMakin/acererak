@@ -6,7 +6,7 @@ test.describe('Combat Tracker', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Combat Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -18,7 +18,7 @@ test.describe('Combat Tracker', () => {
     const tabs = page.locator('[role="tab"]');
     
     // There might be a combat or initiative tab
-    // Or combat controls might be in DM Tools or separate section
+    // Or combat controls might be in GM Tools or separate section
     await page.waitForTimeout(1000);
   });
 
@@ -33,7 +33,7 @@ test.describe('Combat Tracker', () => {
     await page.waitForTimeout(1000);
   });
 
-  test('should start combat as DM', async ({ page }) => {
+  test('should start combat as GM', async ({ page }) => {
     // Look for Start Combat button
     const startButton = page.getByRole('button', { name: /Start Combat/i });
     
@@ -332,7 +332,7 @@ test.describe('Combat Tracker - Integration', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Full Combat Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -358,13 +358,13 @@ test.describe('Combat Tracker - Integration', () => {
     await page.waitForTimeout(1000);
   });
 
-  test('should only allow DM to control combat', async ({ page }) => {
-    // As DM, all combat controls should be available
+  test('should only allow GM to control combat', async ({ page }) => {
+    // As GM, all combat controls should be available
     // Start Combat button should be visible
     
     const startButton = page.getByRole('button', { name: /Start Combat/i });
     
-    // DM should see combat controls
+    // GM should see combat controls
     await page.waitForTimeout(1000);
   });
 

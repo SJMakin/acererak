@@ -8,7 +8,7 @@ import Lobby from './components/Lobby';
 import GameCanvas from './components/GameCanvas';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
-import DMDisconnectModal from './components/DMDisconnectModal';
+import GMDisconnectModal from './components/GMDisconnectModal';
 
 function App() {
   const { game, performUndo, performRedo, selectElement, selectedElementId } = useGameStore();
@@ -48,7 +48,7 @@ function App() {
     });
   }, []);
 
-  // Periodically broadcast state hash for desync detection (DM only)
+  // Periodically broadcast state hash for desync detection (GM only)
   useEffect(() => {
     if (!room.isHost || room.peers.length === 0) return;
 
@@ -96,9 +96,9 @@ function App() {
         <Sidebar room={room} />
       </AppShell.Aside>
 
-      {/* DM Disconnect Modal - only show for non-DM players */}
-      <DMDisconnectModal
-        opened={room.dmDisconnected && !room.isHost}
+      {/* GM Disconnect Modal - only show for non-GM players */}
+      <GMDisconnectModal
+        opened={room.gmDisconnected && !room.isHost}
         onLeaveGame={room.leaveRoom}
       />
     </AppShell>

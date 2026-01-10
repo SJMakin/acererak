@@ -6,7 +6,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 **Architecture Principles:**
 1. **No server** - All data flows peer-to-peer via WebRTC
-2. **DM authority** - DM's browser is source of truth (no CRDTs needed)
+2. **GM authority** - GM's browser is source of truth (no CRDTs needed)
 3. **URL-based assets** - Images via external URLs (no file hosting)
 4. **Client-side storage** - IndexedDB for persistence, JSON for export
 5. **Minimal dependencies** - Keep bundle small for fast P2P sync
@@ -29,14 +29,14 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Player cursors and ping visualization
 - [x] Join/leave notifications
 - [x] Enhanced connection state indicator (connected/syncing/disconnected/error)
-- [x] DM disconnect detection with warning modal (`DMDisconnectModal` component)
+- [x] GM disconnect detection with warning modal (`GMDisconnectModal` component)
 - [x] Desync detection via djb2 state hash comparison
 - [x] "Request Full Sync" recovery for desynced players
 - [x] Element versioning (`version` field) for conflict resolution
-- [x] DM-only action enforcement (FOW updates, grid settings)
+- [x] GM-only action enforcement (FOW updates, grid settings)
 - [x] Grid settings P2P broadcast (`gridUpd` action)
 - [x] In-game chat system (`ChatPanel` component)
-- [x] Whisper messages (DM-only visibility flag)
+- [x] Whisper messages (GM-only visibility flag)
 
 ### Canvas & Tools
 - [x] Grid rendering (square, hex, gridless with configurable size/color/opacity)
@@ -55,7 +55,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] HP bar visualization
 - [x] AC badge display
 - [x] Condition badges
-- [x] DM-only visibility option
+- [x] GM-only visibility option
 - [x] Current turn indicator (combat)
 
 ### Combat Tracker
@@ -76,14 +76,14 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 ### Property Inspector
 - [x] Position editing (X, Y)
 - [x] Z-index controls (bring forward/send backward)
-- [x] Visibility toggle (all/DM only)
+- [x] Visibility toggle (all/GM only)
 - [x] Lock toggle
 - [x] Token properties (name, HP, AC, size, conditions, notes)
 - [x] Shape properties (stroke color, fill color, stroke width)
 - [x] Text properties (font, size, color, alignment, background)
 
 ### Persistence & Data Management
-- [x] Auto-save to IndexedDB (DM only)
+- [x] Auto-save to IndexedDB (GM only)
 - [x] Recent games list in lobby
 - [x] Export/Import with selective categories (v2 format)
 - [x] Merge vs replace import modes
@@ -98,7 +98,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Copy/paste elements
 - [x] Keyboard shortcuts
 - [x] Settings modal (grid, tokens, preferences)
-- [x] Preview as player mode (DM)
+- [x] Preview as player mode (GM)
 - [x] Layer visibility controls (toggle grid, map, tokens, drawings, text, fog)
 - [x] Marquee/box selection (multi-select)
 - [x] Shift+click to add to selection
@@ -108,14 +108,14 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 ## Phase 3: P2P Reliability & State Sync ✅ COMPLETED
 
-**Summary:** Implemented robust P2P state synchronization with DM authority model.
+**Summary:** Implemented robust P2P state synchronization with GM authority model.
 
 **Key Deliverables:**
 - Connection state machine (connected/syncing/disconnected/error)
-- DM disconnect detection with player notification
+- GM disconnect detection with player notification
 - State hash comparison for desync detection + recovery
 - Element versioning for conflict resolution
-- DM-only action enforcement
+- GM-only action enforcement
 - Grid settings broadcast
 - In-game chat with whispers
 
@@ -141,7 +141,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 **Fix:**
 - After `performUndo`/`performRedo`, call `broadcastSync()` to push full state
 - Simple approach since undo can affect multiple elements at once
-- Only DM has undo authority, so DM-side broadcast is sufficient
+- Only GM has undo authority, so GM-side broadcast is sufficient
 
 **Files to modify:**
 - `src/App.tsx` - Add `room.broadcastSync()` after `performUndo`/`performRedo`
@@ -201,7 +201,7 @@ useAnimationFrame(() => {
 
 The following items from original Phase 3.5 planning were dropped or deferred:
 
-- **Player State Persistence** - DROPPED: Already auto-saves for both DM and players via IndexedDB
+- **Player State Persistence** - DROPPED: Already auto-saves for both GM and players via IndexedDB
 - **Retry Logic for Failed Broadcasts** - DEFERRED: Hash comparison + "Request Full Sync" already provides recovery mechanism
 - **Delta Optimization** - DROPPED: Over-complicated for minimal gain; full element broadcasts are acceptable
 - **Import/Export Peer Sync** - ALREADY FIXED: `ExportImportModal.tsx` already calls `room.broadcastSync()` after import (line 607-608)
@@ -252,7 +252,7 @@ The following items from original Phase 3.5 planning were dropped or deferred:
 ### Dice Roller
 - [ ] Save favorite formulas
 - [ ] Roll macros (save full roll sequences)
-- [ ] Secret rolls (DM only)
+- [ ] Secret rolls (GM only)
 - [ ] Target number highlighting
 
 ---
@@ -346,7 +346,7 @@ These features don't fit the decentralized design:
 | v1.3.0 | Export/Import | Selective export, merge/replace modes, v2 format |
 | v1.4.0 | Canvas | Hex/gridless, AOE templates, multi-select operations |
 | v1.5.0 | Measurement | Waypoint paths, difficult terrain modifier |
-| v1.6.0 | P2P Reliability | Connection status, DM disconnect, desync detection, element versioning, chat |
+| v1.6.0 | P2P Reliability | Connection status, GM disconnect, desync detection, element versioning, chat |
 | v1.7.0 | P2P Polish | Undo/redo sync, clipboard sync, cursor throttling/interpolation |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 

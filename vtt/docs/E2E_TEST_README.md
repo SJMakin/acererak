@@ -61,7 +61,7 @@ npx playwright test tests/e2e/game-creation.spec.ts
 
 ### Run a specific test by name
 ```bash
-npx playwright test --grep "should create a new game as DM"
+npx playwright test --grep "should create a new game as GM"
 ```
 
 ### Run tests matching a pattern

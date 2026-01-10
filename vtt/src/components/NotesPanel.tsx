@@ -42,7 +42,7 @@ function NotesEditModal({ note, opened, onClose, onSave }: NotesEditModalProps) 
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [category, setCategory] = useState(note?.category || 'other');
-  const [visibility, setVisibility] = useState<Visibility>(note?.visibleTo || 'dm');
+  const [visibility, setVisibility] = useState<Visibility>(note?.visibleTo || 'gm');
   
   // Reset form when modal opens with new note
   useEffect(() => {
@@ -50,7 +50,7 @@ function NotesEditModal({ note, opened, onClose, onSave }: NotesEditModalProps) 
       setTitle(note?.title || '');
       setContent(note?.content || '');
       setCategory(note?.category || 'other');
-      setVisibility(note?.visibleTo || 'dm');
+      setVisibility(note?.visibleTo || 'gm');
     }
   }, [opened, note]);
 
@@ -90,10 +90,10 @@ function NotesEditModal({ note, opened, onClose, onSave }: NotesEditModalProps) 
           />
           <Select
             label="Visibility"
-            value={visibility === 'all' ? 'all' : 'dm'}
-            onChange={(val) => setVisibility(val === 'all' ? 'all' : 'dm')}
+            value={visibility === 'all' ? 'all' : 'gm'}
+            onChange={(val) => setVisibility(val === 'all' ? 'all' : 'gm')}
             data={[
-              { value: 'dm', label: '🔒 DM Only' },
+              { value: 'gm', label: '🔒 GM Only' },
               { value: 'all', label: '👁️ Visible to All' },
             ]}
           />
@@ -122,7 +122,7 @@ function NotesEditModal({ note, opened, onClose, onSave }: NotesEditModalProps) 
 }
 
 export default function NotesPanel() {
-  const { game, isDM, addCampaignNote, updateCampaignNote, deleteCampaignNote } = useGameStore();
+  const { game, isGM, addCampaignNote, updateCampaignNote, deleteCampaignNote } = useGameStore();
 
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [editingNote, setEditingNote] = useState<CampaignNote | null>(null);
@@ -134,8 +134,8 @@ export default function NotesPanel() {
 
   // Filter notes based on visibility, category, and search
   const filteredNotes = notes.filter((note) => {
-    // Visibility filter: non-DMs only see 'all' notes
-    if (!isDM && note.visibleTo !== 'all') return false;
+    // Visibility filter: non-GMs only see 'all' notes
+    if (!isGM && note.visibleTo !== 'all') return false;
     
     // Category filter
     if (filterCategory && note.category !== filterCategory) return false;
@@ -194,7 +194,7 @@ export default function NotesPanel() {
       {/* Header Actions */}
       <Paper p="xs" withBorder>
         <Stack gap="xs">
-          {isDM && (
+          {isGM && (
             <Button size="xs" onClick={handleNewNote} fullWidth>
               ➕ New Note
             </Button>
@@ -230,7 +230,7 @@ export default function NotesPanel() {
               <Button size="xs" variant="subtle" onClick={() => setSelectedNoteId(null)}>
                 ← Back to list
               </Button>
-              {isDM && (
+              {isGM && (
                 <Group gap="xs">
                   <ActionIcon
                     size="sm"
@@ -259,8 +259,8 @@ export default function NotesPanel() {
               <Badge size="sm" color="violet">
                 {getCategoryIcon(selectedNote.category)} {getCategoryLabel(selectedNote.category)}
               </Badge>
-              {selectedNote.visibleTo === 'dm' && (
-                <Badge size="sm" color="orange">🔒 DM Only</Badge>
+              {selectedNote.visibleTo === 'gm' && (
+                <Badge size="sm" color="orange">🔒 GM Only</Badge>
               )}
             </Group>
 
@@ -316,10 +316,10 @@ export default function NotesPanel() {
                       </Text>
                     </Box>
                     <Group gap={4}>
-                      {note.visibleTo === 'dm' && isDM && (
+                      {note.visibleTo === 'gm' && isGM && (
                         <Badge size="xs" color="orange">🔒</Badge>
                       )}
-                      {isDM && (
+                      {isGM && (
                         <>
                           <ActionIcon
                             size="xs"

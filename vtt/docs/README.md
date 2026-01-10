@@ -5,7 +5,7 @@ A peer-to-peer virtual tabletop for TTRPGs built with React, Konva.js, and Tryst
 ## 🎯 Project Vision
 
 Create a fully client-side, decentralized VTT where:
-- The DM's browser is the source of truth
+- The GM's browser is the source of truth
 - Game state syncs in real-time via P2P connections
 - No backend stores or routes any game data
 - Players can join via QR codes or room IDs
@@ -19,7 +19,7 @@ This is intended to eventually integrate with the main Acererak app (the choose-
 
 ```
 ┌─────────────────────────────────────────────┐
-│           DM's Browser (Authority)          │
+│           GM's Browser (Authority)          │
 │  ┌─────────────┐         ┌───────────────┐  │
 │  │ Game State  │◄────────┤ Trystero Room │  │
 │  │ (IndexedDB) │         │  (BitTorrent) │  │
@@ -47,11 +47,11 @@ This is intended to eventually integrate with the main Acererak app (the choose-
 
 ### Data Flow
 
-1. DM creates game → generates unique room ID → creates Trystero room
+1. GM creates game → generates unique room ID → creates Trystero room
 2. Players scan QR or enter room ID → join Trystero room
 3. Peers exchange SDP/ICE via BitTorrent DHT
 4. WebRTC data channels established
-5. DM broadcasts game state → peers receive and sync
+5. GM broadcasts game state → peers receive and sync
 6. All changes broadcast via P2P (no centralized state)
 
 ### Action Name Constraints
@@ -75,7 +75,7 @@ vtt/
 │   │   ├── Lobby.tsx              # Create/join game UI with QR codes
 │   │   ├── GameCanvas.tsx         # Main Konva canvas (grid, tokens, drawing)
 │   │   ├── Toolbar.tsx            # Tool selection bar (all drawing/interaction tools)
-│   │   ├── Sidebar.tsx            # Token list, player list, DM tools
+│   │   ├── Sidebar.tsx            # Token list, player list, GM tools
 │   │   ├── TokenConfigModal.tsx   # Token placement configuration UI
 │   │   ├── CombatTracker.tsx      # Initiative and turn tracking
 │   │   ├── DiceRoller.tsx         # Dice rolling interface
@@ -107,7 +107,7 @@ vtt/
 ## 🎨 Core Features Implemented
 
 ### ✅ Lobby & Connection
-- Create game as DM
+- Create game as GM
 - Generate QR code for room ID
 - Join game as player (via QR or manual ID)
 - Real-time connection status
@@ -133,7 +133,7 @@ vtt/
 - Drag to move (with snap-to-grid)
 - Token properties: name, HP, AC, image URL, size
 - HP bar visualization
-- DM-only visibility option
+- GM-only visibility option
 - Custom emoji/text display
 
 ### ✅ Fog of War
@@ -142,7 +142,7 @@ vtt/
 - Hide Tool - Click and drag to hide areas
 - Polygon-based reveal/hide logic
 - Real-time sync across all players
-- Toggle fog visibility (DM can see through)
+- Toggle fog visibility (GM can see through)
 
 ### ✅ Interaction Tools
 - **Ping Tool** (📍) - ✅ Fully working with animated visual indicators
@@ -168,8 +168,8 @@ vtt/
 - Roll history
 - Sidebar integration
 
-### ✅ DM Controls
-- Mark elements as DM-only or visible to all
+### ✅ GM Controls
+- Mark elements as GM-only or visible to all
 - Lock/unlock elements
 - Delete elements
 - Fog of War reveal/hide tools
@@ -189,7 +189,7 @@ vtt/
 - Markdown notes on map images
 - Campaign Journal for standalone notes
 - Note categories (Session, NPC, Location, Lore, Plot, etc.)
-- DM-only or public visibility
+- GM-only or public visibility
 - Search and filter notes
 - Simple markdown editor with syntax hints
 
@@ -231,7 +231,7 @@ All canvas objects inherit from `BaseElement`:
 Each has:
 - Position (x, y)
 - Layer (`map`, `gm`, `token`, `drawing`)
-- Visibility (`all`, `dm`, or specific peer IDs)
+- Visibility (`all`, `gm`, or specific peer IDs)
 - Z-index for layering
 - Locked state
 
@@ -263,7 +263,7 @@ Fog of War uses polygon-based reveal/hide:
 - **Hide Tool**: Creates polygon areas to hide again
 - Stored as array of polygon points in game state
 - Players see black overlay except in revealed areas
-- DM can toggle fog visibility to see full map
+- GM can toggle fog visibility to see full map
 
 ### Combat Tracker
 
@@ -306,7 +306,7 @@ db.games.add({
 
 Canvas layers consolidated to 4 (optimized from 6):
 - **Background Layer**: Grid and background color
-- **Map Layer**: Map images and DM-only elements
+- **Map Layer**: Map images and GM-only elements
 - **Drawing Layer**: All shapes, tokens, text combined
 - **UI Layer**: Current drawing preview, fog of war overlay
 
@@ -375,7 +375,7 @@ Outputs to `dist/`
 
 ## 🎮 Usage
 
-### As DM:
+### As GM:
 1. Click "Create Game"
 2. Enter game name and your name
 3. Share the QR code or room ID with players
@@ -395,7 +395,7 @@ Outputs to `dist/`
 3. Enter your name and pick a color
 4. Click "Join Game"
 5. View shared canvas, see fog of war, participate in combat tracker
-6. Limited editing based on DM permissions
+6. Limited editing based on GM permissions
 
 ## 📦 Dependencies
 

@@ -40,7 +40,7 @@ A complete dice rolling system has been implemented for the VTT with the followi
 ### 5. Sidebar Integration
 - **Component**: [`vtt/src/components/Sidebar.tsx`](vtt/src/components/Sidebar.tsx:143)
 - New "Dice" tab added to sidebar
-- Available to all players (not just DM)
+- Available to all players (not just GM)
 
 ### 6. P2P Broadcasting
 - **Hook**: [`vtt/src/hooks/useRoom.ts`](vtt/src/hooks/useRoom.ts:283)
@@ -134,5 +134,5 @@ Current implementation includes a placeholder div ready for 3D rendering integra
 3. **Roll Macros**: Create custom roll buttons with saved formulas
 4. **Dice Colors**: Allow players to customize their dice appearance
 5. **Roll Statistics**: Track and display roll statistics over time
-6. **Private Rolls**: Allow DM to make hidden rolls
+6. **Private Rolls**: Allow GM to make hidden rolls
 7. **Roll Replay**: Ability to re-roll with the same formula

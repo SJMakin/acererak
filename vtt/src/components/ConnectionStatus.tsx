@@ -7,7 +7,7 @@ interface ConnectionStatusProps {
   peers: string[];
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
   lastSyncedAt: number | null;
-  dmDisconnected: boolean;
+  gmDisconnected: boolean;
   isHost: boolean;
   isDesynced?: boolean;
   onRequestSync?: () => void;
@@ -28,12 +28,12 @@ export default function ConnectionStatus({
   peers,
   connectionState,
   lastSyncedAt,
-  dmDisconnected,
+  gmDisconnected,
   isHost,
   isDesynced,
   onRequestSync,
 }: ConnectionStatusProps) {
-  const { isDM } = useGameStore();
+  const { isGM } = useGameStore();
 
   if (!roomId) return null;
 
@@ -63,23 +63,23 @@ export default function ConnectionStatus({
         position="bottom"
       >
         <Badge
-          color={dmDisconnected ? 'red' : config.color}
-          variant={dmDisconnected ? 'filled' : 'light'}
+          color={gmDisconnected ? 'red' : config.color}
+          variant={gmDisconnected ? 'filled' : 'light'}
           leftSection={
             connectionState === 'syncing' || connectionState === 'connecting' ? (
               <Loader size={10} color="white" />
             ) : null
           }
         >
-          {dmDisconnected ? 'DM Disconnected' : config.label}
+          {gmDisconnected ? 'GM Disconnected' : config.label}
         </Badge>
       </Tooltip>
 
-      {/* DM indicator */}
-      {isDM && (
-        <Tooltip label="You are the DM" position="bottom">
+      {/* GM indicator */}
+      {isGM && (
+        <Tooltip label="You are the GM" position="bottom">
           <Badge color="violet" variant="light" leftSection={<IconCrown size={12} />}>
-            DM
+            GM
           </Badge>
         </Tooltip>
       )}
@@ -107,9 +107,9 @@ export default function ConnectionStatus({
         </Tooltip>
       )}
 
-      {/* Resync button for non-DM players */}
+      {/* Resync button for non-GM players */}
       {!isHost && onRequestSync && connectionState === 'connected' && !isDesynced && (
-        <Tooltip label="Request full sync from DM" position="bottom">
+        <Tooltip label="Request full sync from GM" position="bottom">
           <ActionIcon
             variant="subtle"
             size="sm"

@@ -60,10 +60,10 @@ async function testBrowser(browserType, name) {
         await gameNameInput.fill('Test Game');
         console.log('✓ Filled game name');
 
-        const dmNameInput = page.getByPlaceholder('Dungeon Master');
-        if (await dmNameInput.isVisible().catch(() => false)) {
-          await dmNameInput.fill('Test DM');
-          console.log('✓ Filled DM name');
+        const gmNameInput = page.getByPlaceholder('Game Master');
+        if (await gmNameInput.isVisible().catch(() => false)) {
+          await gmNameInput.fill('Test GM');
+          console.log('✓ Filled GM name');
         }
 
         const createButton = page.getByRole('button', { name: /Create Game/i });

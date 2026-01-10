@@ -51,10 +51,11 @@ interface ToolbarProps {
     isHost: boolean;
     connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
     lastSyncedAt: number | null;
-    dmDisconnected: boolean;
+    gmDisconnected: boolean;
     isDesynced: boolean;
     leaveRoom: () => void;
     requestFullSync: () => void;
+    broadcastSync: () => void;
     broadcastGridSettings: (settings: Partial<import('../types').GridSettings>) => void;
   };
 }
@@ -103,7 +104,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     game,
     selectedTool,
     setTool,
-    isDM,
+    isGM,
     viewportScale,
     setViewport,
     viewportOffset,
@@ -144,7 +145,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
           </Text>
           
           {/* Preview Mode Indicator */}
-          {isDM && previewAsPlayer && (
+          {isGM && previewAsPlayer && (
             <Badge
               color="violet"
               variant="filled"
@@ -311,8 +312,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
             </Menu.Dropdown>
           </Menu>
 
-          {/* DM-only tools */}
-          {isDM && (
+          {/* GM-only tools */}
+          {isGM && (
             <>
               <Divider orientation="vertical" />
               {dmTools.map((tool) => (
@@ -477,7 +478,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
           peers={room.peers}
           connectionState={room.connectionState}
           lastSyncedAt={room.lastSyncedAt}
-          dmDisconnected={room.dmDisconnected}
+          gmDisconnected={room.gmDisconnected}
           isHost={room.isHost}
           isDesynced={room.isDesynced}
           onRequestSync={room.requestFullSync}

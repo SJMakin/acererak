@@ -23,7 +23,7 @@ interface CombatTrackerProps {
 export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps) {
   const {
     game,
-    isDM,
+    isGM,
     startCombat,
     endCombat,
     addCombatant,
@@ -125,7 +125,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
         <Text size="sm" c="dimmed" ta="center">
           No combat active
         </Text>
-        {isDM && (
+        {isGM && (
           <Button onClick={handleStartCombat} variant="light">
             Start Combat
           </Button>
@@ -140,7 +140,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
         <Text size="sm" c="dimmed" ta="center">
           Combat has ended
         </Text>
-        {isDM && (
+        {isGM && (
           <Button onClick={handleStartCombat} variant="light">
             Start New Combat
           </Button>
@@ -157,7 +157,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
       <Paper p="sm" withBorder>
         <Group justify="space-between" mb="xs">
           <Text size="lg" fw={700}>Round {combat.round}</Text>
-          {isDM && (
+          {isGM && (
             <Button size="xs" color="red" variant="light" onClick={handleEndCombat}>
               End Combat
             </Button>
@@ -172,7 +172,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
           </Paper>
         )}
 
-        {isDM && combat.combatants.length > 0 && (
+        {isGM && combat.combatants.length > 0 && (
           <Group mt="sm" gap="xs">
             <Button size="xs" onClick={handlePreviousTurn} variant="light">
               ← Previous
@@ -184,8 +184,8 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
         )}
       </Paper>
 
-      {/* Add Combatant (DM only) */}
-      {isDM && (
+      {/* Add Combatant (GM only) */}
+      {isGM && (
         <Paper p="sm" withBorder>
           <Text size="sm" fw={500} mb="xs">Add Combatant</Text>
           <Stack gap="xs">
@@ -256,7 +256,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                         <Badge size="xs" color="violet">Active</Badge>
                       )}
                     </Group>
-                    {isDM && (
+                    {isGM && (
                       <ActionIcon
                         size="xs"
                         color="red"
@@ -273,7 +273,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                     <Text size="xs" c="dimmed" style={{ minWidth: 50 }}>
                       HP: {combatant.hp.current}/{combatant.hp.max}
                     </Text>
-                    {isDM && (
+                    {isGM && (
                       <Group gap={4} style={{ flex: 1 }}>
                         <ActionIcon
                           size="xs"
@@ -328,7 +328,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                           size="xs"
                           color="orange"
                           rightSection={
-                            isDM ? (
+                            isGM ? (
                               <ActionIcon
                                 size="xs"
                                 variant="transparent"
@@ -345,8 +345,8 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                     </Group>
                   )}
 
-                  {/* Add Condition (DM only) */}
-                  {isDM && (
+                  {/* Add Condition (GM only) */}
+                  {isGM && (
                     <Group gap={4}>
                       <TextInput
                         placeholder="Add condition"

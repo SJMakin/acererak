@@ -95,10 +95,10 @@ interface RoomState {
   connectionState: 'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error';
   error: string | null;
   lastSyncedAt: number | null;
-  dmPeerId: string | null;
-  dmDisconnected: boolean;
+  gmPeerId: string | null;
+  gmDisconnected: boolean;
   localHash: string | null;
-  dmHash: string | null;
+  gmHash: string | null;
   isDesynced: boolean;
 }
 
@@ -113,10 +113,10 @@ export function useRoom() {
     connectionState: 'disconnected',
     error: null,
     lastSyncedAt: null,
-    dmPeerId: null,
-    dmDisconnected: false,
+    gmPeerId: null,
+    gmDisconnected: false,
     localHash: null,
-    dmHash: null,
+    gmHash: null,
     isDesynced: false,
   });
 
@@ -157,7 +157,7 @@ export function useRoom() {
     updateGridSettings: state.updateGridSettings,
   }));
 
-  // Create a new room (as DM/host)
+  // Create a new room (as GM/host)
   const createRoom = useCallback((roomId: string): string => {
     setRoomState(prev => ({
       ...prev,
@@ -165,8 +165,8 @@ export function useRoom() {
       isHost: true,
       connectionState: 'connecting',
       error: null,
-      dmPeerId: myPeerId,
-      dmDisconnected: false,
+      gmPeerId: myPeerId,
+      gmDisconnected: false,
     }));
 
     // Start async loading
@@ -248,7 +248,7 @@ export function useRoom() {
               id: newPeerId,
               name: playerName,
               color: playerColor,
-              isDM: false,
+              isGM: false,
               controlledTokens: [],
             });
           }
@@ -322,21 +322,21 @@ export function useRoom() {
     room.onPeerLeave((peerId: string) => {
       console.log('Peer left:', peerId);
 
-      // Check if the DM disconnected
+      // Check if the GM disconnected
       const game = useGameStore.getState().game;
-      const dmPeerId = game?.dmPeerId;
-      const isDMLeaving = dmPeerId && peerId === dmPeerId;
+      const gmPeerId = game?.gmPeerId;
+      const isGMLeaving = gmPeerId && peerId === gmPeerId;
 
       setRoomState((prev) => ({
         ...prev,
         peers: prev.peers.filter((p) => p !== peerId),
-        dmDisconnected: isDMLeaving ? true : prev.dmDisconnected,
+        gmDisconnected: isGMLeaving ? true : prev.gmDisconnected,
       }));
 
-      if (isDMLeaving) {
+      if (isGMLeaving) {
         notifications.show({
-          title: 'DM Disconnected',
-          message: 'The DM has left the game. The session is paused.',
+          title: 'GM Disconnected',
+          message: 'The GM has left the game. The session is paused.',
           color: 'red',
           autoClose: false,
         });
@@ -349,11 +349,11 @@ export function useRoom() {
     onSync((gameState: GameState, peerId: string) => {
       console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
-      // Track sync time and DM peer ID
+      // Track sync time and GM peer ID
       setRoomState(prev => ({
         ...prev,
         lastSyncedAt: Date.now(),
-        dmPeerId: gameState.dmPeerId || peerId,
+        gmPeerId: gameState.gmPeerId || peerId,
         connectionState: 'connected',
       }));
       console.log('Game loaded, should now show canvas');
@@ -414,13 +414,13 @@ export function useRoom() {
     onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, peerId: string) => {
       console.log('Received fog update from:', peerId);
 
-      // Verify the update is from the DM (host) - enforce DM-only action
+      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
 
-      const dmPeerId = currentGame.dmPeerId;
-      if (dmPeerId && peerId !== dmPeerId && !isHost) {
-        console.warn('Ignoring fog update from non-DM peer:', peerId);
+      const gmPeerId = currentGame.gmPeerId;
+      if (gmPeerId && peerId !== gmPeerId && !isHost) {
+        console.warn('Ignoring fog update from non-GM peer:', peerId);
         return;
       }
 
@@ -453,37 +453,37 @@ export function useRoom() {
       });
     });
 
-    // Handle state hash for desync detection (DM broadcasts, players compare)
-    onStateHash((dmHash: string, _peerId: string) => {
+    // Handle state hash for desync detection (GM broadcasts, players compare)
+    onStateHash((gmHash: string, _peerId: string) => {
       const currentGame = useGameStore.getState().game;
-      if (!currentGame || isHost) return; // DM doesn't need to check against itself
+      if (!currentGame || isHost) return; // GM doesn't need to check against itself
 
       const localHash = hashGameState(currentGame);
-      const isDesynced = localHash !== dmHash;
+      const isDesynced = localHash !== gmHash;
 
       setRoomState(prev => ({
         ...prev,
         localHash,
-        dmHash,
+        gmHash,
         isDesynced,
       }));
 
       if (isDesynced) {
-        console.warn('State desync detected! Local:', localHash, 'DM:', dmHash);
+        console.warn('State desync detected! Local:', localHash, 'GM:', gmHash);
       }
     });
 
-    // Handle grid settings update (DM only can broadcast)
+    // Handle grid settings update (GM only can broadcast)
     onGridUpdate((gridSettings: Partial<GridSettings>, peerId: string) => {
       console.log('Received grid update from:', peerId);
 
-      // Verify the update is from the DM (host) - enforce DM-only action
+      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
 
-      const dmPeerId = currentGame.dmPeerId;
-      if (dmPeerId && peerId !== dmPeerId && !isHost) {
-        console.warn('Ignoring grid update from non-DM peer:', peerId);
+      const gmPeerId = currentGame.gmPeerId;
+      if (gmPeerId && peerId !== gmPeerId && !isHost) {
+        console.warn('Ignoring grid update from non-GM peer:', peerId);
         return;
       }
 
@@ -495,16 +495,16 @@ export function useRoom() {
     onChat((chatMessage: ChatMessage, peerId: string) => {
       console.log('Received chat message from:', peerId);
 
-      // Check if DM-only message should be visible
+      // Check if GM-only message should be visible
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
 
-      // If message is DM-only, only DM should see it (or the sender)
-      if (chatMessage.isDMOnly) {
-        const isDM = currentGame.dmPeerId === useGameStore.getState().myPeerId;
+      // If message is GM-only, only GM should see it (or the sender)
+      if (chatMessage.isGMOnly) {
+        const isGM = currentGame.gmPeerId === useGameStore.getState().myPeerId;
         const isSender = chatMessage.playerId === useGameStore.getState().myPeerId;
-        if (!isDM && !isSender) {
-          // Non-DM players shouldn't see DM-only messages (unless they sent it)
+        if (!isGM && !isSender) {
+          // Non-GM players shouldn't see GM-only messages (unless they sent it)
           return;
         }
       }
@@ -556,7 +556,7 @@ export function useRoom() {
     }
   }, []);
 
-  // Request a full sync from the DM
+  // Request a full sync from the GM
   const requestFullSync = useCallback(() => {
     if (actionsRef.current.sendRequestSync) {
       setRoomState(prev => ({
@@ -568,7 +568,7 @@ export function useRoom() {
     }
   }, []);
 
-  // Broadcast state hash (DM only) for desync detection
+  // Broadcast state hash (GM only) for desync detection
   const broadcastStateHash = useCallback(() => {
     const currentGame = useGameStore.getState().game;
     if (actionsRef.current.sendStateHash && currentGame && roomState.isHost) {
@@ -577,7 +577,7 @@ export function useRoom() {
     }
   }, [roomState.isHost]);
 
-  // Broadcast grid settings (DM only)
+  // Broadcast grid settings (GM only)
   const broadcastGridSettings = useCallback((gridSettings: Partial<GridSettings>) => {
     if (actionsRef.current.sendGridUpdate && roomState.isHost) {
       actionsRef.current.sendGridUpdate(gridSettings);
@@ -607,10 +607,10 @@ export function useRoom() {
       connectionState: 'disconnected',
       error: null,
       lastSyncedAt: null,
-      dmPeerId: null,
-      dmDisconnected: false,
+      gmPeerId: null,
+      gmDisconnected: false,
       localHash: null,
-      dmHash: null,
+      gmHash: null,
       isDesynced: false,
     });
     setConnected(false);

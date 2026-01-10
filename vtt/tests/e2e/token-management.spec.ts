@@ -6,7 +6,7 @@ test.describe('Token Management', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Token Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -218,7 +218,7 @@ test.describe('Token Properties', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Properties Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -288,7 +288,7 @@ test.describe('Token Properties', () => {
     }
   });
 
-  test('should display token visibility options for DM', async ({ page }) => {
+  test('should display token visibility options for GM', async ({ page }) => {
     const tokensTab = page.getByRole('tab', { name: /Tokens/i });
     if (await tokensTab.count() > 0) {
       await tokensTab.click();
@@ -305,10 +305,10 @@ test.describe('Token Properties', () => {
         await page.getByText(/Visible Token/i).click();
         await page.waitForTimeout(300);
         
-        // Check DM Tools tab
-        const dmTab = page.getByRole('tab', { name: /DM/i });
-        if (await dmTab.count() > 0) {
-          await dmTab.click();
+        // Check GM Tools tab
+        const gmTab = page.getByRole('tab', { name: /GM/i });
+        if (await gmTab.count() > 0) {
+          await gmTab.click();
           await page.waitForTimeout(300);
           
           // Should see visibility options
@@ -338,10 +338,10 @@ test.describe('Token Properties', () => {
         await page.getByText(/Lockable Token/i).click();
         await page.waitForTimeout(300);
         
-        // Check DM Tools tab for lock checkbox
-        const dmTab = page.getByRole('tab', { name: /DM/i });
-        if (await dmTab.count() > 0) {
-          await dmTab.click();
+        // Check GM Tools tab for lock checkbox
+        const gmTab = page.getByRole('tab', { name: /GM/i });
+        if (await gmTab.count() > 0) {
+          await gmTab.click();
           await page.waitForTimeout(300);
           
           // Look for locked checkbox
@@ -365,7 +365,7 @@ test.describe('Token Movement', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Movement Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();

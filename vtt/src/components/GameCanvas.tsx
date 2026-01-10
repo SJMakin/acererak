@@ -51,7 +51,7 @@ function Token({
   onShiftSelect,
   onDragStart,
   onDragEnd,
-  isDM,
+  isGM,
   showMetadata = true,
 }: {
   element: TokenElement;
@@ -62,7 +62,7 @@ function Token({
   onShiftSelect: () => void;
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
-  isDM: boolean;
+  isGM: boolean;
   showMetadata?: boolean;
 }) {
   const [image] = useImage(element.imageUrl);
@@ -71,7 +71,7 @@ function Token({
 
   // Check visibility
   const visible = element.visibleTo === 'all' ||
-    (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
+    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
 
@@ -317,8 +317,8 @@ function Token({
         </>
       )}
 
-      {/* DM-only indicator */}
-      {element.visibleTo === 'dm' && isDM && (
+      {/* GM-only indicator */}
+      {element.visibleTo === 'gm' && isGM && (
         <Circle
           x={width - 6}
           y={height - 6}
@@ -339,7 +339,7 @@ function MapImage({
   onShiftSelect,
   onDragStart,
   onDragEnd,
-  isDM,
+  isGM,
 }: {
   element: ImageElement;
   isSelected: boolean;
@@ -347,12 +347,12 @@ function MapImage({
   onShiftSelect: () => void;
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
-  isDM: boolean;
+  isGM: boolean;
 }) {
   const [image] = useImage(element.imageUrl);
 
   const visible = element.visibleTo === 'all' ||
-    (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
+    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
 
   if (!visible || !image) return null;
 
@@ -407,7 +407,7 @@ function Shape({
   onShiftSelect,
   onDragStart,
   onDragEnd,
-  isDM,
+  isGM,
 }: {
   element: ShapeElement;
   isSelected: boolean;
@@ -415,10 +415,10 @@ function Shape({
   onShiftSelect: () => void;
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
-  isDM: boolean;
+  isGM: boolean;
 }) {
   const visible = element.visibleTo === 'all' ||
-    (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
+    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
 
@@ -560,7 +560,7 @@ function TextLabel({
   onDragStart,
   onDragEnd,
   onDoubleClick,
-  isDM,
+  isGM,
 }: {
   element: TextElement;
   isSelected: boolean;
@@ -569,10 +569,10 @@ function TextLabel({
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   onDoubleClick: () => void;
-  isDM: boolean;
+  isGM: boolean;
 }) {
   const visible = element.visibleTo === 'all' ||
-    (isDM && (element.visibleTo === 'dm' || Array.isArray(element.visibleTo)));
+    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
 
   if (!visible) return null;
 
@@ -856,7 +856,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     selectedElementIds,
     viewportOffset,
     viewportScale,
-    isDM,
+    isGM,
     myPeerId,
     settings,
     drawingStrokeColor,
@@ -877,8 +877,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     hideFog,
   } = useGameStore();
 
-  // When previewing as player, treat DM as non-DM for visibility purposes
-  const effectiveIsDM = isDM && !previewAsPlayer;
+  // When previewing as player, treat GM as non-GM for visibility purposes
+  const effectiveIsDM = isGM && !previewAsPlayer;
 
   // Clipboard functionality
   const clipboard = useClipboard();
@@ -1979,7 +1979,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
               />
             ))}
           {/* Locked shapes */}
@@ -1994,7 +1994,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
               />
             ))}
           {/* Locked text */}
@@ -2010,7 +2010,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
               />
             ))}
           {/* Locked tokens */}
@@ -2026,13 +2026,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
               />
             ))}
         </Layer>
 
-        {/* Layer 3: Fog of War (listening: false) - Only visible to non-DMs when enabled */}
+        {/* Layer 3: Fog of War (listening: false) - Only visible to non-GMs when enabled */}
         {game.fogOfWar.enabled && layerVisibility.fog && !effectiveIsDM && (
           <Layer listening={false}>
             <KonvaShape
@@ -2083,7 +2083,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
               />
             ))}
           {/* Unlocked text */}
@@ -2099,7 +2099,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
                 onDoubleClick={() => handleTextDoubleClick(el.id)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
               />
             ))}
           {/* Unlocked tokens */}
@@ -2115,7 +2115,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 onShiftSelect={() => toggleElementSelection(el.id)}
                 onDragStart={() => handleElementDragStart(el.id)}
                 onDragEnd={(x, y) => handleElementDragEnd(el.id, x, y)}
-                isDM={effectiveIsDM}
+                isGM={effectiveIsDM}
                 showMetadata={settings.showTokenMetadata}
               />
             ))}

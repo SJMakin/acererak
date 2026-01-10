@@ -10,19 +10,19 @@ This document describes the comprehensive end-to-end test coverage for the Lychg
 
 **Test Coverage:**
 - ✅ Display lobby on initial load
-- ✅ Create a new game as DM
-- ✅ Validate required fields (game name, DM name)
+- ✅ Create a new game as GM
+- ✅ Validate required fields (game name, GM name)
 - ✅ Show recent games tab
 - ✅ Populate join form from URL parameter
 - ✅ Validate join game form
 - ✅ Allow color selection for players
 - ✅ Load game canvas after creation
-- ✅ Show DM controls in toolbar
+- ✅ Show GM controls in toolbar
 
 **Happy Path:**
 1. User opens the VTT
 2. Clicks "Create Game" tab
-3. Enters game name and DM name
+3. Enters game name and GM name
 4. Clicks "Create Game" button
 5. Sees QR code and room ID
 6. Clicks "Start Game"
@@ -69,7 +69,7 @@ This document describes the comprehensive end-to-end test coverage for the Lychg
 - ✅ Show token properties when selected
 - ✅ Edit token properties via Property Inspector
 - ✅ Update token HP
-- ✅ Display token visibility options for DM
+- ✅ Display token visibility options for GM
 - ✅ Lock/unlock token
 - ✅ Move token by dragging on canvas
 - ✅ Snap to grid when snap is enabled
@@ -133,7 +133,7 @@ This document describes the comprehensive end-to-end test coverage for the Lychg
 **Combat Management:**
 - ✅ Show combat tracker in sidebar
 - ✅ Show no combat active initially
-- ✅ Start combat as DM
+- ✅ Start combat as GM
 - ✅ Add combatant to combat
 - ✅ Show initiative order
 - ✅ Advance turn with Next button
@@ -159,19 +159,19 @@ This document describes the comprehensive end-to-end test coverage for the Lychg
 - ✅ Highlight active combatant token on canvas
 - ✅ Update token HP on canvas when changed in combat tracker
 - ✅ Show conditions on token when added in combat tracker
-- ✅ Only allow DM to control combat
+- ✅ Only allow GM to control combat
 - ✅ Complete full combat workflow
 
 **Happy Path:**
-1. DM creates tokens for combat
-2. DM clicks "Start Combat"
-3. DM adds combatants with initiative values
+1. GM creates tokens for combat
+2. GM clicks "Start Combat"
+3. GM adds combatants with initiative values
 4. Combat tracker shows initiative order
-5. DM clicks "Next" to advance turns
+5. GM clicks "Next" to advance turns
 6. Current combatant is highlighted
-7. DM updates HP and adds conditions
+7. GM updates HP and adds conditions
 8. Changes reflect on canvas tokens
-9. DM clicks "End Combat" when done
+9. GM clicks "End Combat" when done
 
 ## Running Tests
 
@@ -214,7 +214,7 @@ npx playwright test tests/e2e/game-creation.spec.ts
 
 ### Run Specific Test
 ```bash
-npx playwright test -g "should create a new game as DM"
+npx playwright test -g "should create a new game as GM"
 ```
 
 ## Test Configuration

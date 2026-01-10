@@ -6,7 +6,7 @@ test.describe('Drawing Tools', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Drawing Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -231,7 +231,7 @@ test.describe('Drawing Style Controls', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Style Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -344,7 +344,7 @@ test.describe('Text Tool', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Text Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
@@ -448,7 +448,7 @@ test.describe('Shape Selection and Manipulation', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: /Create Game/i }).click();
     await page.getByLabel(/Game Name/i).fill('Selection Test');
-    await page.getByLabel(/Your Name \(DM\)/i).fill('DM');
+    await page.getByLabel(/Your Name \(GM\)/i).fill('GM');
     await page.getByRole('button', { name: /Create Game/i }).click();
     await expect(page.getByText(/Game Created!/i)).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /Start Game/i }).click();
