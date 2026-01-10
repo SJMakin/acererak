@@ -287,6 +287,32 @@ The following items from original Phase 3.5 planning were dropped or deferred:
 
 ---
 
+## Deployment
+
+### GitHub Actions CI/CD
+
+Automated deployment to VPS via SCP on push to main branch.
+
+**Workflow:** `.github/workflows/deploy-vtt.yml`
+
+**Required GitHub Secrets:**
+- `VPS_HOST` - Server hostname or IP
+- `VPS_USER` - SSH username
+- `VPS_SSH_KEY` - Private SSH key (ed25519 or RSA)
+- `VPS_PATH` - Deployment path (e.g., `/var/www/vtt`)
+
+**Pipeline Steps:**
+1. Checkout code
+2. Setup Node.js 20
+3. Install dependencies (`npm ci`)
+4. Build production bundle (`npm run build`)
+5. SCP `dist/` folder to VPS
+6. Optional: Restart nginx or run post-deploy script
+
+**Trigger:** Push to `main` branch (paths: `vtt/**`)
+
+---
+
 ## Out of Scope (Architecture Constraints)
 
 These features don't fit the decentralized design:

@@ -1,0 +1,48 @@
+name: Deploy VTT to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'vtt/**'
+      - '.github/workflows/deploy-vtt.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: vtt/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./vtt
+        run: npm ci
+
+      - name: Build production bundle
+        working-directory: ./vtt
+        run: npm run build
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS via SCP
+        run: |
+          scp -i ~/.ssh/deploy_key -r ./vtt/dist/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH }}
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
