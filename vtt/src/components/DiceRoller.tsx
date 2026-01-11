@@ -6,18 +6,16 @@ import {
   Paper,
   Text,
   Group,
-  ScrollArea,
-  ActionIcon,
-  Badge,
   SimpleGrid,
+  Badge,
 } from '@mantine/core';
 import { nanoid } from 'nanoid';
 import { executeDiceRoll } from '../services/diceParser';
 import { useGameStore } from '../stores/gameStore';
-import type { DiceRoll } from '../types';
+import type { ChatMessage } from '../types';
 
 interface DiceRollerProps {
-  onRoll: (roll: DiceRoll) => void;
+  onRoll: (message: ChatMessage) => void;
 }
 
 export default function DiceRoller({ onRoll }: DiceRollerProps) {
@@ -25,9 +23,10 @@ export default function DiceRoller({ onRoll }: DiceRollerProps) {
   const [isRolling, setIsRolling] = useState(false);
   const diceContainerRef = useRef<HTMLDivElement>(null);
 
-  const { game, myPeerId, addDiceRoll, clearDiceHistory } = useGameStore();
+  const { game, myPeerId, addChatMessage } = useGameStore();
   const myPlayer = myPeerId && game?.players[myPeerId];
-  const diceHistory = game?.diceRolls || [];
+  // Get roll messages from chat
+  const rollMessages = game?.chatMessages?.filter(msg => msg.type === 'roll') || [];
 
   // Quick roll buttons config
   const quickRolls = [
@@ -53,21 +52,26 @@ export default function DiceRoller({ onRoll }: DiceRollerProps) {
     try {
       const rollResult = executeDiceRoll(formula);
       
-      const diceRoll: DiceRoll = {
-        id: nanoid(),
+      // Create a roll-type chat message
+      const rollMessage: ChatMessage = {
+        id: nanoid(10),
         playerId: myPeerId!,
         playerName: myPlayer.name,
+        playerColor: myPlayer.color,
         timestamp: Date.now(),
+        type: 'roll',
+        content: '',
+        isGMOnly: false,
         formula: rollResult.formula,
         result: rollResult.result,
         breakdown: rollResult.breakdown,
       };
 
       // Add to local store
-      addDiceRoll(diceRoll);
+      addChatMessage(rollMessage);
       
       // Broadcast to other players
-      onRoll(diceRoll);
+      onRoll(rollMessage);
 
       // Clear custom formula if it was used
       if (formula === customFormula) {
@@ -93,15 +97,6 @@ export default function DiceRoller({ onRoll }: DiceRollerProps) {
     if (e.key === 'Enter') {
       handleCustomRoll();
     }
-  };
-
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-    });
   };
 
   return (
@@ -200,69 +195,53 @@ export default function DiceRoller({ onRoll }: DiceRollerProps) {
         </Text>
       </Paper>
 
-      {/* Roll history */}
+      {/* Roll history - now shows recent rolls from chat */}
       <Paper p="sm" withBorder style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Group justify="space-between" mb="xs">
-          <Text size="sm" fw={500}>Roll History</Text>
-          {diceHistory.length > 0 && (
-            <ActionIcon
-              size="xs"
-              variant="subtle"
-              color="red"
-              onClick={() => clearDiceHistory()}
-              title="Clear history"
-            >
-              🗑️
-            </ActionIcon>
-          )}
+          <Text size="sm" fw={500}>Recent Rolls</Text>
         </Group>
         
-        <ScrollArea style={{ flex: 1 }} offsetScrollbars>
-          <Stack gap="xs">
-            {diceHistory.length === 0 && (
-              <Text size="sm" c="dimmed" ta="center" mt="md">
-                No rolls yet
-              </Text>
-            )}
-            {[...diceHistory].reverse().map((roll) => (
-              <Paper
-                key={roll.id}
-                p="xs"
-                withBorder
-                style={{
-                  borderLeft: roll.playerId === myPeerId ? '3px solid #7c3aed' : '3px solid #373A40',
-                }}
-              >
-                <Group justify="space-between" mb={4}>
-                  <Group gap="xs">
-                    <Text size="xs" fw={500}>
-                      {roll.playerName}
-                    </Text>
-                    <Badge size="xs" variant="light">
-                      {roll.formula}
-                    </Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    {formatTimestamp(roll.timestamp)}
+        <Stack gap="xs" style={{ flex: 1, overflowY: 'auto' }}>
+          {rollMessages.length === 0 && (
+            <Text size="sm" c="dimmed" ta="center" mt="md">
+              No rolls yet
+            </Text>
+          )}
+          {[...rollMessages].reverse().slice(0, 10).map((msg) => (
+            <Paper
+              key={msg.id}
+              p="xs"
+              withBorder
+              style={{
+                borderLeft: msg.playerId === myPeerId ? '3px solid #7c3aed' : '3px solid #373A40',
+              }}
+            >
+              <Group justify="space-between" mb={4}>
+                <Group gap="xs">
+                  <Text size="xs" fw={500} style={{ color: msg.playerColor }}>
+                    {msg.playerName}
                   </Text>
+                  <Badge size="xs" variant="light">
+                    {msg.formula}
+                  </Badge>
                 </Group>
-                <Group justify="space-between" align="flex-start">
-                  <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                    {roll.breakdown}
-                  </Text>
-                  <Text
-                    size="lg"
-                    fw={700}
-                    c="violet"
-                    style={{ minWidth: '40px', textAlign: 'right' }}
-                  >
-                    {roll.result}
-                  </Text>
-                </Group>
-              </Paper>
-            ))}
-          </Stack>
-        </ScrollArea>
+              </Group>
+              <Group justify="space-between" align="flex-start">
+                <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                  {msg.breakdown}
+                </Text>
+                <Text
+                  size="lg"
+                  fw={700}
+                  c="violet"
+                  style={{ minWidth: '40px', textAlign: 'right' }}
+                >
+                  {msg.result}
+                </Text>
+              </Group>
+            </Paper>
+          ))}
+        </Stack>
       </Paper>
     </Stack>
   );

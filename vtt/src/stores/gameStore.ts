@@ -303,7 +303,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   loadGame: (game) => {
-    set({ game });
+    // Migrate legacy diceRolls to roll-type chat messages
+    if (game.diceRolls && game.diceRolls.length > 0) {
+      const rollMessages: ChatMessage[] = game.diceRolls.map(roll => ({
+        id: roll.id,
+        playerId: roll.playerId,
+        playerName: roll.playerName,
+        playerColor: game.players[roll.playerId]?.color || '#7c3aed',
+        timestamp: roll.timestamp,
+        type: 'roll',
+        content: '',
+        isGMOnly: false,
+        formula: roll.formula,
+        result: roll.result,
+        breakdown: roll.breakdown,
+      }));
+      
+      // Merge with existing chat messages, keeping only last 100
+      const existingChat = game.chatMessages || [];
+      const allMessages = [...existingChat, ...rollMessages]
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(-100);
+      
+      set({ game: { ...game, chatMessages: allMessages } });
+    } else {
+      set({ game });
+    }
   },
 
   setConnected: (connected, peerId) => {
@@ -1031,29 +1056,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // Dice management
+  // Dice management - now creates roll-type chat messages
   addDiceRoll: (roll) => {
     set((state) => {
       if (!state.game) return state;
-      const diceRolls = state.game.diceRolls || [];
-      // Keep only last 50 rolls
-      const updatedRolls = [...diceRolls, roll].slice(-50);
+      const chatMessages = state.game.chatMessages || [];
+      // Create a roll-type chat message
+      const rollMessage: ChatMessage = {
+        id: roll.id,
+        playerId: roll.playerId,
+        playerName: roll.playerName,
+        playerColor: state.game.players[roll.playerId]?.color || '#7c3aed',
+        timestamp: roll.timestamp,
+        type: 'roll',
+        content: '', // Rolls don't have text content
+        isGMOnly: false,
+        formula: roll.formula,
+        result: roll.result,
+        breakdown: roll.breakdown,
+      };
+      // Keep only last 100 messages (including rolls)
+      const updatedMessages = [...chatMessages, rollMessage].slice(-100);
       return {
         game: {
           ...state.game,
-          diceRolls: updatedRolls,
+          chatMessages: updatedMessages,
         },
       };
     });
   },
 
   clearDiceHistory: () => {
+    // Remove all roll-type messages from chat
     set((state) => {
       if (!state.game) return state;
+      const chatMessages = state.game.chatMessages || [];
+      const updatedMessages = chatMessages.filter(msg => msg.type !== 'roll');
       return {
         game: {
           ...state.game,
-          diceRolls: [],
+          chatMessages: updatedMessages,
         },
       };
     });

@@ -8,7 +8,6 @@ import type {
   Player,
   Point,
   CombatTracker,
-  DiceRoll,
   GridSettings,
   ChatMessage,
   Scene,
@@ -143,7 +142,6 @@ export function useRoom() {
     sendRequestSync?: ActionSender<null>;
     sendFogUpdate?: ActionSender<{ enabled: boolean; revealed: Point[][] }>;
     sendCombatUpdate?: ActionSender<CombatTracker>;
-    sendDiceRoll?: ActionSender<DiceRoll>;
     sendStateHash?: ActionSender<string>;
     sendGridUpdate?: ActionSender<Partial<GridSettings>>;
     sendChat?: ActionSender<ChatMessage>;
@@ -161,7 +159,6 @@ export function useRoom() {
     updatePlayer,
     setConnected,
     myPeerId,
-    addDiceRoll,
     addChatMessage,
     addPing,
   } = useGameStore();
@@ -296,7 +293,6 @@ export function useRoom() {
     const [sendPlayerLeave, onPlayerLeave] = room.makeAction<any>('plyLeave');
     const [sendRequestSync, onRequestSync] = room.makeAction<any>('reqSync');
     const [sendFogUpdate, onFogUpdate] = room.makeAction<any>('fogUpdate');
-    const [sendDiceRoll, onDiceRoll] = room.makeAction<any>('diceRoll');
     const [sendStateHash, onStateHash] = room.makeAction<any>('stateHash');
     const [sendGridUpdate, onGridUpdate] = room.makeAction<any>('gridUpd');
     const [sendChat, onChat] = room.makeAction<any>('chat');
@@ -314,7 +310,6 @@ export function useRoom() {
       sendPlayerLeave,
       sendRequestSync,
       sendFogUpdate,
-      sendDiceRoll,
       sendStateHash,
       sendGridUpdate,
       sendChat,
@@ -473,16 +468,35 @@ export function useRoom() {
       });
     });
 
-    onDiceRoll((diceRoll: DiceRoll, _peerId: string) => {
-      console.log('Received dice roll from peer:', diceRoll);
-      addDiceRoll(diceRoll);
-      // Show notification
-      notifications.show({
-        title: 'Dice Roll',
-        message: `${diceRoll.playerName} rolled ${diceRoll.formula}: ${diceRoll.result}`,
-        color: 'violet',
-        autoClose: 4000,
-      });
+    // Handle incoming chat messages (including roll-type messages)
+    onChat((chatMessage: ChatMessage, peerId: string) => {
+      console.log('Received chat message from:', peerId, 'type:', chatMessage.type);
+
+      // Check if GM-only message should be visible
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      // If message is GM-only, only GM should see it (or sender)
+      if (chatMessage.isGMOnly) {
+        const isGM = currentGame.gmPeerId === useGameStore.getState().myPeerId;
+        const isSender = chatMessage.playerId === useGameStore.getState().myPeerId;
+        if (!isGM && !isSender) {
+          // Non-GM players shouldn't see GM-only messages (unless they sent it)
+          return;
+        }
+      }
+
+      // Show notification for roll messages
+      if (chatMessage.type === 'roll') {
+        notifications.show({
+          title: 'Dice Roll',
+          message: `${chatMessage.playerName} rolled ${chatMessage.formula}: ${chatMessage.result}`,
+          color: 'violet',
+          autoClose: 4000,
+        });
+      }
+
+      addChatMessage(chatMessage);
     });
 
     // Handle state hash for desync detection (GM broadcasts, players compare)
@@ -521,27 +535,6 @@ export function useRoom() {
 
       // Apply grid settings update
       updateGridSettings(gridSettings);
-    });
-
-    // Handle incoming chat messages
-    onChat((chatMessage: ChatMessage, peerId: string) => {
-      console.log('Received chat message from:', peerId);
-
-      // Check if GM-only message should be visible
-      const currentGame = useGameStore.getState().game;
-      if (!currentGame) return;
-
-      // If message is GM-only, only GM should see it (or the sender)
-      if (chatMessage.isGMOnly) {
-        const isGM = currentGame.gmPeerId === useGameStore.getState().myPeerId;
-        const isSender = chatMessage.playerId === useGameStore.getState().myPeerId;
-        if (!isGM && !isSender) {
-          // Non-GM players shouldn't see GM-only messages (unless they sent it)
-          return;
-        }
-      }
-
-      addChatMessage(chatMessage);
     });
 
     // Handle scene switch (GM-only action, players receive)
@@ -598,7 +591,7 @@ export function useRoom() {
         });
       }
     });
-  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage, switchScene, updateScene, addPing]);
+  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene, addPing]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -637,9 +630,10 @@ export function useRoom() {
     }
   }, []);
 
-  const broadcastDiceRoll = useCallback((roll: DiceRoll) => {
-    if (actionsRef.current.sendDiceRoll) {
-      actionsRef.current.sendDiceRoll(roll);
+  // Dice rolls are now sent as chat messages
+  const broadcastDiceRoll = useCallback((message: ChatMessage) => {
+    if (actionsRef.current.sendChat) {
+      actionsRef.current.sendChat(message);
     }
   }, []);
 

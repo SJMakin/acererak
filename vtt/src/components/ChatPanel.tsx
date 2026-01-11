@@ -48,6 +48,7 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
       playerName,
       playerColor,
       timestamp: Date.now(),
+      type: 'chat',
       content: messageText.trim(),
       isGMOnly,
     };
@@ -83,36 +84,82 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
             </Text>
           )}
 
-          {chatMessages.map((msg) => (
-            <Paper
-              key={msg.id}
-              p="xs"
-              withBorder
-              style={{
-                borderLeftWidth: 3,
-                borderLeftColor: msg.playerColor,
-              }}
-            >
-              <Group justify="space-between" gap="xs" mb={4}>
-                <Group gap="xs">
-                  <Text size="xs" fw={600} style={{ color: msg.playerColor }}>
-                    {msg.playerName}
+          {chatMessages.map((msg) => {
+            // Render roll messages with special formatting
+            if (msg.type === 'roll') {
+              return (
+                <Paper
+                  key={msg.id}
+                  p="xs"
+                  withBorder
+                  style={{
+                    borderLeftWidth: 3,
+                    borderLeftColor: msg.playerColor,
+                    backgroundColor: 'rgba(124, 58, 237, 0.05)',
+                  }}
+                >
+                  <Group justify="space-between" gap="xs" mb={4}>
+                    <Group gap="xs">
+                      <Text size="xs" fw={600} style={{ color: msg.playerColor }}>
+                        {msg.playerName}
+                      </Text>
+                      <Badge size="xs" color="violet" variant="light">
+                        🎲 {msg.formula}
+                      </Badge>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {formatTime(msg.timestamp)}
+                    </Text>
+                  </Group>
+                  <Group justify="space-between" align="flex-start">
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {msg.breakdown}
+                    </Text>
+                    <Text
+                      size="xl"
+                      fw={700}
+                      c="violet"
+                      style={{ minWidth: '50px', textAlign: 'right' }}
+                    >
+                      {msg.result}
+                    </Text>
+                  </Group>
+                </Paper>
+              );
+            }
+
+            // Render regular chat messages
+            return (
+              <Paper
+                key={msg.id}
+                p="xs"
+                withBorder
+                style={{
+                  borderLeftWidth: 3,
+                  borderLeftColor: msg.playerColor,
+                }}
+              >
+                <Group justify="space-between" gap="xs" mb={4}>
+                  <Group gap="xs">
+                    <Text size="xs" fw={600} style={{ color: msg.playerColor }}>
+                      {msg.playerName}
+                    </Text>
+                    {msg.isGMOnly && (
+                      <Badge size="xs" color="violet" variant="light">
+                        Whisper
+                      </Badge>
+                    )}
+                  </Group>
+                  <Text size="xs" c="dimmed">
+                    {formatTime(msg.timestamp)}
                   </Text>
-                  {msg.isGMOnly && (
-                    <Badge size="xs" color="violet" variant="light">
-                      Whisper
-                    </Badge>
-                  )}
                 </Group>
-                <Text size="xs" c="dimmed">
-                  {formatTime(msg.timestamp)}
+                <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {msg.content}
                 </Text>
-              </Group>
-              <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {msg.content}
-              </Text>
-            </Paper>
-          ))}
+              </Paper>
+            );
+          })}
         </Stack>
       </ScrollArea>
 

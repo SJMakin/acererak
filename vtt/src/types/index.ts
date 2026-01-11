@@ -222,8 +222,13 @@ export interface ChatMessage {
   playerName: string;
   playerColor: string;
   timestamp: number;
-  content: string;
+  type?: 'chat' | 'roll'; // Message type - defaults to 'chat'
+  content: string; // For chat messages
   isGMOnly: boolean; // Whisper to GM only
+  // Roll-specific fields (when type is 'roll')
+  formula?: string;
+  result?: number;
+  breakdown?: string;
 }
 
 export interface ChatMessageP2P {

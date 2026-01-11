@@ -227,7 +227,7 @@ Add image placement tool to toolbar (for non-background images: handouts, props,
 
 ---
 
-### 3.4 Dice/Chat Integration
+### 3.4 Dice/Chat Integration ✅ DONE
 
 Combine dice rolls into chat timeline as special message type.
 
@@ -237,11 +237,13 @@ Combine dice rolls into chat timeline as special message type.
 - DiceRoller panel remains for quick-roll buttons but sends to chat
 - Remove separate `diceRolls[]` from game state (use chatMessages)
 
-**Files to modify:**
-- `src/types/index.ts` - Add roll type to ChatMessage
-- `src/components/DiceRoller.tsx` - Send rolls to chat instead of separate history
-- `src/components/ChatPanel.tsx` - Render roll messages with special formatting
-- `src/stores/gameStore.ts` - Remove diceRolls, rolls go through chat
+**Files modified:**
+- `src/types/index.ts` - Added `type?: 'chat' | 'roll'` field to ChatMessage, plus roll-specific fields (formula, result, breakdown)
+- `src/components/DiceRoller.tsx` - Changed to send rolls as ChatMessage via addChatMessage, shows recent rolls from chat (last 10)
+- `src/components/ChatPanel.tsx` - Added special rendering for roll messages with violet background, dice icon badge, and larger result display
+- `src/stores/gameStore.ts` - Modified addDiceRoll to create roll-type chat messages, added backward compatibility in loadGame to migrate legacy diceRolls
+- `src/hooks/useRoom.ts` - Removed separate onDiceRoll handler, updated broadcastDiceRoll to send via chat, updated onChat to handle both regular and roll messages
+- `src/components/Sidebar.tsx` - Updated broadcastDiceRoll prop type from DiceRoll to ChatMessage
 
 **Complexity:** Medium (refactor two systems into one)
 

@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useLibraryStore } from '../stores/libraryStore';
-import type { TokenElement, CanvasElement, Visibility, DiceRoll, ChatMessage } from '../types';
+import type { TokenElement, CanvasElement, Visibility, ChatMessage } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
 import LibraryPanel from './LibraryPanel';
@@ -31,7 +31,7 @@ interface SidebarProps {
     broadcastElementDelete: (elementId: string) => void;
     broadcastSync: () => void;
     broadcastCombat?: () => void;
-    broadcastDiceRoll?: (roll: DiceRoll) => void;
+    broadcastDiceRoll?: (message: ChatMessage) => void;
     broadcastChat?: (message: ChatMessage) => void;
   };
 }
@@ -52,7 +52,7 @@ export default function Sidebar({ room }: SidebarProps) {
   } = useGameStore();
 
   const [activeTab, setActiveTab] = useState<string | null>('tokens');
-  
+
   // Token creation form
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenUrl, setNewTokenUrl] = useState('');
@@ -99,7 +99,7 @@ export default function Sidebar({ room }: SidebarProps) {
   const handleUpdateVisibility = (elementId: string, visibility: Visibility) => {
     const element = game?.elements.find(e => e.id === elementId);
     if (!element) return;
-    
+
     updateElement(elementId, { visibleTo: visibility });
     room.broadcastElementUpdate({ ...element, visibleTo: visibility });
   };
@@ -108,9 +108,9 @@ export default function Sidebar({ room }: SidebarProps) {
   const tokens = game?.elements.filter(e => e.type === 'token') || [];
   const players = game ? Object.values(game.players) : [];
 
-  const handleDiceRoll = (roll: DiceRoll) => {
+  const handleDiceRoll = (message: ChatMessage) => {
     if (room.broadcastDiceRoll) {
-      room.broadcastDiceRoll(roll);
+      room.broadcastDiceRoll(message);
     }
   };
 
@@ -174,11 +174,11 @@ export default function Sidebar({ room }: SidebarProps) {
 
               {/* Token list */}
               {tokens.map((token) => (
-                <Paper 
-                  key={token.id} 
-                  p="xs" 
+                <Paper
+                  key={token.id}
+                  p="xs"
                   withBorder
-                  style={{ 
+                  style={{
                     borderColor: selectedElementId === token.id ? '#7c3aed' : undefined,
                     cursor: 'pointer',
                   }}
@@ -298,7 +298,7 @@ export default function Sidebar({ room }: SidebarProps) {
                         label="Visibility"
                         size="xs"
                         value={
-                          selectedElement.visibleTo === 'all' ? 'all' : 
+                          selectedElement.visibleTo === 'all' ? 'all' :
                           selectedElement.visibleTo === 'gm' ? 'gm' : 'specific'
                         }
                         onChange={(val) => {
@@ -317,15 +317,15 @@ export default function Sidebar({ room }: SidebarProps) {
                         checked={selectedElement.locked}
                         onChange={(e) => {
                           updateElement(selectedElement.id, { locked: e.currentTarget.checked });
-                          room.broadcastElementUpdate({ 
-                            ...selectedElement, 
-                            locked: e.currentTarget.checked 
+                          room.broadcastElementUpdate({
+                            ...selectedElement,
+                            locked: e.currentTarget.checked
                           });
                         }}
                       />
-                      <Button 
-                        size="xs" 
-                        color="red" 
+                      <Button
+                        size="xs"
+                        color="red"
                         variant="light"
                         onClick={() => handleDeleteElement(selectedElement.id)}
                       >
