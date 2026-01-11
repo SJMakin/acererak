@@ -1,7 +1,7 @@
 import type { TokenElement } from '@/types';
 import type Konva from 'konva';
 import { Group, Image, Circle, Rect, Text } from 'react-konva';
-import { useImage } from './GameCanvas';
+import useImage from '../hooks/useImage';
 
 // Token component
 export function Token({

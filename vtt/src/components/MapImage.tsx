@@ -1,7 +1,7 @@
 import type { ImageElement } from '@/types';
 import type Konva from 'konva';
 import { Group, Image, Rect } from 'react-konva';
-import { useImage } from './GameCanvas';
+import useImage from '../hooks/useImage';
 
 // Map image component
 export function MapImage({
