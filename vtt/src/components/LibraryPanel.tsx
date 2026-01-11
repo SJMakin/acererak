@@ -106,12 +106,7 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   };
 
   const getItemIcon = (type: LibraryItemType) => {
-    switch (type) {
-      case 'token': return '👤';
-      case 'map': return '🗺️';
-      case 'scene': return '🎬';
-      default: return '📦';
-    }
+    return '👤';
   };
 
   const getItemStats = (item: LibraryItem) => {
@@ -151,8 +146,6 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
         data={[
           { label: 'All', value: 'all' },
           { label: '👤 Tokens', value: 'token' },
-          { label: '🗺️ Maps', value: 'map' },
-          { label: '🎬 Scenes', value: 'scene' },
         ]}
         fullWidth
       />

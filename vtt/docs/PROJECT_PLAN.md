@@ -296,7 +296,7 @@ Game
 
 ---
 
-### 3.7 Library Simplification
+### 3.7 Library Simplification ✅ DONE
 
 Simplify Library to tokens only. Remove "scene" and "map" types.
 
@@ -313,11 +313,11 @@ Simplify Library to tokens only. Remove "scene" and "map" types.
 - Simplify LibraryPanel UI (no filter dropdown needed)
 - "Save to Library" option only appears for tokens
 
-**Files to modify:**
-- `src/types/index.ts` - Simplify LibraryItemType to just 'token'
-- `src/stores/libraryStore.ts` - Remove addSceneToLibrary, addMapToLibrary, getSceneTemplates, getMapTemplates
-- `src/components/LibraryPanel.tsx` - Remove filter dropdown, simplify to token list
-- `src/components/Sidebar.tsx` - Remove "Save to Library" for non-tokens
+**Files modified:**
+- `src/types/index.ts` - Simplified LibraryItemType to just 'token'
+- `src/stores/libraryStore.ts` - Removed addSceneToLibrary, addMapToLibrary, getSceneTemplates, getMapTemplates; removed unused imports (ImageElement, SceneExport, ImageTemplateData)
+- `src/components/LibraryPanel.tsx` - Removed map/scene filter options, simplified getItemIcon to only return token icon
+- `src/components/ExportImportModal.tsx` - Updated import logic to only handle token library items
 
 **Complexity:** Low (removal/simplification)
 

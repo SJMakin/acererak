@@ -575,30 +575,14 @@ export default function ExportImportModal({
       );
       for (const item of itemsToImport) {
         const existing = libraryItems.find((i) => i.id === item.id);
-        if (!existing) {
+        if (!existing && item.type === 'token') {
           // Add to library store (using direct method)
-          if (item.type === 'token') {
-            await libraryStore.addTokenToLibrary(
-              item.data as any,
-              item.name,
-              item.description,
-              item.tags
-            );
-          } else if (item.type === 'map') {
-            await libraryStore.addMapToLibrary(
-              item.data as any,
-              item.name,
-              item.description,
-              item.tags
-            );
-          } else if (item.type === 'scene') {
-            await libraryStore.addSceneToLibrary(
-              item.data as any,
-              item.name,
-              item.description,
-              item.tags
-            );
-          }
+          await libraryStore.addTokenToLibrary(
+            item.data as any,
+            item.name,
+            item.description,
+            item.tags
+          );
         }
       }
     }

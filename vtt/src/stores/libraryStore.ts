@@ -9,10 +9,7 @@ import type {
   LibraryItem,
   LibraryItemType,
   TokenElement,
-  ImageElement,
-  SceneExport,
   TokenTemplateData,
-  ImageTemplateData,
 } from '../types';
 
 interface LibraryStore {
@@ -27,8 +24,6 @@ interface LibraryStore {
   
   // Actions - CRUD
   addTokenToLibrary: (token: TokenElement, name?: string, description?: string, tags?: string[]) => Promise<string>;
-  addMapToLibrary: (image: ImageElement, name?: string, description?: string, tags?: string[]) => Promise<string>;
-  addSceneToLibrary: (scene: SceneExport, name: string, description?: string, tags?: string[]) => Promise<string>;
   updateLibraryItem: (id: string, updates: Partial<Omit<LibraryItem, 'id' | 'type' | 'data'>>) => Promise<void>;
   deleteLibraryItem: (id: string) => Promise<void>;
   
@@ -39,8 +34,6 @@ interface LibraryStore {
   // Selectors
   getFilteredItems: () => LibraryItem[];
   getTokenTemplates: () => LibraryItem[];
-  getMapTemplates: () => LibraryItem[];
-  getSceneTemplates: () => LibraryItem[];
 }
 
 // Default token templates
@@ -292,59 +285,6 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
     return id;
   },
 
-  // Add a map image to the library
-  addMapToLibrary: async (image, name, description, tags = []) => {
-    const id = nanoid(10);
-    const now = new Date().toISOString();
-    
-    // Strip id from image data
-    const { id: _imageId, ...imageWithoutId } = image;
-    const imageData: ImageTemplateData = {
-      ...imageWithoutId,
-      x: 0,
-      y: 0,
-      zIndex: 0,
-    };
-    
-    const item: LibraryItem = {
-      id,
-      type: 'map',
-      name: name || 'Unnamed Map',
-      description,
-      tags,
-      createdAt: now,
-      updatedAt: now,
-      data: imageData,
-    };
-    
-    await saveLibraryItem(item);
-    set(state => ({ items: [...state.items, item] }));
-    
-    return id;
-  },
-
-  // Add a scene to the library
-  addSceneToLibrary: async (scene, name, description, tags = []) => {
-    const id = nanoid(10);
-    const now = new Date().toISOString();
-    
-    const item: LibraryItem = {
-      id,
-      type: 'scene',
-      name,
-      description,
-      tags,
-      createdAt: now,
-      updatedAt: now,
-      data: scene,
-    };
-    
-    await saveLibraryItem(item);
-    set(state => ({ items: [...state.items, item] }));
-    
-    return id;
-  },
-
   // Update library item metadata
   updateLibraryItem: async (id, updates) => {
     const item = get().items.find(i => i.id === id);
@@ -407,15 +347,5 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   // Get token templates only
   getTokenTemplates: () => {
     return get().items.filter(item => item.type === 'token');
-  },
-
-  // Get map templates only
-  getMapTemplates: () => {
-    return get().items.filter(item => item.type === 'map');
-  },
-
-  // Get scene templates only
-  getSceneTemplates: () => {
-    return get().items.filter(item => item.type === 'scene');
   },
 }));
