@@ -323,7 +323,7 @@ Simplify Library to tokens only. Remove "scene" and "map" types.
 
 ---
 
-### 3.8 Export/Import with Multi-Scene
+### 3.8 Export/Import with Multi-Scene ✅ DONE
 
 Update export/import system to handle multi-scene game structure.
 

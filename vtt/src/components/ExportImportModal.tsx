@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { nanoid } from 'nanoid';
 import {
   Modal,
   Tabs,
@@ -24,50 +25,52 @@ import type {
   LibraryItem,
   CampaignNote,
   GameExport,
+  Scene,
+  CombatTracker,
+  ChatMessage,
 } from '../types';
 
 // Current export format version
-const EXPORT_VERSION = 2;
+const EXPORT_VERSION = 3;
 
-// Enhanced export format with selective data
+// Enhanced export format with selective data (v3)
 interface EnhancedExport {
-  version: number;
+  version: 3;
   exportedAt: string;
   format: 'full' | 'selective';
-  // Game data (optional)
+  // Scenes (new for v3)
+  scenes?: Scene[];
+  // Global state (persists across scenes)
+  combat?: CombatTracker;
+  chatMessages?: ChatMessage[];
+  campaignNotes?: CampaignNote[];
+  libraryItems?: LibraryItem[];
+}
+
+// Legacy v2 format for backward compatibility
+interface EnhancedExportV2 {
+  version: 2;
+  exportedAt: string;
+  format: 'full' | 'selective';
   gameSettings?: {
     gridSettings?: GameState['gridSettings'];
     fogOfWar?: GameState['fogOfWar'];
   };
-  // Elements by type (optional)
   elements?: {
     tokens: CanvasElement[];
     images: CanvasElement[];
     shapes: CanvasElement[];
     text: CanvasElement[];
   };
-  // Campaign notes (optional)
   campaignNotes?: CampaignNote[];
-  // Library items (optional)
   libraryItems?: LibraryItem[];
-  // Combat state (optional)
   combat?: GameState['combat'];
 }
 
 interface SelectionState {
-  // Game settings
-  gridSettings: boolean;
-  fogOfWar: boolean;
-  // Elements by type
-  tokens: Set<string>;
-  images: Set<string>;
-  shapes: Set<string>;
-  text: Set<string>;
-  // All elements toggle
-  allTokens: boolean;
-  allImages: boolean;
-  allShapes: boolean;
-  allText: boolean;
+  // Scenes
+  scenes: Set<string>;
+  allScenes: boolean;
   // Campaign notes
   campaignNotes: Set<string>;
   allNotes: boolean;
@@ -76,6 +79,8 @@ interface SelectionState {
   allLibrary: boolean;
   // Combat
   combat: boolean;
+  // Chat messages
+  chatMessages: boolean;
 }
 
 interface ExportImportModalProps {
@@ -171,78 +176,45 @@ export default function ExportImportModal({
   
   // Expanded state for tree sections
   const [expanded, setExpanded] = useState({
-    settings: true,
-    elements: true,
-    tokens: false,
-    images: false,
-    shapes: false,
-    text: false,
+    scenes: true,
     notes: false,
     library: false,
+    global: false,
   });
   
   // Selection state for export
   const [selection, setSelection] = useState<SelectionState>({
-    gridSettings: true,
-    fogOfWar: true,
-    tokens: new Set(),
-    images: new Set(),
-    shapes: new Set(),
-    text: new Set(),
-    allTokens: true,
-    allImages: true,
-    allShapes: true,
-    allText: true,
+    scenes: new Set(),
+    allScenes: true,
     campaignNotes: new Set(),
     allNotes: true,
     libraryItems: new Set(),
     allLibrary: false,
     combat: true,
+    chatMessages: false,
   });
   
-  // Categorize elements
-  const elementsByType = useMemo(() => {
-    if (!game) {
-      return { tokens: [], images: [], shapes: [], text: [] };
-    }
-    return {
-      tokens: game.elements.filter((e) => e.type === 'token'),
-      images: game.elements.filter((e) => e.type === 'image'),
-      shapes: game.elements.filter((e) => e.type === 'shape'),
-      text: game.elements.filter((e) => e.type === 'text'),
-    };
-  }, [game]);
-  
+  const scenes = game?.scenes || [];
   const campaignNotes = game?.campaignNotes || [];
+  const chatMessages = game?.chatMessages || [];
   
   // Track if we've initialized for this modal session
   const [initialized, setInitialized] = useState(false);
   
-  // Initialize selection with all elements when opening (only once per modal open)
+  // Initialize selection with all scenes when opening (only once per modal open)
   useEffect(() => {
     if (opened && game && !initialized) {
-      const tokens = game.elements.filter((e) => e.type === 'token');
-      const images = game.elements.filter((e) => e.type === 'image');
-      const shapes = game.elements.filter((e) => e.type === 'shape');
-      const text = game.elements.filter((e) => e.type === 'text');
       const notes = game.campaignNotes || [];
       
       setSelection({
-        gridSettings: true,
-        fogOfWar: true,
-        tokens: new Set(tokens.map((e) => e.id)),
-        images: new Set(images.map((e) => e.id)),
-        shapes: new Set(shapes.map((e) => e.id)),
-        text: new Set(text.map((e) => e.id)),
-        allTokens: true,
-        allImages: true,
-        allShapes: true,
-        allText: true,
+        scenes: new Set(game.scenes.map((s) => s.id)),
+        allScenes: true,
         campaignNotes: new Set(notes.map((n) => n.id)),
         allNotes: true,
         libraryItems: new Set(),
         allLibrary: false,
         combat: true,
+        chatMessages: false,
       });
       setInitialized(true);
     }
@@ -255,9 +227,9 @@ export default function ExportImportModal({
   
   // Toggle all items of a type
   const toggleAllOfType = (
-    type: 'tokens' | 'images' | 'shapes' | 'text' | 'campaignNotes' | 'libraryItems',
+    type: 'scenes' | 'campaignNotes' | 'libraryItems',
     items: { id: string }[],
-    allKey: 'allTokens' | 'allImages' | 'allShapes' | 'allText' | 'allNotes' | 'allLibrary'
+    allKey: 'allScenes' | 'allNotes' | 'allLibrary'
   ) => {
     setSelection((prev) => {
       const newAll = !prev[allKey];
@@ -271,10 +243,10 @@ export default function ExportImportModal({
   
   // Toggle single item
   const toggleItem = (
-    type: 'tokens' | 'images' | 'shapes' | 'text' | 'campaignNotes' | 'libraryItems',
+    type: 'scenes' | 'campaignNotes' | 'libraryItems',
     id: string,
     allItems: { id: string }[],
-    allKey: 'allTokens' | 'allImages' | 'allShapes' | 'allText' | 'allNotes' | 'allLibrary'
+    allKey: 'allScenes' | 'allNotes' | 'allLibrary'
   ) => {
     setSelection((prev) => {
       const newSet = new Set(prev[type]);
@@ -293,7 +265,7 @@ export default function ExportImportModal({
   
   // Calculate indeterminate state
   const getIndeterminate = (
-    setKey: 'tokens' | 'images' | 'shapes' | 'text' | 'campaignNotes' | 'libraryItems',
+    setKey: 'scenes' | 'campaignNotes' | 'libraryItems',
     allItems: { id: string }[]
   ) => {
     const selected = selection[setKey].size;
@@ -310,32 +282,10 @@ export default function ExportImportModal({
       format: 'selective',
     };
     
-    // Add game settings if selected
-    if (selection.gridSettings || selection.fogOfWar) {
-      exportData.gameSettings = {
-        gridSettings: selection.gridSettings ? game.gridSettings : undefined,
-        fogOfWar: selection.fogOfWar ? game.fogOfWar : undefined,
-      };
-    }
-    
-    // Add selected elements
-    const selectedTokens = elementsByType.tokens.filter((e) => selection.tokens.has(e.id));
-    const selectedImages = elementsByType.images.filter((e) => selection.images.has(e.id));
-    const selectedShapes = elementsByType.shapes.filter((e) => selection.shapes.has(e.id));
-    const selectedText = elementsByType.text.filter((e) => selection.text.has(e.id));
-    
-    if (
-      selectedTokens.length > 0 ||
-      selectedImages.length > 0 ||
-      selectedShapes.length > 0 ||
-      selectedText.length > 0
-    ) {
-      exportData.elements = {
-        tokens: selectedTokens,
-        images: selectedImages,
-        shapes: selectedShapes,
-        text: selectedText,
-      };
+    // Add selected scenes
+    const selectedScenes = scenes.filter((s) => selection.scenes.has(s.id));
+    if (selectedScenes.length > 0) {
+      exportData.scenes = selectedScenes;
     }
     
     // Add campaign notes
@@ -353,6 +303,11 @@ export default function ExportImportModal({
     // Add combat state
     if (selection.combat && game.combat) {
       exportData.combat = game.combat;
+    }
+    
+    // Add chat messages
+    if (selection.chatMessages && chatMessages.length > 0) {
+      exportData.chatMessages = chatMessages;
     }
     
     // Download file
@@ -378,26 +333,61 @@ export default function ExportImportModal({
       try {
         const data = JSON.parse(e.target?.result as string);
         
-        // Handle both old (version 1) and new formats
+        // Handle different versions
         if (data.version === 1 && data.game) {
-          // Convert old format to new format
+          // Convert v1 format to v3
           const oldData = data as GameExport;
           const converted: EnhancedExport = {
-            version: EXPORT_VERSION,
+            version: 3,
             exportedAt: oldData.exportedAt,
             format: 'full',
-            gameSettings: {
+            scenes: oldData.game.elements && oldData.game.gridSettings ? [{
+              id: nanoid(10),
+              name: 'Imported Scene',
+              backgroundUrl: undefined,
               gridSettings: oldData.game.gridSettings,
-              fogOfWar: oldData.game.fogOfWar,
-            },
-            elements: {
-              tokens: oldData.game.elements.filter((e) => e.type === 'token'),
-              images: oldData.game.elements.filter((e) => e.type === 'image'),
-              shapes: oldData.game.elements.filter((e) => e.type === 'shape'),
-              text: oldData.game.elements.filter((e) => e.type === 'text'),
-            },
+              elements: oldData.game.elements || [],
+              fogOfWar: oldData.game.fogOfWar || { enabled: false, revealed: [] },
+              createdAt: oldData.exportedAt,
+              updatedAt: oldData.exportedAt,
+            }] : [],
             campaignNotes: oldData.game.campaignNotes,
             combat: oldData.game.combat,
+          };
+          setImportData(converted);
+        } else if (data.version === 2) {
+          // Convert v2 format to v3
+          const v2Data = data as EnhancedExportV2;
+          const converted: EnhancedExport = {
+            version: 3,
+            exportedAt: v2Data.exportedAt,
+            format: v2Data.format,
+            scenes: v2Data.elements && v2Data.gameSettings ? [{
+              id: nanoid(10),
+              name: 'Imported Scene',
+              backgroundUrl: undefined,
+              gridSettings: v2Data.gameSettings.gridSettings || {
+                cellSize: 50,
+                width: 20,
+                height: 20,
+                showGrid: true,
+                snapToGrid: true,
+                gridColor: 'rgba(255, 255, 255, 0.2)',
+                gridType: 'square',
+              },
+              elements: [
+                ...(v2Data.elements.tokens || []),
+                ...(v2Data.elements.images || []),
+                ...(v2Data.elements.shapes || []),
+                ...(v2Data.elements.text || []),
+              ],
+              fogOfWar: v2Data.gameSettings.fogOfWar || { enabled: false, revealed: [] },
+              createdAt: v2Data.exportedAt,
+              updatedAt: v2Data.exportedAt,
+            }] : [],
+            campaignNotes: v2Data.campaignNotes,
+            combat: v2Data.combat,
+            libraryItems: v2Data.libraryItems,
           };
           setImportData(converted);
         } else {
@@ -415,49 +405,28 @@ export default function ExportImportModal({
   };
   
   // Initialize selection based on import data
-  const initializeImportSelection = (data: EnhancedExport | GameExport) => {
+  const initializeImportSelection = (data: any) => {
     let enhancedData: EnhancedExport;
     
-    if ('game' in data) {
-      // Old format
-      const oldData = data as GameExport;
-      enhancedData = {
-        version: EXPORT_VERSION,
-        exportedAt: oldData.exportedAt,
-        format: 'full',
-        gameSettings: {
-          gridSettings: oldData.game.gridSettings,
-          fogOfWar: oldData.game.fogOfWar,
-        },
-        elements: {
-          tokens: oldData.game.elements.filter((e) => e.type === 'token'),
-          images: oldData.game.elements.filter((e) => e.type === 'image'),
-          shapes: oldData.game.elements.filter((e) => e.type === 'shape'),
-          text: oldData.game.elements.filter((e) => e.type === 'text'),
-        },
-        campaignNotes: oldData.game.campaignNotes,
-        combat: oldData.game.combat,
-      };
+    if (data.version === 1 && data.game) {
+      // v1 format - already converted in handleFileSelect
+      return;
+    } else if (data.version === 2) {
+      // v2 format - already converted in handleFileSelect
+      return;
     } else {
       enhancedData = data as EnhancedExport;
     }
     
     setSelection({
-      gridSettings: !!enhancedData.gameSettings?.gridSettings,
-      fogOfWar: !!enhancedData.gameSettings?.fogOfWar,
-      tokens: new Set(enhancedData.elements?.tokens?.map((e) => e.id) || []),
-      images: new Set(enhancedData.elements?.images?.map((e) => e.id) || []),
-      shapes: new Set(enhancedData.elements?.shapes?.map((e) => e.id) || []),
-      text: new Set(enhancedData.elements?.text?.map((e) => e.id) || []),
-      allTokens: true,
-      allImages: true,
-      allShapes: true,
-      allText: true,
+      scenes: new Set(enhancedData.scenes?.map((s) => s.id) || []),
+      allScenes: true,
       campaignNotes: new Set(enhancedData.campaignNotes?.map((n) => n.id) || []),
       allNotes: true,
       libraryItems: new Set(enhancedData.libraryItems?.map((i) => i.id) || []),
       allLibrary: true,
       combat: !!enhancedData.combat,
+      chatMessages: !!enhancedData.chatMessages,
     });
   };
   
@@ -469,102 +438,57 @@ export default function ExportImportModal({
     const gameStore = useGameStore.getState();
     const libraryStore = useLibraryStore.getState();
     
-    // Prepare elements to import
-    const elementsToImport: CanvasElement[] = [];
-    
-    if (data.elements) {
-      if (selection.allTokens || selection.tokens.size > 0) {
-        elementsToImport.push(
-          ...data.elements.tokens.filter((e) => selection.tokens.has(e.id))
-        );
-      }
-      if (selection.allImages || selection.images.size > 0) {
-        elementsToImport.push(
-          ...data.elements.images.filter((e) => selection.images.has(e.id))
-        );
-      }
-      if (selection.allShapes || selection.shapes.size > 0) {
-        elementsToImport.push(
-          ...data.elements.shapes.filter((e) => selection.shapes.has(e.id))
-        );
-      }
-      if (selection.allText || selection.text.size > 0) {
-        elementsToImport.push(
-          ...data.elements.text.filter((e) => selection.text.has(e.id))
-        );
+    // Import scenes (always add, never replace)
+    if (data.scenes && selection.allScenes) {
+      const scenesToImport = data.scenes.filter((s) => selection.scenes.has(s.id));
+      for (const scene of scenesToImport) {
+        // Generate new IDs for elements to avoid conflicts
+        const sceneWithNewIds: Scene = {
+          ...scene,
+          id: nanoid(10),
+          elements: scene.elements.map((el) => ({
+            ...el,
+            id: nanoid(10),
+          })),
+        };
+        gameStore.updateScene(sceneWithNewIds.id, sceneWithNewIds);
+        // Add to game's scene list
+        const updatedGame = {
+          ...game,
+          scenes: [...game.scenes, sceneWithNewIds],
+          updatedAt: new Date().toISOString(),
+        };
+        gameStore.loadGame(updatedGame);
       }
     }
     
-    if (importMode === 'replace') {
-      // Replace mode: load entire game state
-      const newGame: GameState = {
-        ...game,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      if (selection.gridSettings && data.gameSettings?.gridSettings) {
-        newGame.gridSettings = data.gameSettings.gridSettings;
-      }
-      if (selection.fogOfWar && data.gameSettings?.fogOfWar) {
-        newGame.fogOfWar = data.gameSettings.fogOfWar;
-      }
-      
-      // Replace elements of selected types
-      const existingElements = game.elements.filter((e) => {
-        if (e.type === 'token' && selection.allTokens) return false;
-        if (e.type === 'image' && selection.allImages) return false;
-        if (e.type === 'shape' && selection.allShapes) return false;
-        if (e.type === 'text' && selection.allText) return false;
-        return true;
-      });
-      
-      newGame.elements = [...existingElements, ...elementsToImport];
-      
-      if (selection.allNotes && data.campaignNotes) {
-        newGame.campaignNotes = data.campaignNotes.filter((n) =>
-          selection.campaignNotes.has(n.id)
-        );
-      }
-      
-      if (selection.combat && data.combat) {
-        newGame.combat = data.combat;
-      }
-      
-      gameStore.loadGame(newGame);
-    } else {
-      // Merge mode: add elements with conflict detection
-      for (const element of elementsToImport) {
-        const existing = game.elements.find((e) => e.id === element.id);
+    // Import campaign notes
+    if (data.campaignNotes) {
+      const notesToImport = data.campaignNotes.filter((n) =>
+        selection.campaignNotes.has(n.id)
+      );
+      for (const note of notesToImport) {
+        const existing = campaignNotes.find((n) => n.id === note.id);
         if (!existing) {
-          // No conflict, add directly
-          gameStore.addElement(element, true);
-        } else {
-          // Conflict: generate new ID and add
-          const { id: _oldId, ...elementWithoutId } = element;
-          gameStore.addElement(elementWithoutId, true);
+          gameStore.addCampaignNote(note);
         }
+        // Skip conflicts for notes in merge mode
       }
-      
-      // Merge campaign notes
-      if (data.campaignNotes) {
-        const notesToImport = data.campaignNotes.filter((n) =>
-          selection.campaignNotes.has(n.id)
-        );
-        for (const note of notesToImport) {
-          const existing = campaignNotes.find((n) => n.id === note.id);
-          if (!existing) {
-            gameStore.addCampaignNote(note);
-          }
-          // Skip conflicts for notes in merge mode
-        }
-      }
-      
-      // Merge settings if selected
-      if (selection.gridSettings && data.gameSettings?.gridSettings) {
-        gameStore.updateGridSettings(data.gameSettings.gridSettings);
-      }
-      if (selection.fogOfWar && data.gameSettings?.fogOfWar) {
-        gameStore.toggleFog(data.gameSettings.fogOfWar.enabled);
+    }
+    
+    // Import combat state
+    if (selection.combat && data.combat) {
+      gameStore.updateCombatState(data.combat);
+    }
+    
+    // Import chat messages
+    if (selection.chatMessages && data.chatMessages) {
+      const existingMessages = game.chatMessages || [];
+      const newMessages = data.chatMessages.filter(
+        (msg) => !existingMessages.some((existing) => existing.id === msg.id)
+      );
+      for (const msg of newMessages) {
+        gameStore.addChatMessage(msg);
       }
     }
     
@@ -598,17 +522,9 @@ export default function ExportImportModal({
   
   // Count selected items
   const selectedCount = {
-    tokens: selection.tokens.size,
-    images: selection.images.size,
-    shapes: selection.shapes.size,
-    text: selection.text.size,
+    scenes: selection.scenes.size,
     notes: selection.campaignNotes.size,
     library: selection.libraryItems.size,
-    total:
-      selection.tokens.size +
-      selection.images.size +
-      selection.shapes.size +
-      selection.text.size,
   };
   
   // Get import data counts
@@ -617,12 +533,11 @@ export default function ExportImportModal({
     
     const data = importData as EnhancedExport;
     return {
-      tokens: data.elements?.tokens?.length || 0,
-      images: data.elements?.images?.length || 0,
-      shapes: data.elements?.shapes?.length || 0,
-      text: data.elements?.text?.length || 0,
+      scenes: data.scenes?.length || 0,
       notes: data.campaignNotes?.length || 0,
       library: data.libraryItems?.length || 0,
+      combat: data.combat ? 1 : 0,
+      chat: data.chatMessages?.length || 0,
     };
   }, [importData]);
   
@@ -647,40 +562,54 @@ export default function ExportImportModal({
             
             <ScrollArea h={400}>
               <Stack gap="xs">
-                {/* Game Settings */}
+                {/* Scenes */}
                 <TreeItem
-                  label="Game Settings"
-                  icon="⚙️"
-                  checked={selection.gridSettings && selection.fogOfWar}
-                  indeterminate={selection.gridSettings !== selection.fogOfWar}
+                  label="Scenes"
+                  icon="🎬"
+                  checked={selection.allScenes}
+                  indeterminate={getIndeterminate('scenes', scenes)}
+                  onChange={() =>
+                    toggleAllOfType('scenes', scenes, 'allScenes')
+                  }
+                  count={scenes.length}
+                  expanded={expanded.scenes}
+                  onToggleExpand={() =>
+                    setExpanded((prev) => ({ ...prev, scenes: !prev.scenes }))
+                  }
+                >
+                  {scenes.map((scene) => (
+                    <TreeItem
+                      key={scene.id}
+                      label={scene.name}
+                      icon="•"
+                      checked={selection.scenes.has(scene.id)}
+                      onChange={() =>
+                        toggleItem('scenes', scene.id, scenes, 'allScenes')
+                      }
+                      count={scene.elements.length}
+                    />
+                  ))}
+                </TreeItem>
+                
+                {/* Global State */}
+                <Divider />
+                <TreeItem
+                  label="Global State"
+                  icon="🌐"
+                  checked={selection.combat && selection.chatMessages}
+                  indeterminate={selection.combat !== selection.chatMessages}
                   onChange={(checked) =>
                     setSelection((prev) => ({
                       ...prev,
-                      gridSettings: checked,
-                      fogOfWar: checked,
+                      combat: checked,
+                      chatMessages: checked,
                     }))
                   }
-                  expanded={expanded.settings}
+                  expanded={expanded.global}
                   onToggleExpand={() =>
-                    setExpanded((prev) => ({ ...prev, settings: !prev.settings }))
+                    setExpanded((prev) => ({ ...prev, global: !prev.global }))
                   }
                 >
-                  <TreeItem
-                    label="Grid Configuration"
-                    icon="🗺️"
-                    checked={selection.gridSettings}
-                    onChange={(checked) =>
-                      setSelection((prev) => ({ ...prev, gridSettings: checked }))
-                    }
-                  />
-                  <TreeItem
-                    label="Fog of War State"
-                    icon="🌫️"
-                    checked={selection.fogOfWar}
-                    onChange={(checked) =>
-                      setSelection((prev) => ({ ...prev, fogOfWar: checked }))
-                    }
-                  />
                   {game?.combat && (
                     <TreeItem
                       label="Combat State"
@@ -691,190 +620,16 @@ export default function ExportImportModal({
                       }
                     />
                   )}
-                </TreeItem>
-                
-                <Divider />
-                
-                {/* Elements */}
-                <TreeItem
-                  label="Canvas Elements"
-                  icon="🖼️"
-                  checked={selectedCount.total === game?.elements.length}
-                  indeterminate={
-                    selectedCount.total > 0 &&
-                    selectedCount.total < (game?.elements.length || 0)
-                  }
-                  onChange={(checked) => {
-                    if (checked) {
-                      setSelection((prev) => ({
-                        ...prev,
-                        tokens: new Set(elementsByType.tokens.map((e) => e.id)),
-                        images: new Set(elementsByType.images.map((e) => e.id)),
-                        shapes: new Set(elementsByType.shapes.map((e) => e.id)),
-                        text: new Set(elementsByType.text.map((e) => e.id)),
-                        allTokens: true,
-                        allImages: true,
-                        allShapes: true,
-                        allText: true,
-                      }));
-                    } else {
-                      setSelection((prev) => ({
-                        ...prev,
-                        tokens: new Set(),
-                        images: new Set(),
-                        shapes: new Set(),
-                        text: new Set(),
-                        allTokens: false,
-                        allImages: false,
-                        allShapes: false,
-                        allText: false,
-                      }));
-                    }
-                  }}
-                  count={game?.elements.length || 0}
-                  expanded={expanded.elements}
-                  onToggleExpand={() =>
-                    setExpanded((prev) => ({ ...prev, elements: !prev.elements }))
-                  }
-                >
-                  {/* Tokens */}
-                  {elementsByType.tokens.length > 0 && (
+                  {chatMessages.length > 0 && (
                     <TreeItem
-                      label="Tokens"
-                      icon="👤"
-                      checked={selection.allTokens}
-                      indeterminate={getIndeterminate('tokens', elementsByType.tokens)}
-                      onChange={() =>
-                        toggleAllOfType('tokens', elementsByType.tokens, 'allTokens')
+                      label="Chat History"
+                      icon="💬"
+                      checked={selection.chatMessages}
+                      onChange={(checked) =>
+                        setSelection((prev) => ({ ...prev, chatMessages: checked }))
                       }
-                      count={elementsByType.tokens.length}
-                      expanded={expanded.tokens}
-                      onToggleExpand={() =>
-                        setExpanded((prev) => ({ ...prev, tokens: !prev.tokens }))
-                      }
-                    >
-                      {elementsByType.tokens.map((token) => (
-                        <TreeItem
-                          key={token.id}
-                          label={(token as any).name || 'Unnamed Token'}
-                          icon="•"
-                          checked={selection.tokens.has(token.id)}
-                          onChange={() =>
-                            toggleItem(
-                              'tokens',
-                              token.id,
-                              elementsByType.tokens,
-                              'allTokens'
-                            )
-                          }
-                        />
-                      ))}
-                    </TreeItem>
-                  )}
-                  
-                  {/* Images */}
-                  {elementsByType.images.length > 0 && (
-                    <TreeItem
-                      label="Map Images"
-                      icon="🗺️"
-                      checked={selection.allImages}
-                      indeterminate={getIndeterminate('images', elementsByType.images)}
-                      onChange={() =>
-                        toggleAllOfType('images', elementsByType.images, 'allImages')
-                      }
-                      count={elementsByType.images.length}
-                      expanded={expanded.images}
-                      onToggleExpand={() =>
-                        setExpanded((prev) => ({ ...prev, images: !prev.images }))
-                      }
-                    >
-                      {elementsByType.images.map((img) => (
-                        <TreeItem
-                          key={img.id}
-                          label={(img as any).name || 'Map Image'}
-                          icon="•"
-                          checked={selection.images.has(img.id)}
-                          onChange={() =>
-                            toggleItem(
-                              'images',
-                              img.id,
-                              elementsByType.images,
-                              'allImages'
-                            )
-                          }
-                        />
-                      ))}
-                    </TreeItem>
-                  )}
-                  
-                  {/* Shapes */}
-                  {elementsByType.shapes.length > 0 && (
-                    <TreeItem
-                      label="Drawings"
-                      icon="✏️"
-                      checked={selection.allShapes}
-                      indeterminate={getIndeterminate('shapes', elementsByType.shapes)}
-                      onChange={() =>
-                        toggleAllOfType('shapes', elementsByType.shapes, 'allShapes')
-                      }
-                      count={elementsByType.shapes.length}
-                      expanded={expanded.shapes}
-                      onToggleExpand={() =>
-                        setExpanded((prev) => ({ ...prev, shapes: !prev.shapes }))
-                      }
-                    >
-                      {elementsByType.shapes.map((shape, index) => (
-                        <TreeItem
-                          key={shape.id}
-                          label={`${(shape as any).shapeType} ${index + 1}`}
-                          icon="•"
-                          checked={selection.shapes.has(shape.id)}
-                          onChange={() =>
-                            toggleItem(
-                              'shapes',
-                              shape.id,
-                              elementsByType.shapes,
-                              'allShapes'
-                            )
-                          }
-                        />
-                      ))}
-                    </TreeItem>
-                  )}
-                  
-                  {/* Text */}
-                  {elementsByType.text.length > 0 && (
-                    <TreeItem
-                      label="Text Labels"
-                      icon="📝"
-                      checked={selection.allText}
-                      indeterminate={getIndeterminate('text', elementsByType.text)}
-                      onChange={() =>
-                        toggleAllOfType('text', elementsByType.text, 'allText')
-                      }
-                      count={elementsByType.text.length}
-                      expanded={expanded.text}
-                      onToggleExpand={() =>
-                        setExpanded((prev) => ({ ...prev, text: !prev.text }))
-                      }
-                    >
-                      {elementsByType.text.map((txt) => (
-                        <TreeItem
-                          key={txt.id}
-                          label={(txt as any).content?.substring(0, 20) || 'Text'}
-                          icon="•"
-                          checked={selection.text.has(txt.id)}
-                          onChange={() =>
-                            toggleItem(
-                              'text',
-                              txt.id,
-                              elementsByType.text,
-                              'allText'
-                            )
-                          }
-                        />
-                      ))}
-                    </TreeItem>
+                      count={chatMessages.length}
+                    />
                   )}
                 </TreeItem>
                 
@@ -969,48 +724,34 @@ export default function ExportImportModal({
                 <Button variant="subtle" size="xs" onClick={() => {
                   setSelection((prev) => ({
                     ...prev,
-                    gridSettings: true,
-                    fogOfWar: true,
-                    tokens: new Set(elementsByType.tokens.map((e) => e.id)),
-                    images: new Set(elementsByType.images.map((e) => e.id)),
-                    shapes: new Set(elementsByType.shapes.map((e) => e.id)),
-                    text: new Set(elementsByType.text.map((e) => e.id)),
-                    allTokens: true,
-                    allImages: true,
-                    allShapes: true,
-                    allText: true,
+                    scenes: new Set(scenes.map((s) => s.id)),
+                    allScenes: true,
                     campaignNotes: new Set(campaignNotes.map((n) => n.id)),
                     allNotes: true,
                     libraryItems: new Set(libraryItems.map((i) => i.id)),
                     allLibrary: true,
                     combat: true,
+                    chatMessages: true,
                   }));
                 }}>
                   Select All
                 </Button>
                 <Button variant="subtle" size="xs" onClick={() => {
                   setSelection({
-                    gridSettings: false,
-                    fogOfWar: false,
-                    tokens: new Set(),
-                    images: new Set(),
-                    shapes: new Set(),
-                    text: new Set(),
-                    allTokens: false,
-                    allImages: false,
-                    allShapes: false,
-                    allText: false,
+                    scenes: new Set(),
+                    allScenes: false,
                     campaignNotes: new Set(),
                     allNotes: false,
                     libraryItems: new Set(),
                     allLibrary: false,
                     combat: false,
+                    chatMessages: false,
                   });
                 }}>
                   Select None
                 </Button>
               </Group>
-              <Button onClick={handleExport} disabled={selectedCount.total === 0 && !selection.gridSettings && !selection.fogOfWar}>
+              <Button onClick={handleExport} disabled={selectedCount.scenes === 0 && selectedCount.notes === 0 && selectedCount.library === 0 && !selection.combat && !selection.chatMessages}>
                 Export Selected
               </Button>
             </Group>
@@ -1065,50 +806,14 @@ export default function ExportImportModal({
                   <Stack gap="xs">
                     {importCounts && (
                       <>
-                        {importCounts.tokens > 0 && (
+                        {importCounts.scenes > 0 && (
                           <Checkbox
-                            label={`Tokens (${importCounts.tokens})`}
-                            checked={selection.allTokens}
+                            label={`Scenes (${importCounts.scenes})`}
+                            checked={selection.allScenes}
                             onChange={() =>
                               setSelection((prev) => ({
                                 ...prev,
-                                allTokens: !prev.allTokens,
-                              }))
-                            }
-                          />
-                        )}
-                        {importCounts.images > 0 && (
-                          <Checkbox
-                            label={`Map Images (${importCounts.images})`}
-                            checked={selection.allImages}
-                            onChange={() =>
-                              setSelection((prev) => ({
-                                ...prev,
-                                allImages: !prev.allImages,
-                              }))
-                            }
-                          />
-                        )}
-                        {importCounts.shapes > 0 && (
-                          <Checkbox
-                            label={`Drawings (${importCounts.shapes})`}
-                            checked={selection.allShapes}
-                            onChange={() =>
-                              setSelection((prev) => ({
-                                ...prev,
-                                allShapes: !prev.allShapes,
-                              }))
-                            }
-                          />
-                        )}
-                        {importCounts.text > 0 && (
-                          <Checkbox
-                            label={`Text Labels (${importCounts.text})`}
-                            checked={selection.allText}
-                            onChange={() =>
-                              setSelection((prev) => ({
-                                ...prev,
-                                allText: !prev.allText,
+                                allScenes: !prev.allScenes,
                               }))
                             }
                           />
@@ -1137,32 +842,7 @@ export default function ExportImportModal({
                             }
                           />
                         )}
-                        {(importData as EnhancedExport).gameSettings && (
-                          <>
-                            <Divider label="Settings" labelPosition="left" />
-                            <Checkbox
-                              label="Grid Settings"
-                              checked={selection.gridSettings}
-                              onChange={() =>
-                                setSelection((prev) => ({
-                                  ...prev,
-                                  gridSettings: !prev.gridSettings,
-                                }))
-                              }
-                            />
-                            <Checkbox
-                              label="Fog of War State"
-                              checked={selection.fogOfWar}
-                              onChange={() =>
-                                setSelection((prev) => ({
-                                  ...prev,
-                                  fogOfWar: !prev.fogOfWar,
-                                }))
-                              }
-                            />
-                          </>
-                        )}
-                        {(importData as EnhancedExport).combat && (
+                        {importCounts.combat > 0 && (
                           <Checkbox
                             label="Combat State"
                             checked={selection.combat}
@@ -1170,6 +850,18 @@ export default function ExportImportModal({
                               setSelection((prev) => ({
                                 ...prev,
                                 combat: !prev.combat,
+                              }))
+                            }
+                          />
+                        )}
+                        {importCounts.chat > 0 && (
+                          <Checkbox
+                            label={`Chat Messages (${importCounts.chat})`}
+                            checked={selection.chatMessages}
+                            onChange={() =>
+                              setSelection((prev) => ({
+                                ...prev,
+                                chatMessages: !prev.chatMessages,
                               }))
                             }
                           />
