@@ -2,7 +2,8 @@ import { Layer } from 'react-konva';
 import { Shape } from '../Shape';
 import { TextLabel } from '../TextLabel';
 import { Token } from '../Token';
-import type { CanvasElement, GridSettings, ShapeElement, TextElement, TokenElement } from '../../types';
+import { MapImage } from '../MapImage';
+import type { CanvasElement, GridSettings, ImageElement, ShapeElement, TextElement, TokenElement } from '../../types';
 
 interface InteractiveElementsLayerProps {
   elements: CanvasElement[];
@@ -70,6 +71,21 @@ export function InteractiveElementsLayer({
             onDragStart={() => onDragStart(el.id)}
             onDragEnd={(x, y) => onDragEnd(el.id, x, y)}
             onDoubleClick={() => onTextDoubleClick(el.id)}
+            isGM={isGM}
+          />
+        ))}
+      {/* Unlocked images */}
+      {layerVisibility.map && elements
+        .filter((el): el is ImageElement => el.type === 'image' && !el.locked)
+        .map(el => (
+          <MapImage
+            key={el.id}
+            element={el}
+            isSelected={selectedElementId === el.id || selectedElementIds.includes(el.id)}
+            onSelect={() => onSelect(el.id)}
+            onShiftSelect={() => onShiftSelect(el.id)}
+            onDragStart={() => onDragStart(el.id)}
+            onDragEnd={(x, y) => onDragEnd(el.id, x, y)}
             isGM={isGM}
           />
         ))}

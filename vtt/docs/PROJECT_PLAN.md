@@ -206,7 +206,7 @@ Add dropdown scene picker in toolbar for quick scene switching.
 
 ---
 
-### 3.3 Image Tool ⭐ HIGH PRIORITY
+### 3.3 Image Tool ✅ DONE
 
 Add image placement tool to toolbar (for non-background images: handouts, props, overlays).
 
@@ -217,11 +217,11 @@ Add image placement tool to toolbar (for non-background images: handouts, props,
 4. Image element created at click position
 5. Image properties editable in PropertyInspector sidebar
 
-**Files to modify:**
-- `src/components/Toolbar.tsx` - Add image tool button
-- `src/components/GameCanvas.tsx` - Handle image tool click → open modal
-- `src/components/ImageModal.tsx` - New modal for URL input
-- `src/components/PropertyInspector.tsx` - Ensure image properties work
+**Files modified:**
+- `src/components/Toolbar.tsx` - Added image tool button with IconPhoto
+- `src/components/GameCanvas.tsx` - Added image tool click handler and ImageModal
+- `src/components/ImageModal.tsx` - Created new modal for URL/size/name input
+- `src/components/canvas/InteractiveElementsLayer.tsx` - Added ImageElement rendering for unlocked images
 
 **Complexity:** Low-Medium (follows token tool pattern)
 

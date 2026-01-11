@@ -32,6 +32,7 @@ import {
   IconTypography,
   IconRuler,
   IconMapPin,
+  IconPhoto,
   IconEye,
   IconEyeOff,
   IconChevronDown,
@@ -95,6 +96,7 @@ const drawingTools: { id: ToolType; icon: React.ComponentType<any>; label: strin
 // Utility tools
 const utilityTools: { id: ToolType; icon: React.ComponentType<any>; label: string; shortcut?: string }[] = [
   { id: 'text', icon: IconTypography, label: 'Add Text', shortcut: 'T' },
+  { id: 'image', icon: IconPhoto, label: 'Place Image', shortcut: 'I' },
   { id: 'measure', icon: IconRuler, label: 'Measure Distance', shortcut: 'M' },
   { id: 'ping', icon: IconMapPin, label: 'Ping Location', shortcut: 'P' },
 ];

@@ -10,6 +10,7 @@ import { useCanvasKeyboardShortcuts } from '../hooks/useCanvasKeyboardShortcuts'
 import type { CanvasElement, Point, TokenElement, ImageElement, ShapeElement, TextElement, Player } from '../types';
 import TokenConfigModal from './TokenConfigModal';
 import TextInputModal from './TextInputModal';
+import ImageModal, { type ImageConfig } from './ImageModal';
 import ToolHints from './canvas/ToolHints';
 import { BackgroundLayer } from './canvas/BackgroundLayer';
 import { StaticElementsLayer } from './canvas/StaticElementsLayer';
@@ -64,6 +65,10 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Token placement state
   const [tokenModalOpened, setTokenModalOpened] = useState(false);
   const [tokenPlacementPosition, setTokenPlacementPosition] = useState<Point | null>(null);
+  
+  // Image placement state
+  const [imageModalOpened, setImageModalOpened] = useState(false);
+  const [imagePlacementPosition, setImagePlacementPosition] = useState<Point | null>(null);
   
   // Text editing state
   const [textModalOpened, setTextModalOpened] = useState(false);
@@ -146,6 +151,32 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     editingTextId,
     updateElement,
   });
+
+  // Handle image modal submission
+  const handleImageSubmit = useCallback((config: ImageConfig) => {
+    if (!imagePlacementPosition || !game) return;
+
+    const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+    if (!activeScene) return;
+
+    const newElement: Omit<ImageElement, 'id'> = {
+      type: 'image',
+      layer: 'map',
+      x: imagePlacementPosition.x,
+      y: imagePlacementPosition.y,
+      imageUrl: config.imageUrl,
+      width: config.width,
+      height: config.height,
+      name: config.name,
+      visibleTo: 'all',
+      locked: false,
+      zIndex: activeScene.elements.length,
+    };
+
+    const id = addElement(newElement);
+    room.broadcastElementUpdate({ ...newElement, id } as ImageElement);
+    setImagePlacementPosition(null);
+  }, [imagePlacementPosition, game, addElement, room]);
 
   // Handle text double-click for editing (sets state for modal)
   const handleTextDoubleClick = useCallback((elementId: string) => {
@@ -377,6 +408,22 @@ export default function GameCanvas({ room }: GameCanvasProps) {
             // Store position and open modal
             setTokenPlacementPosition({ x, y });
             setTokenModalOpened(true);
+          }
+        }
+      }
+      // Handle image tool
+      if (selectedTool === 'image' && e.target === e.target.getStage()) {
+        const stage = stageRef.current;
+        if (stage) {
+          const pointer = stage.getPointerPosition();
+          if (pointer) {
+            // Transform to canvas coordinates
+            const x = (pointer.x - viewportOffset.x) / viewportScale;
+            const y = (pointer.y - viewportOffset.y) / viewportScale;
+            
+            // Store position and open modal
+            setImagePlacementPosition({ x, y });
+            setImageModalOpened(true);
           }
         }
       }
@@ -803,6 +850,16 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           setEditingTextId(null);
         }}
         initialText={textEditContent}
+      />
+      
+      {/* Image Placement Modal */}
+      <ImageModal
+        opened={imageModalOpened}
+        onClose={() => {
+          setImageModalOpened(false);
+          setImagePlacementPosition(null);
+        }}
+        onSubmit={handleImageSubmit}
       />
     </div>
   );
