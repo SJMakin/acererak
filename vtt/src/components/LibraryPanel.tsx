@@ -46,6 +46,9 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
 
   const { game, addElement } = useGameStore();
 
+  // Get active scene
+  const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -59,18 +62,18 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   const filteredItems = getFilteredItems();
 
   const handlePlaceOnCanvas = (item: LibraryItem) => {
-    if (!game) return;
+    if (!game || !activeScene) return;
 
     if (item.type === 'token') {
       const templateData = item.data as TokenTemplateData;
-      const cellSize = game.gridSettings.cellSize;
+      const cellSize = activeScene.gridSettings.cellSize;
       
       // Place token at center of current viewport
       const newToken: Omit<TokenElement, 'id'> = {
         ...templateData,
         x: cellSize * 5, // Default position
         y: cellSize * 5,
-        zIndex: game.elements.length,
+        zIndex: activeScene.elements.length,
       };
 
       const id = addElement(newToken);

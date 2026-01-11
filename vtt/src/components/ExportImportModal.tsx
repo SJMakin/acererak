@@ -441,6 +441,8 @@ export default function ExportImportModal({
     // Import scenes (always add, never replace)
     if (data.scenes && selection.allScenes) {
       const scenesToImport = data.scenes.filter((s) => selection.scenes.has(s.id));
+      const newScenes: Scene[] = [];
+      
       for (const scene of scenesToImport) {
         // Generate new IDs for elements to avoid conflicts
         const sceneWithNewIds: Scene = {
@@ -451,11 +453,14 @@ export default function ExportImportModal({
             id: nanoid(10),
           })),
         };
-        gameStore.updateScene(sceneWithNewIds.id, sceneWithNewIds);
-        // Add to game's scene list
+        newScenes.push(sceneWithNewIds);
+      }
+      
+      // Add all scenes in a single update
+      if (newScenes.length > 0) {
         const updatedGame = {
           ...game,
-          scenes: [...game.scenes, sceneWithNewIds],
+          scenes: [...game.scenes, ...newScenes],
           updatedAt: new Date().toISOString(),
         };
         gameStore.loadGame(updatedGame);

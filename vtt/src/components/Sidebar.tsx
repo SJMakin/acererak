@@ -58,8 +58,11 @@ export default function Sidebar({ room }: SidebarProps) {
   const [newTokenUrl, setNewTokenUrl] = useState('');
   const [newTokenSize, setNewTokenSize] = useState(1);
 
+  // Get active scene
+  const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+
   // Get selected element
-  const selectedElement = game?.elements.find(e => e.id === selectedElementId);
+  const selectedElement = activeScene?.elements.find(e => e.id === selectedElementId);
 
   const handleAddToken = () => {
     if (!newTokenName.trim()) return;
@@ -75,7 +78,7 @@ export default function Sidebar({ room }: SidebarProps) {
       height: newTokenSize,
       visibleTo: 'all',
       locked: false,
-      zIndex: game?.elements.length || 0,
+      zIndex: activeScene?.elements.length || 0,
     };
 
     const id = addElement(token);
@@ -97,7 +100,7 @@ export default function Sidebar({ room }: SidebarProps) {
   };
 
   const handleUpdateVisibility = (elementId: string, visibility: Visibility) => {
-    const element = game?.elements.find(e => e.id === elementId);
+    const element = activeScene?.elements.find(e => e.id === elementId);
     if (!element) return;
 
     updateElement(elementId, { visibleTo: visibility });
@@ -105,7 +108,7 @@ export default function Sidebar({ room }: SidebarProps) {
   };
 
   // Get tokens and other elements
-  const tokens = game?.elements.filter(e => e.type === 'token') || [];
+  const tokens = activeScene?.elements.filter(e => e.type === 'token') || [];
   const players = game ? Object.values(game.players) : [];
 
   const handleDiceRoll = (message: ChatMessage) => {
@@ -394,7 +397,7 @@ export default function Sidebar({ room }: SidebarProps) {
                   <Stack gap="xs">
                     <Checkbox
                       label="Enable Fog of War"
-                      checked={game?.fogOfWar.enabled}
+                      checked={activeScene?.fogOfWar.enabled}
                       onChange={(e) => {
                         useGameStore.getState().toggleFog(e.currentTarget.checked);
                       }}
