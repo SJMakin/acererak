@@ -46,6 +46,8 @@ import {
   IconCopy,
   IconTrash,
   IconEdit,
+  IconShare,
+  IconDatabase,
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
@@ -53,6 +55,7 @@ import type { ToolType, Scene } from '../types';
 import SettingsModal from './SettingsModal';
 import ExportImportModal from './ExportImportModal';
 import SceneModal from './SceneModal';
+import ShareGameModal from './ShareGameModal';
 import ConnectionStatus from './ConnectionStatus';
 
 interface ToolbarProps {
@@ -141,6 +144,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   const [settingsOpened, setSettingsOpened] = useState(false);
   const [exportImportOpened, setExportImportOpened] = useState(false);
   const [exportImportMode, setExportImportMode] = useState<'export' | 'import'>('export');
+  const [shareGameOpened, setShareGameOpened] = useState(false);
   
   // Scene Modal state
   const [sceneModalOpened, setSceneModalOpened] = useState(false);
@@ -646,23 +650,74 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
 
           <Menu.Dropdown>
             <Menu.Label>Game</Menu.Label>
-            <Menu.Item onClick={() => {
-              setExportImportMode('export');
-              setExportImportOpened(true);
-            }}>
-              💾 Export Game...
+            
+            {/* Share Game submenu */}
+            {room.roomId && (
+              <Menu
+                trigger="hover"
+                position="right"
+                openDelay={100}
+                closeDelay={100}
+              >
+                <Menu.Target>
+                  <Menu.Item leftSection={<IconShare size={16} />}>
+                    Share Game
+                  </Menu.Item>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item
+                    leftSection={<IconCopy size={16} />}
+                    onClick={() => {
+                      navigator.clipboard.writeText(room.roomId!);
+                    }}
+                  >
+                    Copy Room ID
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconShare size={16} />}
+                    onClick={() => setShareGameOpened(true)}
+                  >
+                    Show QR Code
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconCopy size={16} />}
+                    onClick={() => {
+                      const joinLink = `${window.location.origin}${window.location.pathname}?room=${room.roomId}`;
+                      navigator.clipboard.writeText(joinLink);
+                    }}
+                  >
+                    Copy Join Link
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )}
+            
+            <Menu.Item
+              leftSection={<IconDatabase size={16} />}
+              onClick={() => {
+                setExportImportMode('export');
+                setExportImportOpened(true);
+              }}
+            >
+              Save/Load...
             </Menu.Item>
-            <Menu.Item onClick={() => {
-              setExportImportMode('import');
-              setExportImportOpened(true);
-            }}>
-              📥 Import...
+            
+            <Menu.Divider />
+            
+            <Menu.Item
+              leftSection={<IconSettings size={16} />}
+              onClick={() => setSettingsOpened(true)}
+            >
+              Settings...
             </Menu.Item>
             
             {room.roomId && (
               <>
                 <Menu.Divider />
-                <Menu.Item color="red" onClick={room.leaveRoom}>
+                <Menu.Item
+                  color="red"
+                  onClick={room.leaveRoom}
+                >
                   🚪 Leave Game
                 </Menu.Item>
               </>
@@ -690,6 +745,13 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
         opened={exportImportOpened}
         onClose={() => setExportImportOpened(false)}
         mode={exportImportMode}
+      />
+
+      {/* Share Game Modal */}
+      <ShareGameModal
+        opened={shareGameOpened}
+        onClose={() => setShareGameOpened(false)}
+        roomId={room.roomId}
       />
 
       {/* Scene Modal */}

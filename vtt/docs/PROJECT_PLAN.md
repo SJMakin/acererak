@@ -247,7 +247,7 @@ Combine dice rolls into chat timeline as special message type.
 
 ---
 
-### 3.5 Game Menu & Room Sharing
+### 3.5 Game Menu & Room Sharing ✅ DONE
 
 Fix missing room sharing after game starts + clean up Game menu.
 
@@ -267,9 +267,9 @@ Game
 └─ Leave Game
 ```
 
-**Files to modify:**
-- `src/components/App.tsx` or `src/components/GameMenu.tsx` - Restructure menu
-- `src/components/ShareGameModal.tsx` - New modal with QR/ID/link options
+**Files modified:**
+- `src/components/ShareGameModal.tsx` - Created new modal with QR code, Room ID display, and copy buttons
+- `src/components/Toolbar.tsx` - Added ShareGameModal state, restructured Game menu with Share Game submenu, combined Export/Import into Save/Load... menu item
 
 **Complexity:** Low (UI reorganization)
 
