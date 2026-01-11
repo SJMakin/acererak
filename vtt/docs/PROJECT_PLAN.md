@@ -381,7 +381,37 @@ interface ExportFileV3 {
 
 ---
 
-### 3.9 Mobile Support
+### 3.9 Code Review Bug Fixes ✅ DONE
+
+Fix major issues found during Phase 3 code review.
+
+**Issues Fixed:**
+
+1. **Sidebar.tsx - Stale References to Legacy Data Structure**
+   - Lines: 62, 78, 100, 108
+   - Problem: References `game?.elements` and `game?.fogOfWar` directly instead of through active scene
+   - Fix: Added `activeScene` helper and replaced all references
+
+2. **LibraryPanel.tsx - Same Legacy Data Issue**
+   - Lines: 66-73
+   - Problem: References `game.gridSettings` and `game.elements` directly
+   - Fix: Added `activeScene` helper and replaced all references
+
+3. **ExportImportModal.tsx - Scene Import Logic Bug**
+   - Lines: 442-461
+   - Problem: Calls `updateScene` before scene exists, then `loadGame` overwrites
+   - Fix: Collect all new scenes and add them in a single `loadGame` call
+
+**Files modified:**
+- `src/components/Sidebar.tsx` - Added activeScene helper, replaced game?.elements with activeScene?.elements, replaced game?.fogOfWar with activeScene?.fogOfWar
+- `src/components/LibraryPanel.tsx` - Added activeScene helper, replaced game.gridSettings with activeScene.gridSettings, replaced game.elements with activeScene.elements
+- `src/components/ExportImportModal.tsx` - Fixed scene import logic to avoid calling updateScene before scene exists
+
+**Complexity:** Low (data access refactoring)
+
+---
+
+### 3.10 Mobile Support
 
 - [ ] Ensure create/join game forms fit on mobile screen
 - [ ] Touch gesture optimization (pinch zoom, two-finger pan)
@@ -562,6 +592,7 @@ These features don't fit the decentralized design:
 | v1.7.0 | P2P Polish | Undo/redo sync, clipboard sync, cursor throttling/interpolation |
 | v1.8.0 | Scene System | Multi-scene architecture, scene picker, image tool, dice/chat integration, export v3 format |
 | v1.8.1 | Bug Fixes | Ping P2P visibility fix |
+| v1.8.2 | Bug Fixes | Code review fixes - active scene data access, scene import logic |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---
