@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Stage, Layer, Rect, Line, Circle, Ellipse, Image, Text, Group, Path, Shape as KonvaShape, Arrow } from 'react-konva';
+import { Stage, Layer, Rect, Line, Circle, Ellipse, Text, Group, Path, Shape as KonvaShape, Arrow } from 'react-konva';
 import type Konva from 'konva';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
@@ -7,6 +7,11 @@ import { useClipboard } from '../hooks/useClipboard';
 import type { CanvasElement, Point, TokenElement, ImageElement, ShapeElement, TextElement, Player } from '../types';
 import TokenConfigModal, { type TokenConfig } from './TokenConfigModal';
 import TextInputModal from './TextInputModal';
+import { Shape } from './Shape';
+import { TextLabel } from './TextLabel';
+import { MapImage } from './MapImage';
+import { Grid } from './Grid';
+import { Token } from './Token';
 
 interface GameCanvasProps {
   room: {
@@ -19,7 +24,7 @@ interface GameCanvasProps {
 }
 
 // Custom hook for loading images
-function useImage(url: string): [HTMLImageElement | null, boolean] {
+export function useImage(url: string): [HTMLImageElement | null, boolean] {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -39,765 +44,6 @@ function useImage(url: string): [HTMLImageElement | null, boolean] {
   }, [url]);
 
   return [image, loaded];
-}
-
-// Token component
-function Token({
-  element,
-  cellSize,
-  isSelected,
-  isCurrentTurn,
-  onSelect,
-  onShiftSelect,
-  onDragStart,
-  onDragEnd,
-  isGM,
-  showMetadata = true,
-}: {
-  element: TokenElement;
-  cellSize: number;
-  isSelected: boolean;
-  isCurrentTurn?: boolean;
-  onSelect: () => void;
-  onShiftSelect: () => void;
-  onDragStart: () => void;
-  onDragEnd: (x: number, y: number) => void;
-  isGM: boolean;
-  showMetadata?: boolean;
-}) {
-  const [image] = useImage(element.imageUrl);
-  const width = element.width * cellSize;
-  const height = element.height * cellSize;
-
-  // Check visibility
-  const visible = element.visibleTo === 'all' ||
-    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
-
-  if (!visible) return null;
-
-  // Calculate HP percentage and color
-  const hpPercent = element.hp ? (element.hp.current / element.hp.max) : 1;
-  const hpColor = hpPercent > 0.66 ? '#22c55e' : hpPercent > 0.33 ? '#f59e0b' : '#ef4444';
-  
-  // Scale factors for metadata
-  const scale = Math.max(0.5, Math.min(1, width / 50)); // Scale based on token size
-  const fontSize = 12 * scale;
-  const badgeSize = 20 * scale;
-  const conditionBadgeSize = 16 * scale;
-
-  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const evt = e.evt;
-    if (evt.shiftKey) {
-      onShiftSelect();
-    } else {
-      onSelect();
-    }
-  };
-
-  return (
-    <Group
-      x={element.x}
-      y={element.y}
-      draggable={!element.locked}
-      onClick={handleClick}
-      onTap={onSelect}
-      onDragStart={onDragStart}
-      onDragEnd={(e) => {
-        const node = e.target;
-        onDragEnd(node.x(), node.y());
-      }}
-    >
-      {/* Token image or placeholder */}
-      {image ? (
-        <Image
-          image={image}
-          width={width}
-          height={height}
-          cornerRadius={width / 2}
-        />
-      ) : (
-        <Circle
-          x={width / 2}
-          y={height / 2}
-          radius={width / 2}
-          fill="#6366f1"
-        />
-      )}
-
-      {/* Selection indicator */}
-      {isSelected && (
-        <Rect
-          x={-2}
-          y={-2}
-          width={width + 4}
-          height={height + 4}
-          stroke="#22c55e"
-          strokeWidth={2}
-          cornerRadius={width / 2}
-          listening={false}
-        />
-      )}
-
-      {/* Current turn indicator */}
-      {isCurrentTurn && (
-        <Circle
-          x={width / 2}
-          y={height / 2}
-          radius={width / 2 + 4}
-          stroke="#fbbf24"
-          strokeWidth={3}
-          dash={[8, 4]}
-          listening={false}
-        />
-      )}
-
-      {showMetadata && (
-        <>
-          {/* Name label with background */}
-          {element.name && (
-            <Group y={height + 2}>
-              <Rect
-                x={-2}
-                y={0}
-                width={width + 4}
-                height={fontSize + 6}
-                fill="rgba(0, 0, 0, 0.7)"
-                cornerRadius={3}
-              />
-              <Text
-                x={0}
-                y={3}
-                width={width}
-                text={element.name}
-                fontSize={fontSize}
-                fill="white"
-                align="center"
-                fontStyle="bold"
-              />
-            </Group>
-          )}
-
-          {/* HP bar with text */}
-          {element.hp && (
-            <Group y={height + (element.name ? fontSize + 10 : 4)}>
-              {/* HP bar background */}
-              <Rect
-                width={width}
-                height={6 * scale}
-                fill="#1f2937"
-                cornerRadius={3}
-              />
-              {/* HP bar foreground */}
-              <Rect
-                width={hpPercent * width}
-                height={6 * scale}
-                fill={hpColor}
-                cornerRadius={3}
-              />
-              {/* HP text */}
-              <Text
-                x={0}
-                y={8 * scale}
-                width={width}
-                text={`${element.hp.current}/${element.hp.max}`}
-                fontSize={fontSize * 0.85}
-                fill="white"
-                align="center"
-                fontStyle="bold"
-                shadowColor="black"
-                shadowBlur={3}
-                shadowOffsetX={1}
-                shadowOffsetY={1}
-              />
-            </Group>
-          )}
-
-          {/* AC badge (top-right corner) */}
-          {element.ac !== undefined && (
-            <Group x={width - badgeSize / 2} y={badgeSize / 2}>
-              {/* Shield background */}
-              <Circle
-                radius={badgeSize / 2}
-                fill="#3b82f6"
-                stroke="#1e40af"
-                strokeWidth={1.5}
-              />
-              {/* AC text */}
-              <Text
-                x={-badgeSize / 2}
-                y={-badgeSize / 2}
-                width={badgeSize}
-                height={badgeSize}
-                text={String(element.ac)}
-                fontSize={fontSize * 0.9}
-                fill="white"
-                align="center"
-                verticalAlign="middle"
-                fontStyle="bold"
-              />
-            </Group>
-          )}
-
-          {/* Condition badges (around token) */}
-          {element.conditions && element.conditions.length > 0 && (
-            <>
-              {element.conditions.slice(0, 6).map((condition, index) => {
-                // Position conditions around the token in a circle
-                const angle = (index / Math.min(element.conditions!.length, 6)) * Math.PI * 2 - Math.PI / 2;
-                const radius = width / 2 + conditionBadgeSize;
-                const x = width / 2 + Math.cos(angle) * radius;
-                const y = height / 2 + Math.sin(angle) * radius;
-                
-                // Get condition color
-                const conditionColors: Record<string, string> = {
-                  'poisoned': '#10b981',
-                  'stunned': '#f59e0b',
-                  'paralyzed': '#6366f1',
-                  'charmed': '#ec4899',
-                  'frightened': '#8b5cf6',
-                  'restrained': '#ef4444',
-                  'blinded': '#64748b',
-                  'deafened': '#64748b',
-                  'invisible': '#a855f7',
-                  'prone': '#78716c',
-                };
-                const conditionColor = conditionColors[condition.toLowerCase()] || '#94a3b8';
-                
-                return (
-                  <Group key={condition + index} x={x} y={y}>
-                    {/* Condition badge background */}
-                    <Circle
-                      radius={conditionBadgeSize / 2}
-                      fill={conditionColor}
-                      stroke="#000"
-                      strokeWidth={1}
-                    />
-                    {/* Condition initial */}
-                    <Text
-                      x={-conditionBadgeSize / 2}
-                      y={-conditionBadgeSize / 2}
-                      width={conditionBadgeSize}
-                      height={conditionBadgeSize}
-                      text={condition.charAt(0).toUpperCase()}
-                      fontSize={fontSize * 0.75}
-                      fill="white"
-                      align="center"
-                      verticalAlign="middle"
-                      fontStyle="bold"
-                    />
-                  </Group>
-                );
-              })}
-            </>
-          )}
-
-          {/* Token size indicator for large tokens */}
-          {(element.width > 1 || element.height > 1) && (
-            <Group x={badgeSize / 2} y={badgeSize / 2}>
-              <Circle
-                radius={badgeSize / 2}
-                fill="rgba(0, 0, 0, 0.7)"
-                stroke="#6b7280"
-                strokeWidth={1}
-              />
-              <Text
-                x={-badgeSize / 2}
-                y={-badgeSize / 2}
-                width={badgeSize}
-                height={badgeSize}
-                text={`${element.width}×${element.height}`}
-                fontSize={fontSize * 0.65}
-                fill="white"
-                align="center"
-                verticalAlign="middle"
-                fontStyle="bold"
-              />
-            </Group>
-          )}
-        </>
-      )}
-
-      {/* GM-only indicator */}
-      {element.visibleTo === 'gm' && isGM && (
-        <Circle
-          x={width - 6}
-          y={height - 6}
-          radius={6}
-          fill="#7c3aed"
-          opacity={0.8}
-        />
-      )}
-    </Group>
-  );
-}
-
-// Map image component
-function MapImage({
-  element,
-  isSelected,
-  onSelect,
-  onShiftSelect,
-  onDragStart,
-  onDragEnd,
-  isGM,
-}: {
-  element: ImageElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onShiftSelect: () => void;
-  onDragStart: () => void;
-  onDragEnd: (x: number, y: number) => void;
-  isGM: boolean;
-}) {
-  const [image] = useImage(element.imageUrl);
-
-  const visible = element.visibleTo === 'all' ||
-    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
-
-  if (!visible || !image) return null;
-
-  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const evt = e.evt;
-    if (evt.shiftKey) {
-      onShiftSelect();
-    } else {
-      onSelect();
-    }
-  };
-
-  return (
-    <Group
-      x={element.x}
-      y={element.y}
-      draggable={!element.locked}
-      onClick={handleClick}
-      onTap={onSelect}
-      onDragStart={onDragStart}
-      onDragEnd={(e) => {
-        const node = e.target;
-        onDragEnd(node.x(), node.y());
-      }}
-    >
-      <Image
-        image={image}
-        width={element.width}
-        height={element.height}
-        rotation={element.rotation || 0}
-      />
-      {isSelected && (
-        <Rect
-          x={-2}
-          y={-2}
-          width={element.width + 4}
-          height={element.height + 4}
-          stroke="#22c55e"
-          strokeWidth={2}
-          listening={false}
-        />
-      )}
-    </Group>
-  );
-}
-
-// Shape component
-function Shape({
-  element,
-  isSelected,
-  onSelect,
-  onShiftSelect,
-  onDragStart,
-  onDragEnd,
-  isGM,
-}: {
-  element: ShapeElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onShiftSelect: () => void;
-  onDragStart: () => void;
-  onDragEnd: (x: number, y: number) => void;
-  isGM: boolean;
-}) {
-  const visible = element.visibleTo === 'all' ||
-    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
-
-  if (!visible) return null;
-
-  const { style } = element;
-  const stroke = style?.strokeColor || '#ffffff';
-  const fill = style?.fillColor || 'transparent';
-  const strokeWidth = style?.lineWidth || 2;
-
-  // Calculate bounds for selection highlight
-  let boundsX = element.x;
-  let boundsY = element.y;
-  let boundsWidth = element.width || 100;
-  let boundsHeight = element.height || 100;
-
-  if (element.shapeType === 'freehand' || element.shapeType === 'line' || element.shapeType === 'polygon') {
-    // Calculate bounding box from points
-    if (element.points.length > 0) {
-      const xs = element.points.map(p => p.x);
-      const ys = element.points.map(p => p.y);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      const maxX = Math.max(...xs);
-      const maxY = Math.max(...ys);
-      boundsX = minX;
-      boundsY = minY;
-      boundsWidth = maxX - minX;
-      boundsHeight = maxY - minY;
-    }
-  } else if (element.shapeType === 'circle') {
-    const radius = Math.min(element.width || 50, element.height || 50) / 2;
-    boundsX = element.x - radius;
-    boundsY = element.y - radius;
-    boundsWidth = radius * 2;
-    boundsHeight = radius * 2;
-  }
-
-  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const evt = e.evt;
-    if (evt.shiftKey) {
-      onShiftSelect();
-    } else {
-      onSelect();
-    }
-  };
-
-  return (
-    <Group
-      x={element.x}
-      y={element.y}
-      draggable={!element.locked}
-      onClick={handleClick}
-      onTap={onSelect}
-      onDragStart={onDragStart}
-      onDragEnd={(e) => {
-        const node = e.target;
-        onDragEnd(node.x(), node.y());
-      }}
-    >
-      {/* Shape rendering */}
-      {(element.shapeType === 'freehand' || element.shapeType === 'line' || element.shapeType === 'polygon') && (
-        <Line
-          points={element.points.flatMap(p => [p.x, p.y])}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          closed={element.shapeType === 'polygon'}
-          fill={element.shapeType === 'polygon' ? fill : undefined}
-          tension={element.shapeType === 'freehand' ? 0.5 : 0}
-        />
-      )}
-
-      {element.shapeType === 'rectangle' && (
-        <Rect
-          x={0}
-          y={0}
-          width={element.width || 100}
-          height={element.height || 100}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          fill={fill}
-        />
-      )}
-
-      {element.shapeType === 'circle' && (
-        <Circle
-          x={0}
-          y={0}
-          radius={Math.min(element.width || 50, element.height || 50) / 2}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          fill={fill}
-        />
-      )}
-
-      {element.shapeType === 'ellipse' && (
-        <Ellipse
-          x={(element.width || 100) / 2}
-          y={(element.height || 100) / 2}
-          radiusX={(element.width || 100) / 2}
-          radiusY={(element.height || 100) / 2}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          fill={fill}
-        />
-      )}
-
-      {element.shapeType === 'arrow' && element.points.length >= 2 && (
-        <Arrow
-          points={[element.points[0].x, element.points[0].y, element.points[1].x, element.points[1].y]}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          fill={style?.fillColor || stroke}
-          pointerLength={Math.max(10, strokeWidth * 3)}
-          pointerWidth={Math.max(8, strokeWidth * 2.5)}
-        />
-      )}
-
-      {/* Selection highlight */}
-      {isSelected && (
-        <Rect
-          x={boundsX - element.x - 2}
-          y={boundsY - element.y - 2}
-          width={boundsWidth + 4}
-          height={boundsHeight + 4}
-          stroke="#22c55e"
-          strokeWidth={2}
-          listening={false}
-        />
-      )}
-    </Group>
-  );
-}
-
-// Text component
-function TextLabel({
-  element,
-  isSelected,
-  onSelect,
-  onShiftSelect,
-  onDragStart,
-  onDragEnd,
-  onDoubleClick,
-  isGM,
-}: {
-  element: TextElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onShiftSelect: () => void;
-  onDragStart: () => void;
-  onDragEnd: (x: number, y: number) => void;
-  onDoubleClick: () => void;
-  isGM: boolean;
-}) {
-  const visible = element.visibleTo === 'all' ||
-    (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));
-
-  if (!visible) return null;
-
-  const { style } = element;
-  const fontSize = style?.fontSize || 16;
-  const fontFamily = style?.fontFamily || 'sans-serif';
-  const fontWeight = style?.fontWeight || 'normal';
-  const fontStyle = style?.fontStyle || 'normal';
-  const textAlign = style?.textAlign || 'left';
-  const textColor = style?.strokeColor || '#ffffff';
-  const width = element.width || 200;
-  
-  // Background properties
-  const backgroundEnabled = style?.backgroundEnabled ?? true;
-  const backgroundColor = style?.backgroundColor || 'rgba(0, 0, 0, 0.7)';
-  const backgroundOpacity = style?.backgroundOpacity ?? 0.7;
-
-  // Build fontStyle string for Konva (accepts 'normal', 'italic', 'bold', 'italic bold')
-  let konvaFontStyle = 'normal';
-  if (fontStyle === 'italic' && fontWeight === 'bold') {
-    konvaFontStyle = 'italic bold';
-  } else if (fontStyle === 'italic') {
-    konvaFontStyle = 'italic';
-  } else if (fontWeight === 'bold') {
-    konvaFontStyle = 'bold';
-  }
-
-  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const evt = e.evt;
-    if (evt.shiftKey) {
-      onShiftSelect();
-    } else {
-      onSelect();
-    }
-  };
-
-  return (
-    <Group
-      x={element.x}
-      y={element.y}
-      draggable={!element.locked}
-      onClick={handleClick}
-      onTap={onSelect}
-      onDblClick={onDoubleClick}
-      onDblTap={onDoubleClick}
-      onDragStart={onDragStart}
-      onDragEnd={(e) => {
-        const node = e.target;
-        onDragEnd(node.x(), node.y());
-      }}
-    >
-      {/* Background rectangle */}
-      {backgroundEnabled && (
-        <Rect
-          x={0}
-          y={0}
-          width={width}
-          height={(element.height || fontSize * 1.5) + 8}
-          fill={backgroundColor}
-          opacity={backgroundOpacity}
-          cornerRadius={4}
-        />
-      )}
-      
-      {/* Text content with wrapping */}
-      <Text
-        text={element.content}
-        fontSize={fontSize}
-        fontFamily={fontFamily}
-        fontStyle={konvaFontStyle}
-        fill={textColor}
-        width={width}
-        padding={4}
-        align={textAlign}
-        wrap="word"
-      />
-      
-      {/* Selection highlight */}
-      {isSelected && (
-        <Rect
-          x={-2}
-          y={-2}
-          width={width + 4}
-          height={(element.height || fontSize * 1.5) + 12}
-          stroke="#22c55e"
-          strokeWidth={2}
-          listening={false}
-        />
-      )}
-    </Group>
-  );
-}
-
-// Square Grid component
-function SquareGrid({
-  width,
-  height,
-  cellSize,
-  color
-}: {
-  width: number;
-  height: number;
-  cellSize: number;
-  color: string;
-}) {
-  const lines = [];
-  
-  // Vertical lines
-  for (let i = 0; i <= width; i++) {
-    lines.push(
-      <Line
-        key={`v-${i}`}
-        points={[i * cellSize, 0, i * cellSize, height * cellSize]}
-        stroke={color}
-        strokeWidth={1}
-        listening={false}
-      />
-    );
-  }
-  
-  // Horizontal lines
-  for (let i = 0; i <= height; i++) {
-    lines.push(
-      <Line
-        key={`h-${i}`}
-        points={[0, i * cellSize, width * cellSize, i * cellSize]}
-        stroke={color}
-        strokeWidth={1}
-        listening={false}
-      />
-    );
-  }
-  
-  return <>{lines}</>;
-}
-
-// Hex Grid component (flat-top hexagons)
-function HexGrid({
-  width,
-  height,
-  cellSize,
-  color
-}: {
-  width: number;
-  height: number;
-  cellSize: number;
-  color: string;
-}) {
-  const hexagons = [];
-  
-  // Hex dimensions for flat-top hexagons
-  // cellSize represents the width of the hex
-  const hexWidth = cellSize;
-  const hexHeight = (Math.sqrt(3) / 2) * hexWidth;
-  
-  // Spacing between hex centers
-  const horizSpacing = hexWidth * 0.75;
-  const vertSpacing = hexHeight;
-  
-  // Calculate number of hexagons needed
-  const totalWidth = width * cellSize;
-  const totalHeight = height * cellSize;
-  const cols = Math.ceil(totalWidth / horizSpacing) + 1;
-  const rows = Math.ceil(totalHeight / vertSpacing) + 1;
-  
-  // Generate hexagon points for flat-top orientation
-  const getHexPoints = (cx: number, cy: number): number[] => {
-    const points: number[] = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i;
-      const x = cx + (hexWidth / 2) * Math.cos(angle);
-      const y = cy + (hexWidth / 2) * Math.sin(angle);
-      points.push(x, y);
-    }
-    return points;
-  };
-  
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      // Offset every other column
-      const xOffset = col * horizSpacing;
-      const yOffset = row * vertSpacing + (col % 2 === 1 ? vertSpacing / 2 : 0);
-      
-      // Only draw if within bounds
-      if (xOffset <= totalWidth + hexWidth && yOffset <= totalHeight + hexHeight) {
-        hexagons.push(
-          <Line
-            key={`hex-${row}-${col}`}
-            points={getHexPoints(xOffset, yOffset)}
-            stroke={color}
-            strokeWidth={1}
-            closed={true}
-            listening={false}
-          />
-        );
-      }
-    }
-  }
-  
-  return <>{hexagons}</>;
-}
-
-// Grid dispatcher component
-function Grid({
-  gridType = 'square',
-  width,
-  height,
-  cellSize,
-  color
-}: {
-  gridType?: 'square' | 'hex' | 'none';
-  width: number;
-  height: number;
-  cellSize: number;
-  color: string;
-}) {
-  if (gridType === 'none') {
-    return null;
-  }
-  
-  if (gridType === 'hex') {
-    return <HexGrid width={width} height={height} cellSize={cellSize} color={color} />;
-  }
-  
-  return <SquareGrid width={width} height={height} cellSize={cellSize} color={color} />;
 }
 
 export default function GameCanvas({ room }: GameCanvasProps) {
@@ -991,13 +237,17 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle element drag start - record initial positions for multi-select move
   const handleElementDragStart = useCallback((elementId: string) => {
+    // Get active scene elements
+    const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+    if (!activeScene) return;
+
     // Check if dragging an element that's part of a multi-selection
     if (selectedElementIds.length > 1 && selectedElementIds.includes(elementId)) {
       isDraggingMultiple.current = true;
       // Record initial positions of all selected elements
       const positions: Record<string, Point> = {};
       selectedElementIds.forEach(id => {
-        const el = game?.elements.find(e => e.id === id);
+        const el = activeScene.elements.find(e => e.id === id);
         if (el) {
           positions[id] = { x: el.x, y: el.y };
         }
@@ -1011,15 +261,19 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle element drag end
   const handleElementDragEnd = useCallback((elementId: string, x: number, y: number) => {
-    const element = game?.elements.find(e => e.id === elementId);
+    // Get active scene
+    const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+    if (!activeScene) return;
+
+    const element = activeScene.elements.find(e => e.id === elementId);
     if (!element) return;
 
     // Snap to grid if enabled
     let finalX = x;
     let finalY = y;
-    
-    if (game?.gridSettings.snapToGrid) {
-      const cellSize = game.gridSettings.cellSize;
+
+    if (activeScene.gridSettings.snapToGrid) {
+      const cellSize = activeScene.gridSettings.cellSize;
       finalX = Math.round(x / cellSize) * cellSize;
       finalY = Math.round(y / cellSize) * cellSize;
     }
@@ -1037,15 +291,15 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         const updatedElements: CanvasElement[] = [];
 
         selectedElementIds.forEach(id => {
-          const el = game?.elements.find(e => e.id === id);
+          const el = activeScene.elements.find(e => e.id === id);
           const originalPos = dragStartPositions.current[id];
           if (el && originalPos) {
             let newX = originalPos.x + deltaX;
             let newY = originalPos.y + deltaY;
 
             // Snap each element to grid
-            if (game?.gridSettings.snapToGrid) {
-              const cellSize = game.gridSettings.cellSize;
+            if (activeScene.gridSettings.snapToGrid) {
+              const cellSize = activeScene.gridSettings.cellSize;
               newX = Math.round(newX / cellSize) * cellSize;
               newY = Math.round(newY / cellSize) * cellSize;
             }
@@ -1078,12 +332,16 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const handleTokenSubmit = useCallback((config: TokenConfig) => {
     if (!tokenPlacementPosition || !game) return;
 
+    // Get active scene
+    const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+    if (!activeScene) return;
+
     let x = tokenPlacementPosition.x;
     let y = tokenPlacementPosition.y;
 
     // Snap to grid if enabled
-    if (game.gridSettings.snapToGrid) {
-      const cellSize = game.gridSettings.cellSize;
+    if (activeScene.gridSettings.snapToGrid) {
+      const cellSize = activeScene.gridSettings.cellSize;
       x = Math.round(x / cellSize) * cellSize;
       y = Math.round(y / cellSize) * cellSize;
     }
@@ -1099,7 +357,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       height: config.size,
       visibleTo: 'all',
       locked: false,
-      zIndex: game.elements.length,
+      zIndex: activeScene.elements.length,
       hp: config.hp,
       ac: config.ac,
     };
@@ -1114,7 +372,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle text double-click for editing
   const handleTextDoubleClick = useCallback((elementId: string) => {
-    const element = game?.elements.find(e => e.id === elementId);
+    // Get active scene
+    const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+    if (!activeScene) return;
+
+    const element = activeScene.elements.find(e => e.id === elementId);
     if (element && element.type === 'text') {
       setEditingTextId(elementId);
       setTextEditContent(element.content);
@@ -1125,17 +387,21 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle text submission (new or edit)
   const handleTextSubmit = useCallback((text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !game) return;
+
+    // Get active scene
+    const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+    if (!activeScene) return;
 
     if (editingTextId) {
       // Update existing text
-      const element = game?.elements.find(e => e.id === editingTextId);
+      const element = activeScene.elements.find(e => e.id === editingTextId);
       if (element && element.type === 'text') {
         updateElement(editingTextId, { content: text });
         const updatedElement: TextElement = { ...element, content: text };
         room.broadcastElementUpdate(updatedElement);
       }
-    } else if (textEditPosition && game) {
+    } else if (textEditPosition) {
       // Create new text element
       const newElement: Omit<TextElement, 'id'> = {
         type: 'text',
@@ -1146,7 +412,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         width: 200,
         visibleTo: 'all',
         locked: false,
-        zIndex: game.elements.length,
+        zIndex: activeScene.elements.length,
         style: {
           fontSize: 16,
           fontFamily: 'sans-serif',
@@ -1173,6 +439,10 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Finish polygon helper function - defined early so it can be used by handlers below
   const finishPolygon = useCallback(() => {
     if (polygonPoints.length >= 3 && game) {
+      // Get active scene
+      const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+      if (!activeScene) return;
+
       const newElement: Omit<ShapeElement, 'id'> = {
         type: 'shape' as const,
         layer: 'drawing' as const,
@@ -1182,7 +452,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         points: polygonPoints,
         visibleTo: 'all' as const,
         locked: false,
-        zIndex: game.elements.length || 0,
+        zIndex: activeScene.elements.length,
         style: {
           strokeColor: drawingStrokeColor,
           fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1423,18 +693,21 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       
       // Only select if the marquee is big enough (not just a click)
       if (maxX - minX > 5 || maxY - minY > 5) {
+        // Get active scene for marquee selection
+        const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+
         // Find all elements within the marquee rectangle
-        const selectedIds = (game?.elements || [])
+        const selectedIds = (activeScene?.elements || [])
           .filter(el => {
             // Get element bounds
             let elMinX = el.x;
             let elMinY = el.y;
             let elMaxX = el.x;
             let elMaxY = el.y;
-            
+
             if (el.type === 'token') {
               const token = el as TokenElement;
-              const cellSize = game?.gridSettings.cellSize || 50;
+              const cellSize = activeScene?.gridSettings.cellSize || 50;
               elMaxX = el.x + token.width * cellSize;
               elMaxY = el.y + token.height * cellSize;
             } else if (el.type === 'shape') {
@@ -1485,11 +758,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       setDrawStartPoint(null);
       return;
     }
-    
+
     isDrawing.current = false;
-    
+
+    // Get active scene for element creation
+    const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
+
     // Only save if we have at least 2 points (4 values: x1,y1,x2,y2)
-    if (currentLine.length >= 4) {
+    if (currentLine.length >= 4 && activeScene) {
       const startX = drawStartPoint.x;
       const startY = drawStartPoint.y;
       const endX = currentLine[currentLine.length - 2];
@@ -1512,8 +788,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         }
         
         // Broadcast fog update
-        if (room.broadcastFogUpdate && game?.fogOfWar) {
-          room.broadcastFogUpdate(game.fogOfWar);
+        if (room.broadcastFogUpdate && activeScene?.fogOfWar) {
+          room.broadcastFogUpdate(activeScene.fogOfWar);
         }
       } else if (selectedTool === 'draw-freehand') {
         // Freehand: convert all points
@@ -1531,7 +807,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points,
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1549,7 +825,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [{ x: startX, y: startY }, { x: endX, y: endY }],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: 'transparent',
@@ -1574,7 +850,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1596,7 +872,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1621,7 +897,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1639,7 +915,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [{ x: startX, y: startY }, { x: endX, y: endY }],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingStrokeColor, // Arrow head uses stroke color
@@ -1661,7 +937,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: '#f97316', // Orange for AOE
             fillColor: 'rgba(249, 115, 22, 0.3)', // Semi-transparent orange
@@ -1696,7 +972,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points,
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: '#ef4444', // Red for cone
             fillColor: 'rgba(239, 68, 68, 0.3)', // Semi-transparent red
@@ -1730,7 +1006,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           ],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: '#f97316', // Orange for triangle
             fillColor: 'rgba(249, 115, 22, 0.3)', // Semi-transparent orange
@@ -1760,7 +1036,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points,
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: '#3b82f6', // Blue for line
             fillColor: 'rgba(59, 130, 246, 0.3)', // Semi-transparent blue
@@ -1785,7 +1061,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points: [],
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: '#8b5cf6', // Purple for square AOE
             fillColor: 'rgba(139, 92, 246, 0.3)', // Semi-transparent purple
@@ -1808,7 +1084,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           points,
           visibleTo: 'all' as const,
           locked: false,
-          zIndex: game?.elements.length || 0,
+          zIndex: activeScene.elements.length,
           style: {
             strokeColor: drawingStrokeColor,
             fillColor: drawingFillEnabled ? drawingFillColor : 'transparent',
@@ -1908,7 +1184,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   if (!game) return null;
 
-  const { gridSettings, elements } = game;
+  // Get active scene data
+  const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+  if (!activeScene) return null;
+
+  const { gridSettings, elements, fogOfWar } = activeScene;
   const gridWidth = gridSettings.width * gridSettings.cellSize;
   const gridHeight = gridSettings.height * gridSettings.cellSize;
 
@@ -2033,7 +1313,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         </Layer>
 
         {/* Layer 3: Fog of War (listening: false) - Only visible to non-GMs when enabled */}
-        {game.fogOfWar.enabled && layerVisibility.fog && !effectiveIsDM && (
+        {fogOfWar.enabled && layerVisibility.fog && !effectiveIsDM && (
           <Layer listening={false}>
             <KonvaShape
               sceneFunc={(context, shape) => {
@@ -2047,7 +1327,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
                 // Cut out revealed areas using destination-out composite operation
                 context.globalCompositeOperation = 'destination-out';
                 
-                game.fogOfWar.revealed.forEach((polygon) => {
+                fogOfWar.revealed.forEach((polygon) => {
                   if (polygon.length > 0) {
                     context.beginPath();
                     context.moveTo(polygon[0].x, polygon[0].y);

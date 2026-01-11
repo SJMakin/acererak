@@ -34,6 +34,10 @@ import {
   IconCone,
   IconLine,
   IconTriangle,
+  IconMap,
+  IconPlus,
+  IconSettings,
+  IconCopy,
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
@@ -157,7 +161,88 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
             </Badge>
           )}
         </Group>
-        
+
+        {/* Scene Picker - GM only */}
+        {isGM && game && (() => {
+          const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+          return (
+            <Menu shadow="md" width={250}>
+              <Menu.Target>
+                <Tooltip label="Switch Scene" position="bottom">
+                  <ActionIcon variant="subtle" size="lg">
+                    <Group gap={4}>
+                      <IconMap size={18} />
+                      <Text size="sm" fw={500}>{activeScene?.name || 'Scene'}</Text>
+                      <IconChevronDown size={12} />
+                    </Group>
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Scenes</Menu.Label>
+                {game.scenes.map((scene) => (
+                  <Menu.Item
+                    key={scene.id}
+                    leftSection={<IconMap size={16} />}
+                    onClick={() => {
+                      useGameStore.getState().switchScene(scene.id);
+                      room.broadcastSceneSwitch(scene.id);
+                    }}
+                    color={scene.id === game.activeSceneId ? 'violet' : undefined}
+                    bg={scene.id === game.activeSceneId ? 'var(--mantine-color-violet-light)' : undefined}
+                  >
+                    <Group justify="space-between" gap="xs">
+                      <Text size="sm">{scene.name}</Text>
+                      {scene.id === game.activeSceneId && (
+                        <Badge size="xs" variant="light" color="violet">
+                          Active
+                        </Badge>
+                      )}
+                    </Group>
+                  </Menu.Item>
+                ))}
+
+                <Menu.Divider />
+
+                <Menu.Item
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => {
+                    // TODO: Open Scene Creation Modal
+                    console.log('Create new scene');
+                  }}
+                >
+                  New Scene
+                </Menu.Item>
+
+                <Menu.Item
+                  leftSection={<IconCopy size={16} />}
+                  onClick={() => {
+                    if (activeScene) {
+                      const newSceneId = useGameStore.getState().duplicateScene(activeScene.id);
+                      const newScene = game.scenes.find(s => s.id === newSceneId);
+                      if (newScene) {
+                        room.broadcastSceneUpdate(newScene);
+                      }
+                    }
+                  }}
+                >
+                  Duplicate Current Scene
+                </Menu.Item>
+
+                <Menu.Item
+                  leftSection={<IconSettings size={16} />}
+                  onClick={() => {
+                    // TODO: Open Scene Manager Modal
+                    console.log('Manage scenes');
+                  }}
+                >
+                  Manage Scenes
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          );
+        })()}
+
         <Divider orientation="vertical" />
 
         {/* Undo/Redo buttons */}

@@ -16,6 +16,8 @@ import type {
   Settings,
   CampaignNote,
   ChatMessage,
+  Scene,
+  FogOfWar,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
@@ -59,6 +61,47 @@ function saveSettings(settings: Settings) {
   } catch (error) {
     console.error('Failed to save settings:', error);
   }
+}
+
+// Helper to get active scene from game state
+function getActiveScene(game: GameState | null): Scene | null {
+  if (!game) return null;
+  return game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0] || null;
+}
+
+// Helper to update the active scene in game state
+function updateActiveScene(game: GameState, sceneUpdates: Partial<Scene>): GameState {
+  return {
+    ...game,
+    scenes: game.scenes.map(s =>
+      s.id === game.activeSceneId
+        ? { ...s, ...sceneUpdates, updatedAt: new Date().toISOString() }
+        : s
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// Helper to create a default scene
+function createDefaultScene(name: string, settings: Settings): Scene {
+  const now = new Date().toISOString();
+  return {
+    id: nanoid(10),
+    name,
+    gridSettings: {
+      cellSize: settings.cellSize,
+      width: settings.gridSize.width,
+      height: settings.gridSize.height,
+      showGrid: settings.showGridByDefault,
+      snapToGrid: settings.snapToGridByDefault,
+      gridColor: settings.gridColor,
+      gridType: 'square',
+    },
+    elements: [],
+    fogOfWar: { enabled: false, revealed: [] },
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 interface LayerVisibility {
@@ -123,6 +166,15 @@ interface GameStore {
 
   // Actions - Grid
   updateGridSettings: (settings: Partial<GridSettings>) => void;
+
+  // Actions - Scenes
+  getActiveScene: () => Scene | null;
+  createScene: (name: string, backgroundUrl?: string, copyFromCurrent?: boolean) => string;
+  switchScene: (sceneId: string) => void;
+  updateScene: (sceneId: string, updates: Partial<Scene>) => void;
+  deleteScene: (sceneId: string) => void;
+  duplicateScene: (sceneId: string) => string;
+  reorderScenes: (sceneIds: string[]) => void;
 
   // Actions - Fog of War
   revealFog: (polygon: Point[], skipHistory?: boolean) => void;
@@ -208,22 +260,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   createGame: (name, playerName) => {
     const peerId = nanoid(10);
     const state = get();
+    const now = new Date().toISOString();
+
+    // Create initial scene with default settings
+    const initialScene = createDefaultScene('Scene 1', state.settings);
+
     const game: GameState = {
       id: nanoid(12),
       name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      gridSettings: {
-        cellSize: state.settings.cellSize,
-        width: state.settings.gridSize.width,
-        height: state.settings.gridSize.height,
-        showGrid: state.settings.showGridByDefault,
-        snapToGrid: state.settings.snapToGridByDefault,
-        gridColor: state.settings.gridColor,
-        gridType: 'square',
-      },
-      elements: [],
-      fogOfWar: { enabled: false, revealed: [] },
+      createdAt: now,
+      updatedAt: now,
+      // Multi-scene architecture
+      scenes: [initialScene],
+      activeSceneId: initialScene.id,
+      // Global state
       players: {
         [peerId]: {
           id: peerId,
@@ -247,7 +297,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isConnected: connected, myPeerId: peerId || get().myPeerId });
   },
 
-  // Element management
+  // Element management (operates on active scene)
   addElement: (elementData, skipHistory = false) => {
     const id = nanoid(10);
     // Initialize version to 1 for new elements
@@ -255,28 +305,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set((state) => {
       if (!state.game) return state;
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
 
       // Track action in history
       if (!skipHistory) {
         useHistoryStore.getState().pushAction({
           type: 'add',
           timestamp: Date.now(),
-          before: { elements: state.game.elements },
-          after: { elements: [...state.game.elements, element] },
+          before: { elements: activeScene.elements },
+          after: { elements: [...activeScene.elements, element] },
           elementId: id,
           description: `Added ${element.type}`,
         });
       }
 
-      const updatedGame = {
-        ...state.game,
-        elements: [...state.game.elements, element],
-        updatedAt: new Date().toISOString(),
-      };
+      const updatedGame = updateActiveScene(state.game, {
+        elements: [...activeScene.elements, element],
+      });
       debouncedSave(updatedGame, state.isGM);
-      return {
-        game: updatedGame,
-      };
+      return { game: updatedGame };
     });
 
     return id;
@@ -285,8 +333,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   addOrUpdateElement: (element, _skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
 
-      const existing = state.game.elements.find(e => e.id === element.id);
+      const existing = activeScene.elements.find(e => e.id === element.id);
 
       if (existing) {
         // Version-based conflict resolution: only update if incoming version is >= local
@@ -299,27 +349,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
 
         // Update existing element
-        const updatedElements = state.game.elements.map(el =>
+        const updatedElements = activeScene.elements.map(el =>
           el.id === element.id ? { ...el, ...element } : el
         );
 
-        const updatedGame = {
-          ...state.game,
-          elements: updatedElements,
-          updatedAt: new Date().toISOString(),
-        };
-
+        const updatedGame = updateActiveScene(state.game, { elements: updatedElements });
         debouncedSave(updatedGame, state.isGM);
         return { game: updatedGame };
       } else {
         // Add new element with existing ID (P2P sync case)
         // Ensure version is set
         const elementWithVersion = { ...element, version: element.version || 1 };
-        const updatedGame = {
-          ...state.game,
-          elements: [...state.game.elements, elementWithVersion],
-          updatedAt: new Date().toISOString(),
-        };
+        const updatedGame = updateActiveScene(state.game, {
+          elements: [...activeScene.elements, elementWithVersion],
+        });
 
         debouncedSave(updatedGame, state.isGM);
         return { game: updatedGame };
@@ -330,8 +373,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   updateElement: (id, updates, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
 
-      const oldElement = state.game.elements.find(el => el.id === id);
+      const oldElement = activeScene.elements.find(el => el.id === id);
       if (!oldElement) return state;
 
       // Track action in history (only for significant updates like position or properties)
@@ -346,8 +391,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         useHistoryStore.getState().pushAction({
           type: isPositionUpdate ? 'move' : 'update',
           timestamp: Date.now(),
-          before: { elements: state.game.elements },
-          after: { elements: state.game.elements.map((el) =>
+          before: { elements: activeScene.elements },
+          after: { elements: activeScene.elements.map((el) =>
             el.id === id ? updatedElement : el
           ) },
           elementId: id,
@@ -355,37 +400,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
       }
 
-      const updatedGame: GameState = {
-        ...state.game,
-        elements: state.game.elements.map((el) =>
+      const updatedGame = updateActiveScene(state.game, {
+        elements: activeScene.elements.map((el) =>
           el.id === id ? updatedElement : el
         ),
-        updatedAt: new Date().toISOString(),
-      };
+      });
       debouncedSave(updatedGame, state.isGM);
-      return {
-        game: updatedGame,
-      };
+      return { game: updatedGame };
     });
   },
 
   updateElements: (updates, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
-      
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
       // Build map of updates for efficient lookup
       const updateMap = new Map(updates.map(u => [u.id, u.updates]));
-      
+
       // Track action in history
       const hasPositionUpdates = updates.some(u => u.updates.x !== undefined || u.updates.y !== undefined);
-      
+
       if (!skipHistory && hasPositionUpdates) {
         useHistoryStore.getState().pushAction({
           type: 'move',
           timestamp: Date.now(),
-          before: { elements: state.game.elements },
+          before: { elements: activeScene.elements },
           after: {
-            elements: state.game.elements.map((el) => {
+            elements: activeScene.elements.map((el) => {
               const elUpdates = updateMap.get(el.id);
               return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
             })
@@ -393,45 +436,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
           description: `Moved ${updates.length} element${updates.length > 1 ? 's' : ''}`,
         });
       }
-      
-      const updatedGame: GameState = {
-        ...state.game,
-        elements: state.game.elements.map((el) => {
+
+      const updatedGame = updateActiveScene(state.game, {
+        elements: activeScene.elements.map((el) => {
           const elUpdates = updateMap.get(el.id);
           return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
         }),
-        updatedAt: new Date().toISOString(),
-      };
+      });
       debouncedSave(updatedGame, state.isGM);
-      return {
-        game: updatedGame,
-      };
+      return { game: updatedGame };
     });
   },
 
   deleteElement: (id, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
-      
-      const deletedElement = state.game.elements.find(el => el.id === id);
-      
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
+      const deletedElement = activeScene.elements.find(el => el.id === id);
+
       // Track action in history
       if (!skipHistory && deletedElement) {
         useHistoryStore.getState().pushAction({
           type: 'delete',
           timestamp: Date.now(),
-          before: { elements: state.game.elements },
-          after: { elements: state.game.elements.filter((el) => el.id !== id) },
+          before: { elements: activeScene.elements },
+          after: { elements: activeScene.elements.filter((el) => el.id !== id) },
           elementId: id,
           description: `Deleted ${deletedElement.type}`,
         });
       }
-      
-      const updatedGame = {
-        ...state.game,
-        elements: state.game.elements.filter((el) => el.id !== id),
-        updatedAt: new Date().toISOString(),
-      };
+
+      const updatedGame = updateActiveScene(state.game, {
+        elements: activeScene.elements.filter((el) => el.id !== id),
+      });
       debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
@@ -481,18 +520,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const ids: string[] = [];
     set((state) => {
       if (!state.game) return state;
-      
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
       const newElements = elementsData.map(elementData => {
         const id = nanoid(10);
         ids.push(id);
-        return { ...elementData, id } as CanvasElement;
+        return { ...elementData, id, version: 1 } as CanvasElement;
       });
-      
-      const updatedGame = {
-        ...state.game,
-        elements: [...state.game.elements, ...newElements],
-        updatedAt: new Date().toISOString(),
-      };
+
+      const updatedGame = updateActiveScene(state.game, {
+        elements: [...activeScene.elements, ...newElements],
+      });
       debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
     });
@@ -502,23 +541,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   deleteElements: (ids, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
-      
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
       // Track action in history
       if (!skipHistory && ids.length > 0) {
         useHistoryStore.getState().pushAction({
           type: 'delete',
           timestamp: Date.now(),
-          before: { elements: state.game.elements },
-          after: { elements: state.game.elements.filter((el) => !ids.includes(el.id)) },
+          before: { elements: activeScene.elements },
+          after: { elements: activeScene.elements.filter((el) => !ids.includes(el.id)) },
           description: `Deleted ${ids.length} element${ids.length > 1 ? 's' : ''}`,
         });
       }
-      
-      const updatedGame = {
-        ...state.game,
-        elements: state.game.elements.filter((el) => !ids.includes(el.id)),
-        updatedAt: new Date().toISOString(),
-      };
+
+      const updatedGame = updateActiveScene(state.game, {
+        elements: activeScene.elements.filter((el) => !ids.includes(el.id)),
+      });
       debouncedSave(updatedGame, state.isGM);
       return {
         game: updatedGame,
@@ -568,59 +607,211 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // Grid management
+  // Grid management (operates on active scene)
   updateGridSettings: (settings) => {
     set((state) => {
       if (!state.game) return state;
-      return {
-        game: {
-          ...state.game,
-          gridSettings: { ...state.game.gridSettings, ...settings },
-          updatedAt: new Date().toISOString(),
-        },
-      };
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
+      const updatedGame = updateActiveScene(state.game, {
+        gridSettings: { ...activeScene.gridSettings, ...settings },
+      });
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
     });
   },
 
-  // Fog of War management
+  // Scene management
+  getActiveScene: () => {
+    const state = get();
+    return getActiveScene(state.game);
+  },
+
+  createScene: (name, backgroundUrl, copyFromCurrent = false) => {
+    const state = get();
+    const now = new Date().toISOString();
+    let newScene: Scene;
+
+    if (copyFromCurrent && state.game) {
+      const currentScene = getActiveScene(state.game);
+      if (currentScene) {
+        newScene = {
+          ...currentScene,
+          id: nanoid(10),
+          name,
+          backgroundUrl: backgroundUrl || currentScene.backgroundUrl,
+          createdAt: now,
+          updatedAt: now,
+        };
+      } else {
+        newScene = createDefaultScene(name, state.settings);
+        if (backgroundUrl) newScene.backgroundUrl = backgroundUrl;
+      }
+    } else {
+      newScene = createDefaultScene(name, state.settings);
+      if (backgroundUrl) newScene.backgroundUrl = backgroundUrl;
+    }
+
+    set((s) => {
+      if (!s.game) return s;
+      const updatedGame = {
+        ...s.game,
+        scenes: [...s.game.scenes, newScene],
+        activeSceneId: newScene.id,
+        updatedAt: now,
+      };
+      debouncedSave(updatedGame, s.isGM);
+      return { game: updatedGame };
+    });
+
+    return newScene.id;
+  },
+
+  switchScene: (sceneId) => {
+    set((state) => {
+      if (!state.game) return state;
+      const sceneExists = state.game.scenes.some(s => s.id === sceneId);
+      if (!sceneExists) return state;
+
+      const updatedGame = {
+        ...state.game,
+        activeSceneId: sceneId,
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame, selectedElementId: null, selectedElementIds: [] };
+    });
+  },
+
+  updateScene: (sceneId, updates) => {
+    set((state) => {
+      if (!state.game) return state;
+      const now = new Date().toISOString();
+      const updatedGame = {
+        ...state.game,
+        scenes: state.game.scenes.map(s =>
+          s.id === sceneId ? { ...s, ...updates, updatedAt: now } : s
+        ),
+        updatedAt: now,
+      };
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
+    });
+  },
+
+  deleteScene: (sceneId) => {
+    set((state) => {
+      if (!state.game) return state;
+      // Don't delete the last scene
+      if (state.game.scenes.length <= 1) return state;
+
+      const filteredScenes = state.game.scenes.filter(s => s.id !== sceneId);
+      const newActiveId = state.game.activeSceneId === sceneId
+        ? filteredScenes[0].id
+        : state.game.activeSceneId;
+
+      const updatedGame = {
+        ...state.game,
+        scenes: filteredScenes,
+        activeSceneId: newActiveId,
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame, selectedElementId: null, selectedElementIds: [] };
+    });
+  },
+
+  duplicateScene: (sceneId) => {
+    const state = get();
+    if (!state.game) return '';
+
+    const sceneToCopy = state.game.scenes.find(s => s.id === sceneId);
+    if (!sceneToCopy) return '';
+
+    const now = new Date().toISOString();
+    const newScene: Scene = {
+      ...sceneToCopy,
+      id: nanoid(10),
+      name: `${sceneToCopy.name} (Copy)`,
+      elements: sceneToCopy.elements.map(el => ({ ...el, id: nanoid(10) })),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((s) => {
+      if (!s.game) return s;
+      const updatedGame = {
+        ...s.game,
+        scenes: [...s.game.scenes, newScene],
+        updatedAt: now,
+      };
+      debouncedSave(updatedGame, s.isGM);
+      return { game: updatedGame };
+    });
+
+    return newScene.id;
+  },
+
+  reorderScenes: (sceneIds) => {
+    set((state) => {
+      if (!state.game) return state;
+      // Create map of scene id -> scene
+      const sceneMap = new Map(state.game.scenes.map(s => [s.id, s]));
+      // Reorder based on provided IDs
+      const reorderedScenes = sceneIds
+        .map(id => sceneMap.get(id))
+        .filter((s): s is Scene => s !== undefined);
+      // Add any scenes that weren't in the provided list
+      const includedIds = new Set(sceneIds);
+      const remainingScenes = state.game.scenes.filter(s => !includedIds.has(s.id));
+
+      const updatedGame = {
+        ...state.game,
+        scenes: [...reorderedScenes, ...remainingScenes],
+        updatedAt: new Date().toISOString(),
+      };
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
+    });
+  },
+
+  // Fog of War management (operates on active scene)
   revealFog: (polygon, skipHistory = false) => {
     set((state) => {
       if (!state.game) return state;
-      
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
+      const newFogOfWar = {
+        ...activeScene.fogOfWar,
+        revealed: [...activeScene.fogOfWar.revealed, polygon],
+      };
+
       // Track action in history
       if (!skipHistory) {
         useHistoryStore.getState().pushAction({
           type: 'fog-reveal',
           timestamp: Date.now(),
-          before: { fogOfWar: state.game.fogOfWar },
-          after: { fogOfWar: {
-            ...state.game.fogOfWar,
-            revealed: [...state.game.fogOfWar.revealed, polygon],
-          } },
+          before: { fogOfWar: activeScene.fogOfWar },
+          after: { fogOfWar: newFogOfWar },
           description: 'Revealed fog area',
         });
       }
-      
-      return {
-        game: {
-          ...state.game,
-          fogOfWar: {
-            ...state.game.fogOfWar,
-            revealed: [...state.game.fogOfWar.revealed, polygon],
-          },
-          updatedAt: new Date().toISOString(),
-        },
-      };
+
+      const updatedGame = updateActiveScene(state.game, { fogOfWar: newFogOfWar });
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
     });
   },
 
   hideFog: (polygon, skipHistory = false) => {
     set((state) => {
-      if (!state.game) return {};
-      
+      if (!state.game) return state;
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
       // Simple implementation: remove revealed areas that intersect with hide polygon
-      // For a quick implementation, we'll filter out polygons whose first point
-      // is inside the hide polygon (simplified collision detection)
       const isPointInPolygon = (point: Point, poly: Point[]): boolean => {
         let inside = false;
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -632,55 +823,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
         return inside;
       };
-      
-      const filteredRevealed = state.game.fogOfWar.revealed.filter((revealedPoly) => {
-        // Keep the revealed polygon if its center is NOT in the hide polygon
+
+      const filteredRevealed = activeScene.fogOfWar.revealed.filter((revealedPoly) => {
         if (revealedPoly.length === 0) return false;
-        
-        // Calculate center point
         const centerX = revealedPoly.reduce((sum, p) => sum + p.x, 0) / revealedPoly.length;
         const centerY = revealedPoly.reduce((sum, p) => sum + p.y, 0) / revealedPoly.length;
-        
         return !isPointInPolygon({ x: centerX, y: centerY }, polygon);
       });
-      
+
+      const newFogOfWar = {
+        ...activeScene.fogOfWar,
+        revealed: filteredRevealed,
+      };
+
       // Track action in history
       if (!skipHistory) {
         useHistoryStore.getState().pushAction({
           type: 'fog-hide',
           timestamp: Date.now(),
-          before: { fogOfWar: state.game.fogOfWar },
-          after: { fogOfWar: {
-            ...state.game.fogOfWar,
-            revealed: filteredRevealed,
-          } },
+          before: { fogOfWar: activeScene.fogOfWar },
+          after: { fogOfWar: newFogOfWar },
           description: 'Hid fog area',
         });
       }
-      
-      return {
-        game: {
-          ...state.game,
-          fogOfWar: {
-            ...state.game.fogOfWar,
-            revealed: filteredRevealed,
-          },
-          updatedAt: new Date().toISOString(),
-        },
-      };
+
+      const updatedGame = updateActiveScene(state.game, { fogOfWar: newFogOfWar });
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
     });
   },
 
   toggleFog: (enabled) => {
     set((state) => {
       if (!state.game) return state;
-      return {
-        game: {
-          ...state.game,
-          fogOfWar: { ...state.game.fogOfWar, enabled },
-          updatedAt: new Date().toISOString(),
-        },
-      };
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
+      const updatedGame = updateActiveScene(state.game, {
+        fogOfWar: { ...activeScene.fogOfWar, enabled },
+      });
+      debouncedSave(updatedGame, state.isGM);
+      return { game: updatedGame };
     });
   },
 
@@ -717,7 +900,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   addCombatant: (tokenId, initiative, dexterity) => {
     set((state) => {
       if (!state.game?.combat) return state;
-      const token = state.game.elements.find(e => e.id === tokenId) as TokenElement;
+      const activeScene = getActiveScene(state.game);
+      if (!activeScene) return state;
+
+      const token = activeScene.elements.find(e => e.id === tokenId) as TokenElement;
       if (!token || token.type !== 'token') return state;
 
       const combatant: Combatant = {

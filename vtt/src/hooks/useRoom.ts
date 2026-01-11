@@ -11,18 +11,29 @@ import type {
   DiceRoll,
   GridSettings,
   ChatMessage,
+  Scene,
 } from '../types';
 
 const APP_ID = 'lychgate-vtt-v1';
 
+// Helper to get active scene from game state
+function getActiveScene(game: GameState) {
+  return game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0] || null;
+}
+
 // Simple hash function for state comparison
 function hashGameState(game: GameState): string {
+  // Get active scene for per-scene data
+  const activeScene = getActiveScene(game);
+
   // Hash important game state fields for desync detection
   const stateStr = JSON.stringify({
-    elementCount: game.elements.length,
-    elementIds: game.elements.map(e => e.id).sort(),
-    fogEnabled: game.fogOfWar.enabled,
-    fogRevealedCount: game.fogOfWar.revealed.length,
+    activeSceneId: game.activeSceneId,
+    sceneCount: game.scenes.length,
+    elementCount: activeScene?.elements.length || 0,
+    elementIds: activeScene?.elements.map(e => e.id).sort() || [],
+    fogEnabled: activeScene?.fogOfWar.enabled || false,
+    fogRevealedCount: activeScene?.fogOfWar.revealed.length || 0,
     combatRound: game.combat?.round,
     combatTurn: game.combat?.currentTurn,
   });
@@ -136,6 +147,8 @@ export function useRoom() {
     sendStateHash?: ActionSender<string>;
     sendGridUpdate?: ActionSender<Partial<GridSettings>>;
     sendChat?: ActionSender<ChatMessage>;
+    sendSceneSwitch?: ActionSender<string>;
+    sendSceneUpdate?: ActionSender<Scene>;
   }>({});
 
   const {
@@ -152,9 +165,11 @@ export function useRoom() {
     addChatMessage,
   } = useGameStore();
 
-  const { toggleFog, updateGridSettings } = useGameStore((state) => ({
+  const { toggleFog, updateGridSettings, switchScene, updateScene } = useGameStore((state) => ({
     toggleFog: state.toggleFog,
     updateGridSettings: state.updateGridSettings,
+    switchScene: state.switchScene,
+    updateScene: state.updateScene,
   }));
 
   // Create a new room (as GM/host)
@@ -284,6 +299,8 @@ export function useRoom() {
     const [sendStateHash, onStateHash] = room.makeAction<any>('stateHash');
     const [sendGridUpdate, onGridUpdate] = room.makeAction<any>('gridUpd');
     const [sendChat, onChat] = room.makeAction<any>('chat');
+    const [sendSceneSwitch, onSceneSwitch] = room.makeAction<any>('sceneSwi');
+    const [sendSceneUpdate, onSceneUpdate] = room.makeAction<any>('sceneUpd');
 
     // Store senders
     actionsRef.current = {
@@ -300,6 +317,8 @@ export function useRoom() {
       sendStateHash,
       sendGridUpdate,
       sendChat,
+      sendSceneSwitch,
+      sendSceneUpdate,
     };
 
     // Handle peer events
@@ -373,9 +392,8 @@ export function useRoom() {
     });
 
     onPing((data: { position: Point; color: string }, peerId: string) => {
-      // Handle ping visualization (emit event or update store)
+      // Ping visualization is handled in GameCanvas.tsx via setPings state
       console.log('Ping from', peerId, 'at', data.position);
-      // TODO: Add visual ping to canvas
     });
 
     onPlayerJoin((player: Player, _peerId: string) => {
@@ -424,18 +442,30 @@ export function useRoom() {
         return;
       }
 
-      // Update fog of war state
+      // Get active scene
+      const activeScene = getActiveScene(currentGame);
+      if (!activeScene) return;
+
+      // Update fog of war state on active scene
       if (fogOfWar.enabled !== undefined) {
         toggleFog(fogOfWar.enabled);
       }
-      // Update revealed areas by replacing them entirely
+      // Update revealed areas by replacing them entirely on active scene
       useGameStore.setState({
         game: {
           ...currentGame,
-          fogOfWar: {
-            enabled: fogOfWar.enabled ?? currentGame.fogOfWar.enabled,
-            revealed: fogOfWar.revealed ?? currentGame.fogOfWar.revealed,
-          },
+          scenes: currentGame.scenes.map(s =>
+            s.id === currentGame.activeSceneId
+              ? {
+                  ...s,
+                  fogOfWar: {
+                    enabled: fogOfWar.enabled ?? s.fogOfWar.enabled,
+                    revealed: fogOfWar.revealed ?? s.fogOfWar.revealed,
+                  },
+                  updatedAt: new Date().toISOString(),
+                }
+              : s
+          ),
           updatedAt: new Date().toISOString(),
         },
       });
@@ -511,7 +541,62 @@ export function useRoom() {
 
       addChatMessage(chatMessage);
     });
-  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage]);
+
+    // Handle scene switch (GM-only action, players receive)
+    onSceneSwitch((sceneId: string, peerId: string) => {
+      console.log('Received scene switch from:', peerId, 'to scene:', sceneId);
+
+      // Verify the update is from the GM (host) - enforce GM-only action
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      const gmPeerId = currentGame.gmPeerId;
+      if (gmPeerId && peerId !== gmPeerId && !isHost) {
+        console.warn('Ignoring scene switch from non-GM peer:', peerId);
+        return;
+      }
+
+      // Switch to the specified scene
+      switchScene(sceneId);
+
+      notifications.show({
+        title: 'Scene Changed',
+        message: `The GM has switched to a new scene`,
+        color: 'blue',
+        autoClose: 3000,
+      });
+    });
+
+    // Handle scene updates (new or updated scene data)
+    onSceneUpdate((scene: Scene, peerId: string) => {
+      console.log('Received scene update from:', peerId, 'scene:', scene.name);
+
+      // Verify the update is from the GM (host) - enforce GM-only action
+      const currentGame = useGameStore.getState().game;
+      if (!currentGame) return;
+
+      const gmPeerId = currentGame.gmPeerId;
+      if (gmPeerId && peerId !== gmPeerId && !isHost) {
+        console.warn('Ignoring scene update from non-GM peer:', peerId);
+        return;
+      }
+
+      // Check if scene exists (update) or is new (add)
+      const existingScene = currentGame.scenes.find(s => s.id === scene.id);
+      if (existingScene) {
+        updateScene(scene.id, scene);
+      } else {
+        // Add new scene to game state
+        useGameStore.setState({
+          game: {
+            ...currentGame,
+            scenes: [...currentGame.scenes, scene],
+            updatedAt: new Date().toISOString(),
+          },
+        });
+      }
+    });
+  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage, switchScene, updateScene]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -591,6 +676,20 @@ export function useRoom() {
     }
   }, []);
 
+  // Broadcast scene switch (GM only)
+  const broadcastSceneSwitch = useCallback((sceneId: string) => {
+    if (actionsRef.current.sendSceneSwitch && roomState.isHost) {
+      actionsRef.current.sendSceneSwitch(sceneId);
+    }
+  }, [roomState.isHost]);
+
+  // Broadcast scene update (GM only)
+  const broadcastSceneUpdate = useCallback((scene: Scene) => {
+    if (actionsRef.current.sendSceneUpdate && roomState.isHost) {
+      actionsRef.current.sendSceneUpdate(scene);
+    }
+  }, [roomState.isHost]);
+
   // Leave room
   const leaveRoom = useCallback(() => {
     if (roomRef.current) {
@@ -641,5 +740,7 @@ export function useRoom() {
     broadcastStateHash,
     broadcastGridSettings,
     broadcastChat,
+    broadcastSceneSwitch,
+    broadcastSceneUpdate,
   };
 }

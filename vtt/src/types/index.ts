@@ -97,6 +97,18 @@ export interface FogOfWar {
   revealed: Point[][];   // array of revealed polygons
 }
 
+// Scene - represents a single map/location in the game
+export interface Scene {
+  id: string;
+  name: string;
+  backgroundUrl?: string;    // THE MAP (first-class, not an element)
+  gridSettings: GridSettings; // Per-scene grid config
+  elements: CanvasElement[]; // Tokens, drawings, images, text
+  fogOfWar: FogOfWar;        // Per-scene fog
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Player {
   id: string;            // peer ID
   name: string;
@@ -123,15 +135,26 @@ export interface GameState {
   name: string;
   createdAt: string;
   updatedAt: string;
-  gridSettings: GridSettings;
-  elements: CanvasElement[];
-  fogOfWar: FogOfWar;
+
+  // Multi-scene architecture
+  scenes: Scene[];           // Array of scenes
+  activeSceneId: string;     // Currently displayed scene
+
+  // Global state (persists across scenes)
   players: Record<string, Player>;
-  gmPeerId?: string;     // who is the GM
-  combat?: CombatTracker; // combat encounter state
-  diceRolls?: DiceRoll[]; // dice roll history
+  gmPeerId?: string;         // who is the GM
+  combat?: CombatTracker;    // combat encounter state
+  diceRolls?: DiceRoll[];    // dice roll history
   campaignNotes?: CampaignNote[]; // Campaign journal notes
   chatMessages?: ChatMessage[]; // In-game chat messages
+
+  // Legacy fields for migration (deprecated - use scenes instead)
+  /** @deprecated Use scenes[].gridSettings instead */
+  gridSettings?: GridSettings;
+  /** @deprecated Use scenes[].elements instead */
+  elements?: CanvasElement[];
+  /** @deprecated Use scenes[].fogOfWar instead */
+  fogOfWar?: FogOfWar;
 }
 
 // P2P message types
@@ -208,6 +231,16 @@ export interface ChatMessageP2P {
   message: ChatMessage;
 }
 
+export interface SceneSwitchMessage {
+  type: 'scene-switch';
+  sceneId: string;
+}
+
+export interface SceneUpdateMessage {
+  type: 'scene-update';
+  scene: Scene;
+}
+
 export type P2PMessage =
   | SyncMessage
   | ElementUpdateMessage
@@ -218,7 +251,9 @@ export type P2PMessage =
   | PlayerLeaveMessage
   | FogUpdateMessage
   | DiceRollMessage
-  | ChatMessageP2P;
+  | ChatMessageP2P
+  | SceneSwitchMessage
+  | SceneUpdateMessage;
 
 // Room/Session types
 export interface RoomConfig {
@@ -249,12 +284,13 @@ export interface SceneExport {
   fogOfWar: FogOfWar;
 }
 
-// Library types for reusable tokens/maps/scenes
-export type LibraryItemType = 'token' | 'map' | 'scene';
+// Library types for reusable tokens
+// Note: Maps are just URLs (paste when creating scene background)
+// Note: Scenes are shared via export/import (file sharing)
+export type LibraryItemType = 'token';
 
 // Template data types (without id, position, zIndex - assigned when placed)
 export type TokenTemplateData = Omit<TokenElement, 'id'>;
-export type ImageTemplateData = Omit<ImageElement, 'id'>;
 
 export interface LibraryItem {
   id: string;
@@ -265,8 +301,8 @@ export interface LibraryItem {
   tags: string[];
   createdAt: string;
   updatedAt: string;
-  // Data stored depends on type - templates don't have id yet
-  data: TokenTemplateData | ImageTemplateData | SceneExport;
+  // Data is always a token template (maps/scenes removed from library)
+  data: TokenTemplateData;
 }
 
 export interface LibraryExport {
@@ -287,6 +323,7 @@ export type ToolType =
   | 'draw-polygon'
   | 'draw-arrow'
   | 'token'
+  | 'image'          // Place image (handouts, props, overlays)
   | 'text'
   | 'measure'
   | 'ping'

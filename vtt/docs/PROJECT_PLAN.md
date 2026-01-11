@@ -21,12 +21,14 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Mantine UI component library
 - [x] Konva.js canvas rendering (4 optimized layers)
 
-### P2P Networking (Phase 3 Complete)
+### P2P Networking (Phase 3 & 3.5 Complete)
 - [x] Trystero integration (Torrent strategy with Node.js polyfills)
 - [x] WebRTC peer connections with STUN/TURN servers
 - [x] Room creation/joining via ID or QR code
 - [x] Real-time state sync (elements, fog, combat, dice, chat)
-- [x] Player cursors and ping visualization
+- [x] Player cursors with throttling (10Hz max, 5px min delta)
+- [x] Client-side cursor interpolation for smooth movement
+- [x] Ping visualization with animated pulse effect
 - [x] Join/leave notifications
 - [x] Enhanced connection state indicator (connected/syncing/disconnected/error)
 - [x] GM disconnect detection with warning modal (`GMDisconnectModal` component)
@@ -37,6 +39,8 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Grid settings P2P broadcast (`gridUpd` action)
 - [x] In-game chat system (`ChatPanel` component)
 - [x] Whisper messages (GM-only visibility flag)
+- [x] Undo/redo state synchronization
+- [x] Copy/cut/paste operations broadcast
 
 ### Canvas & Tools
 - [x] Grid rendering (square, hex, gridless with configurable size/color/opacity)
@@ -106,7 +110,296 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 ---
 
-## Phase 3: P2P Reliability & State Sync ✅ COMPLETED
+## Phase 3: Scene System & Core UX
+
+**Status:** In Progress
+
+**Priority:** High (core functionality gaps blocking real gameplay)
+
+### 3.1 Multi-Scene Architecture ⭐ HIGH PRIORITY
+
+Refactor from single-scene to multi-scene game model.
+
+**New Data Model:**
+```typescript
+interface GameState {
+  scenes: Scene[];           // Array of scenes
+  activeSceneId: string;     // Currently displayed scene
+  players: Record<...>;      // Global - persist across scenes
+  combat?: CombatTracker;    // Global - persist across scenes
+  chatMessages?: ChatMessage[];  // Global
+  campaignNotes?: CampaignNote[];  // Global
+}
+
+interface Scene {
+  id: string;
+  name: string;
+  backgroundUrl?: string;    // THE MAP (first-class, not an element)
+  gridSettings: GridSettings; // Per-scene grid config
+  elements: CanvasElement[]; // Tokens, drawings, images, text
+  fogOfWar: FogOfWar;        // Per-scene fog
+}
+```
+
+**Key Design Decisions:**
+- **Background image** is a scene property, not an element (THE map identity)
+- **Grid settings** are per-scene (different maps need different grids)
+- **Combat tracker** is global (initiative persists when switching scenes)
+- **Tokens/elements** are per-scene (stay on their scene)
+- **Players** only see active scene (GM controls switching)
+- **Scene management** is GM-only (players don't see scene list)
+
+**Files to modify:**
+- `src/types/index.ts` - Add Scene interface, update GameState
+- `src/stores/gameStore.ts` - Refactor for multi-scene, add scene CRUD actions
+- `src/hooks/useRoom.ts` - Add `sceneSwitch` P2P action
+- `src/db/database.ts` - Update schema if needed
+
+**Complexity:** High (architectural change)
+
+---
+
+### 3.2 Scene Picker UI ⭐ HIGH PRIORITY
+
+Add dropdown scene picker in toolbar for quick scene switching.
+
+**UI Components:**
+- Dropdown in toolbar showing current scene name
+- List of all scenes with click-to-switch
+- "+ New Scene" option at bottom
+- "Manage Scenes" option (opens modal for rename/delete/reorder)
+- "Duplicate Scene" option (copy current as new)
+
+**Scene Creation Modal:**
+```
+┌─────────────────────────────────────┐
+│ Create New Scene                    │
+├─────────────────────────────────────┤
+│ Scene Name: [___________________]   │
+│                                     │
+│ Background Image (optional):        │
+│ [https://...                     ]  │
+│ [Image preview if URL valid]        │
+│                                     │
+│ Grid Settings:                      │
+│ Type: [Square ▼]  Size: [32]px      │
+│ [x] Show grid   Color: [#ccc]       │
+│                                     │
+│ [ ] Copy elements from current scene│
+│                                     │
+│         [Cancel]  [Create Scene]    │
+└─────────────────────────────────────┘
+```
+
+**Grid Settings Migration:**
+- Remove grid settings from Settings modal (no longer game-wide)
+- Grid is configured per-scene in scene creation/edit modal
+- Each scene has its own `gridSettings` (type, size, color, opacity, visible)
+- Settings modal retains: token defaults, UI preferences, keybinds
+
+**Files to modify:**
+- `src/components/Toolbar.tsx` - Add scene dropdown
+- `src/components/SceneModal.tsx` - New component for create/edit scene
+- `src/components/SceneManager.tsx` - New component for list management
+
+**Complexity:** Medium (new UI components, gameStore integration)
+
+---
+
+### 3.3 Image Tool ⭐ HIGH PRIORITY
+
+Add image placement tool to toolbar (for non-background images: handouts, props, overlays).
+
+**Behavior:**
+1. Click image tool icon in toolbar
+2. Click on canvas where image should be placed
+3. Modal opens asking for URL (and optional size)
+4. Image element created at click position
+5. Image properties editable in PropertyInspector sidebar
+
+**Files to modify:**
+- `src/components/Toolbar.tsx` - Add image tool button
+- `src/components/GameCanvas.tsx` - Handle image tool click → open modal
+- `src/components/ImageModal.tsx` - New modal for URL input
+- `src/components/PropertyInspector.tsx` - Ensure image properties work
+
+**Complexity:** Low-Medium (follows token tool pattern)
+
+---
+
+### 3.4 Dice/Chat Integration
+
+Combine dice rolls into chat timeline as special message type.
+
+**Changes:**
+- Dice rolls become `ChatMessage` with `type: 'roll'`
+- ChatPanel renders roll messages with formula/result formatting
+- DiceRoller panel remains for quick-roll buttons but sends to chat
+- Remove separate `diceRolls[]` from game state (use chatMessages)
+
+**Files to modify:**
+- `src/types/index.ts` - Add roll type to ChatMessage
+- `src/components/DiceRoller.tsx` - Send rolls to chat instead of separate history
+- `src/components/ChatPanel.tsx` - Render roll messages with special formatting
+- `src/stores/gameStore.ts` - Remove diceRolls, rolls go through chat
+
+**Complexity:** Medium (refactor two systems into one)
+
+---
+
+### 3.5 Game Menu & Room Sharing
+
+Fix missing room sharing after game starts + clean up Game menu.
+
+**Current Issue:** Once in-game, no way to share Room ID/QR with latecomers.
+
+**New Game Menu Structure:**
+```
+Game
+├─ Share Game
+│   ├─ Copy Room ID
+│   ├─ Show QR Code
+│   └─ Copy Join Link
+├─ ─────────────
+├─ Save/Load...      ← Combines Export/Import into one modal
+├─ Settings...
+└─ ─────────────
+└─ Leave Game
+```
+
+**Files to modify:**
+- `src/components/App.tsx` or `src/components/GameMenu.tsx` - Restructure menu
+- `src/components/ShareGameModal.tsx` - New modal with QR/ID/link options
+
+**Complexity:** Low (UI reorganization)
+
+---
+
+### 3.6 Bug Fixes
+
+**Ping P2P visibility:**
+- Pings work locally but not across P2P sessions
+- `useRoom.ts` receives pings but doesn't expose them to GameCanvas
+- Need callback or store update so GameCanvas can render received pings
+
+**Files to modify:**
+- `src/hooks/useRoom.ts` - Expose received pings via callback/store
+- `src/components/GameCanvas.tsx` - Subscribe to received pings
+
+**NOTE:**
+- Review other functionality to ensure events are broadcast properly.
+
+**Complexity:** Low (wire up existing systems)
+
+---
+
+### 3.7 Library Simplification
+
+Simplify Library to tokens only. Remove "scene" and "map" types.
+
+**Rationale:**
+- **Tokens** have valuable template data (HP, AC, conditions, size, notes) - worth saving
+- **Maps** are just image URLs - paste directly when creating scene background
+- **Scenes** are shared via file export (includes background, grid, elements, fog)
+- **Overlay images** are less reusable than tokens, can be in scene exports if needed
+
+**Changes:**
+- Library supports: `token` only (remove type filter entirely)
+- Remove scene-related code from libraryStore
+- Remove map-related code from libraryStore
+- Simplify LibraryPanel UI (no filter dropdown needed)
+- "Save to Library" option only appears for tokens
+
+**Files to modify:**
+- `src/types/index.ts` - Simplify LibraryItemType to just 'token'
+- `src/stores/libraryStore.ts` - Remove addSceneToLibrary, addMapToLibrary, getSceneTemplates, getMapTemplates
+- `src/components/LibraryPanel.tsx` - Remove filter dropdown, simplify to token list
+- `src/components/Sidebar.tsx` - Remove "Save to Library" for non-tokens
+
+**Complexity:** Low (removal/simplification)
+
+---
+
+### 3.8 Export/Import with Multi-Scene
+
+Update export/import system to handle multi-scene game structure.
+
+**Export File Format (v3):**
+```typescript
+interface ExportFileV3 {
+  version: 3;
+  exportedAt: string;
+  gameName: string;
+  // Selective export - any combination of:
+  scenes?: Scene[];           // Selected scenes with all their data
+  combat?: CombatTracker;     // Global combat state
+  chatMessages?: ChatMessage[]; // Chat history
+  campaignNotes?: CampaignNote[]; // Notes
+  libraryItems?: LibraryItem[];  // Token/map templates
+}
+```
+
+**Export UI Changes:**
+- Tree view now shows scenes as top-level items with children:
+  ```
+  ☑ Scenes
+    ☑ Tavern (12 elements)
+    ☑ Dungeon Level 1 (8 elements)
+    ☐ Dungeon Level 2 (3 elements)
+  ☑ Combat Tracker
+  ☑ Chat History
+  ☑ Campaign Notes
+  ☑ Library (tokens/maps)
+  ```
+- "Export All" selects everything
+- "Export Current Scene" quick option
+- Individual scene selection for sharing specific maps
+
+**Import Behavior:**
+- **Scenes**: Add to game's scene list (don't replace)
+- **Combat/Chat/Notes**: Merge or replace option (as current)
+- **Library**: Merge into existing library
+- Importing scenes from another game = easy scene sharing
+
+**Scene Sharing Workflow:**
+1. GM A exports "Tavern" scene from their game
+2. GM B imports the `.vtt.json` file
+3. "Tavern" appears in GM B's scene dropdown
+4. No need for separate "scene library" - just file sharing
+
+**Files to modify:**
+- `src/types/index.ts` - Update ExportFile interface to v3
+- `src/components/ExportImportModal.tsx` - Update tree view for scenes
+- `src/stores/gameStore.ts` - Update import logic for scene merging
+
+**Complexity:** Medium (existing UI, new data structure)
+
+---
+
+### 3.9 Mobile Support
+
+- [ ] Ensure create/join game forms fit on mobile screen
+- [ ] Touch gesture optimization (pinch zoom, two-finger pan)
+- [ ] Mobile-friendly toolbar layout
+- [ ] Responsive sidebar
+- [ ] Touch-friendly element selection
+
+**Complexity:** Medium (responsive design, touch events)
+
+---
+
+### Future Improvements (Deferred)
+
+**Token sidebar redesign:**
+- Current sidebar token section not properly functional
+- Need to improve token list UX
+- Add player token ownership/assignment
+- **Status:** Deferred to Phase 4+ (requires design thinking)
+
+
+---
+
+## ~~Phase 3: P2P Reliability & State Sync~~ ✅ COMPLETED (v1.6.0)
 
 **Summary:** Implemented robust P2P state synchronization with GM authority model.
 
@@ -119,107 +412,21 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - Grid settings broadcast
 - In-game chat with whispers
 
-*See "P2P Networking" in Completed Features for full details.*
+*Moved to "P2P Networking" in Completed Features.*
 
 ---
 
-## Phase 3.5: P2P Polish & Bug Fixes ✅ COMPLETED
+## ~~Phase 3.5: P2P Polish & Bug Fixes~~ ✅ COMPLETED (v1.7.0)
 
 **Summary:** Fixed P2P broadcast gaps and improved cursor performance.
 
 **Key Deliverables:**
-- Undo/Redo now broadcasts full state sync to peers
-- Copy/Cut/Paste operations broadcast element updates/deletions
-- Cursor broadcasts throttled (10Hz max, 5px min delta)
-- Client-side cursor interpolation for smooth movement
+- Undo/redo state synchronization
+- Copy/cut/paste operations broadcast
+- Cursor throttling (10Hz max, 5px min delta)
+- Client-side cursor interpolation
 
-### Bug Fix 1: Undo/Redo P2P Sync
-**Problem:** Undo/redo changes game state but doesn't broadcast to peers - players see inconsistent state.
-
-**Root Cause:** `performUndo` and `performRedo` in `gameStore.ts` modify game state directly without calling any broadcast function. Currently called from `App.tsx` and `Toolbar.tsx` without follow-up sync.
-
-**Fix:**
-- After `performUndo`/`performRedo`, call `broadcastSync()` to push full state
-- Simple approach since undo can affect multiple elements at once
-- Only GM has undo authority, so GM-side broadcast is sufficient
-
-**Files to modify:**
-- `src/App.tsx` - Add `room.broadcastSync()` after `performUndo`/`performRedo`
-- `src/components/Toolbar.tsx` - Same fix if undo/redo triggered from toolbar
-
-**Complexity:** Low (single broadcast call after each operation)
-
-### Bug Fix 2: Copy/Cut/Paste P2P Sync
-**Problem:** Cut deletes elements and paste adds elements without broadcasting to peers.
-
-**Root Cause:** `useClipboard.ts` calls `deleteElements` (line 49) and `addElements` (line 128) directly without any broadcast mechanism. The hook doesn't have access to the room.
-
-**Fix:**
-- Option A: Pass broadcast callbacks to `useClipboard` hook
-- Option B: Add return values and handle broadcast at call site
-- Option B is cleaner - return the affected element IDs/objects from cut/paste, then broadcast in the component that uses the hook
-
-**Files to modify:**
-- `src/hooks/useClipboard.ts` - Return cut element IDs and pasted elements
-- `src/App.tsx` or `src/components/GameCanvas.tsx` - Handle broadcast after clipboard operations
-
-**Complexity:** Medium (callback wiring through hook)
-
-### Enhancement 1: Cursor Throttling & Smoothing
-**Problem:** Cursor broadcasts on every mouse move (network flooding) and movements appear jerky on clients.
-
-**Approach:**
-- Throttle cursor broadcasts to max 10Hz (100ms interval)
-- Only broadcast if position changed significantly (>5px delta)
-- Add client-side interpolation for received cursor positions
-- Use lerp (linear interpolation) to smooth cursor movement between updates
-
-**Implementation:**
-```typescript
-// Throttle side (sender)
-const throttledBroadcastCursor = throttle((position) => {
-  if (distance(lastSent, position) > 5) {
-    broadcastCursor(position);
-    lastSent = position;
-  }
-}, 100);
-
-// Smoothing side (receiver)
-// Store target position and lerp current toward it each frame
-useAnimationFrame(() => {
-  currentPos = lerp(currentPos, targetPos, 0.2);
-});
-```
-
-**Files to modify:**
-- `src/hooks/useRoom.ts` - Add throttle wrapper around `broadcastCursor`
-- `src/components/GameCanvas.tsx` - Add cursor interpolation for peer cursors, delta check before broadcast
-
-**Complexity:** Medium (throttle + interpolation logic)
-
-### Deferred/Dropped Items
-
-The following items from original Phase 3.5 planning were dropped or deferred:
-
-- **Player State Persistence** - DROPPED: Already auto-saves for both GM and players via IndexedDB
-- **Retry Logic for Failed Broadcasts** - DEFERRED: Hash comparison + "Request Full Sync" already provides recovery mechanism
-- **Delta Optimization** - DROPPED: Over-complicated for minimal gain; full element broadcasts are acceptable
-- **Import/Export Peer Sync** - ALREADY FIXED: `ExportImportModal.tsx` already calls `room.broadcastSync()` after import (line 607-608)
-
-### Future Consideration: Dice/Chat Integration
-**Question:** Should dice rolls be displayed in chat instead of a separate panel?
-
-**Benefits:**
-- Single timeline of game events (rolls + conversation)
-- Natural context for rolls ("I attack the goblin" → roll → result)
-- Easier to review session history
-
-**Implementation thoughts:**
-- Dice rolls could be a special `ChatMessage` type with `type: 'roll'`
-- Chat panel renders roll messages with formula/result formatting
-- DiceRoller panel could remain for quick-roll buttons but output to chat
-
-**Status:** Pending user decision - implement if desired after bug fixes
+*Moved to "P2P Networking" in Completed Features.*
 
 ---
 
@@ -348,6 +555,7 @@ These features don't fit the decentralized design:
 | v1.5.0 | Measurement | Waypoint paths, difficult terrain modifier |
 | v1.6.0 | P2P Reliability | Connection status, GM disconnect, desync detection, element versioning, chat |
 | v1.7.0 | P2P Polish | Undo/redo sync, clipboard sync, cursor throttling/interpolation |
+| v1.8.0 | Scene System | Multi-scene architecture, scene picker, image tool, dice/chat integration, export v3 format |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---
