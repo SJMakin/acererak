@@ -20,10 +20,13 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     viewportScale,
   } = useGameStore();
 
-  const copyElements = useCallback((elementIds: string[]) => {
-    if (!game || elementIds.length === 0) return;
+  // Get active scene
+  const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
 
-    const elementsToCopy = game.elements.filter(el => elementIds.includes(el.id));
+  const copyElements = useCallback((elementIds: string[]) => {
+    if (!activeScene || elementIds.length === 0) return;
+
+    const elementsToCopy = activeScene.elements.filter(el => elementIds.includes(el.id));
     if (elementsToCopy.length === 0) return;
 
     // Store copies in clipboard
@@ -37,9 +40,9 @@ export function useClipboard(options: UseClipboardOptions = {}) {
   }, [game, options]);
 
   const cutElements = useCallback((elementIds: string[]): { count: number; deletedIds: string[] } | undefined => {
-    if (!game || elementIds.length === 0) return;
+    if (!activeScene || elementIds.length === 0) return;
 
-    const elementsToCut = game.elements.filter(el => elementIds.includes(el.id));
+    const elementsToCut = activeScene.elements.filter(el => elementIds.includes(el.id));
     if (elementsToCut.length === 0) return;
 
     // Copy to clipboard
@@ -56,7 +59,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
   }, [game, deleteElements, options]);
 
   const pasteElements = useCallback((mousePosition?: Point): { count: number; pastedElements: CanvasElement[] } | undefined => {
-    if (!game || clipboard.current.length === 0) return;
+    if (!activeScene || clipboard.current.length === 0) return;
 
     // Calculate paste position
     let pasteX = 0;
@@ -68,8 +71,8 @@ export function useClipboard(options: UseClipboardOptions = {}) {
       pasteY = (mousePosition.y - viewportOffset.y) / viewportScale;
     } else {
       // Use center of viewport as fallback
-      const canvasWidth = game.gridSettings.width * game.gridSettings.cellSize;
-      const canvasHeight = game.gridSettings.height * game.gridSettings.cellSize;
+      const canvasWidth = activeScene.gridSettings.width * activeScene.gridSettings.cellSize;
+      const canvasHeight = activeScene.gridSettings.height * activeScene.gridSettings.cellSize;
       pasteX = canvasWidth / 2;
       pasteY = canvasHeight / 2;
     }
@@ -109,7 +112,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
         ...elementData,
         x: el.x + finalOffsetX,
         y: el.y + finalOffsetY,
-        zIndex: game.elements.length + 1,
+        zIndex: activeScene.elements.length + 1,
       };
 
       // For tokens, update name to indicate it's a copy

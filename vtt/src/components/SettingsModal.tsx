@@ -25,6 +25,9 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
   const { settings, updateSettings, resetSettings, game, updateGridSettings } = useGameStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
 
+  // Get active scene
+  const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
+
   // Sync local settings with store when modal opens
   useEffect(() => {
     if (opened) {
@@ -131,11 +134,11 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
 
             <Divider label="Current Game Grid Type" />
 
-            {game ? (
+            {activeScene ? (
               <Select
                 label="Grid Type"
                 description="Choose the grid style for this game"
-                value={game.gridSettings.gridType || 'square'}
+                value={activeScene.gridSettings.gridType || 'square'}
                 onChange={(val) => {
                   if (val) {
                     const update = { gridType: val as GridType };

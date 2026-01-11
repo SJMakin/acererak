@@ -39,7 +39,8 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
   const [newCondition, setNewCondition] = useState('');
 
   const combat = game?.combat;
-  const tokens = game?.elements.filter((e) => e.type === 'token') as TokenElement[] || [];
+  const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
+  const tokens = activeScene?.elements.filter((e) => e.type === 'token') as TokenElement[] || [];
   
   // Filter tokens not already in combat
   const availableTokens = tokens.filter(

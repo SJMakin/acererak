@@ -32,8 +32,11 @@ interface PropertyInspectorProps {
 export default function PropertyInspector({ room }: PropertyInspectorProps) {
   const { game, selectedElementId, isGM, updateElement, deleteElement, selectElement } = useGameStore();
 
+  // Get active scene
+  const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
+
   // Get selected element
-  const selectedElement = game?.elements.find((e) => e.id === selectedElementId);
+  const selectedElement = activeScene?.elements.find((e) => e.id === selectedElementId);
 
   // Local state for condition input
   const [newCondition, setNewCondition] = useState('');
@@ -146,14 +149,14 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
               size="xs"
               value={selectedElement.x}
               onChange={(val) => handleUpdate({ x: Number(val) || 0 })}
-              step={game?.gridSettings.snapToGrid ? game.gridSettings.cellSize : 1}
+              step={activeScene?.gridSettings.snapToGrid ? activeScene.gridSettings.cellSize : 1}
             />
             <NumberInput
               label="Y"
               size="xs"
               value={selectedElement.y}
               onChange={(val) => handleUpdate({ y: Number(val) || 0 })}
-              step={game?.gridSettings.snapToGrid ? game.gridSettings.cellSize : 1}
+              step={activeScene?.gridSettings.snapToGrid ? activeScene.gridSettings.cellSize : 1}
             />
           </Group>
 

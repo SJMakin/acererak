@@ -16,7 +16,6 @@ import {
   Modal,
   Button,
   TextInput,
-  List,
   ActionIcon as MantineActionIcon,
 } from '@mantine/core';
 import {

@@ -17,7 +17,6 @@ import type {
   CampaignNote,
   ChatMessage,
   Scene,
-  FogOfWar,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 

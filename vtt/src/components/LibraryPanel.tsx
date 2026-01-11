@@ -108,7 +108,7 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
     }
   };
 
-  const getItemIcon = (type: LibraryItemType) => {
+  const getItemIcon = () => {
     return '👤';
   };
 
@@ -170,7 +170,7 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
               >
                 <Group justify="space-between" wrap="nowrap">
                   <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="lg">{getItemIcon(item.type)}</Text>
+                    <Text size="lg">{getItemIcon()}</Text>
                     <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                       <Text size="sm" fw={500} truncate>
                         {item.name}
