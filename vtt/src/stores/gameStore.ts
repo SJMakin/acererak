@@ -113,12 +113,21 @@ interface LayerVisibility {
   fog: boolean;
 }
 
+interface Ping {
+  id: string;
+  x: number;
+  y: number;
+  color: string;
+  timestamp: number;
+}
+
 interface GameStore {
   // Game state
   game: GameState | null;
   isConnected: boolean;
   myPeerId: string | null;
   isGM: boolean;
+  pings: Ping[];
 
   // UI state
   selectedTool: ToolType;
@@ -195,6 +204,9 @@ interface GameStore {
   addDiceRoll: (roll: DiceRoll) => void;
   clearDiceHistory: () => void;
 
+  // Actions - Pings
+  addPing: (x: number, y: number, color: string) => void;
+
   // Actions - Chat
   addChatMessage: (message: ChatMessage) => void;
   clearChatMessages: () => void;
@@ -236,6 +248,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isConnected: false,
   myPeerId: null,
   isGM: false,
+  pings: [],
   selectedTool: 'select',
   selectedElementId: null,
   selectedElementIds: [],
@@ -1044,6 +1057,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
       };
     });
+  },
+
+  // Ping actions
+  addPing: (x, y, color) => {
+    const id = nanoid(10);
+    const timestamp = Date.now();
+    set((state) => ({
+      pings: [...state.pings, { id, x, y, color, timestamp }],
+    }));
+
+    // Auto-cleanup old pings after 2 seconds
+    setTimeout(() => {
+      set((state) => ({
+        pings: state.pings.filter(p => p.id !== id),
+      }));
+    }, 2000);
   },
 
   // Chat actions

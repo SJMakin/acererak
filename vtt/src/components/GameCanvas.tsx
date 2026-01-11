@@ -4,7 +4,6 @@ import type Konva from 'konva';
 import { useGameStore } from '../stores/gameStore';
 import { useClipboard } from '../hooks/useClipboard';
 import { useCursorInterpolation } from '../hooks/useCursorInterpolation';
-import { usePings } from '../hooks/usePings';
 import { useElementHandlers } from '../hooks/useElementHandlers';
 import { useModalHandlers } from '../hooks/useModalHandlers';
 import { useCanvasKeyboardShortcuts } from '../hooks/useCanvasKeyboardShortcuts';
@@ -54,8 +53,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   // Polygon drawing state
   const [polygonPoints, setPolygonPoints] = useState<Point[]>([]);
   
-  // Ping state for visualization
-  const { pings, addPing } = usePings();
+  // Ping state for visualization - now from game store
+  const { pings, addPing } = useGameStore();
   
   // Measure tool state - Enhanced with waypoints
   const [measureWaypoints, setMeasureWaypoints] = useState<Point[]>([]);

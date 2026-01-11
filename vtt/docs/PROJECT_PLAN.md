@@ -275,19 +275,22 @@ Game
 
 ---
 
-### 3.6 Bug Fixes
+### 3.6 Bug Fixes ✅ DONE
 
 **Ping P2P visibility:**
 - Pings work locally but not across P2P sessions
 - `useRoom.ts` receives pings but doesn't expose them to GameCanvas
 - Need callback or store update so GameCanvas can render received pings
 
-**Files to modify:**
-- `src/hooks/useRoom.ts` - Expose received pings via callback/store
-- `src/components/GameCanvas.tsx` - Subscribe to received pings
+**Solution Implemented:**
+- Added `pings` state and `addPing` action to game store
+- Updated `useRoom.ts` to call `addPing` when receiving pings from peers
+- Updated `GameCanvas.tsx` to use pings from game store instead of local hook
 
-**NOTE:**
-- Review other functionality to ensure events are broadcast properly.
+**Files modified:**
+- `src/stores/gameStore.ts` - Added pings state and addPing action
+- `src/hooks/useRoom.ts` - Wire up onPing handler to call addPing
+- `src/components/GameCanvas.tsx` - Use pings from game store
 
 **Complexity:** Low (wire up existing systems)
 
@@ -556,6 +559,7 @@ These features don't fit the decentralized design:
 | v1.6.0 | P2P Reliability | Connection status, GM disconnect, desync detection, element versioning, chat |
 | v1.7.0 | P2P Polish | Undo/redo sync, clipboard sync, cursor throttling/interpolation |
 | v1.8.0 | Scene System | Multi-scene architecture, scene picker, image tool, dice/chat integration, export v3 format |
+| v1.8.1 | Bug Fixes | Ping P2P visibility fix |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---

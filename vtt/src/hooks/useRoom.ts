@@ -163,6 +163,7 @@ export function useRoom() {
     myPeerId,
     addDiceRoll,
     addChatMessage,
+    addPing,
   } = useGameStore();
 
   const { toggleFog, updateGridSettings, switchScene, updateScene } = useGameStore((state) => ({
@@ -392,8 +393,9 @@ export function useRoom() {
     });
 
     onPing((data: { position: Point; color: string }, peerId: string) => {
-      // Ping visualization is handled in GameCanvas.tsx via setPings state
+      // Add received ping to game store for visualization
       console.log('Ping from', peerId, 'at', data.position);
+      addPing(data.position.x, data.position.y, data.color);
     });
 
     onPlayerJoin((player: Player, _peerId: string) => {
@@ -596,7 +598,7 @@ export function useRoom() {
         });
       }
     });
-  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage, switchScene, updateScene]);
+  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, addDiceRoll, updateGridSettings, addChatMessage, switchScene, updateScene, addPing]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
