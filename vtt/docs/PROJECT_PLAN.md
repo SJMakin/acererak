@@ -159,7 +159,7 @@ interface Scene {
 
 ---
 
-### 3.2 Scene Picker UI ⭐ HIGH PRIORITY
+### 3.2 Scene Picker UI ✅ DONE
 
 Add dropdown scene picker in toolbar for quick scene switching.
 

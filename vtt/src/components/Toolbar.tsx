@@ -13,6 +13,11 @@ import {
   Popover,
   Stack,
   Box,
+  Modal,
+  Button,
+  TextInput,
+  List,
+  ActionIcon as MantineActionIcon,
 } from '@mantine/core';
 import {
   IconPointer,
@@ -38,12 +43,15 @@ import {
   IconPlus,
   IconSettings,
   IconCopy,
+  IconTrash,
+  IconEdit,
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
-import type { ToolType } from '../types';
+import type { ToolType, Scene } from '../types';
 import SettingsModal from './SettingsModal';
 import ExportImportModal from './ExportImportModal';
+import SceneModal from './SceneModal';
 import ConnectionStatus from './ConnectionStatus';
 
 interface ToolbarProps {
@@ -61,6 +69,8 @@ interface ToolbarProps {
     requestFullSync: () => void;
     broadcastSync: () => void;
     broadcastGridSettings: (settings: Partial<import('../types').GridSettings>) => void;
+    broadcastSceneSwitch: (sceneId: string) => void;
+    broadcastSceneUpdate: (scene: Scene) => void;
   };
 }
 
@@ -129,6 +139,12 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   const [settingsOpened, setSettingsOpened] = useState(false);
   const [exportImportOpened, setExportImportOpened] = useState(false);
   const [exportImportMode, setExportImportMode] = useState<'export' | 'import'>('export');
+  
+  // Scene Modal state
+  const [sceneModalOpened, setSceneModalOpened] = useState(false);
+  const [editingScene, setEditingScene] = useState<Scene | undefined>(undefined);
+  const [sceneManagerOpened, setSceneManagerOpened] = useState(false);
+  const [editingSceneName, setEditingSceneName] = useState('');
 
   const handleZoom = (factor: number) => {
     const newScale = Math.min(Math.max(viewportScale * factor, 0.25), 3);
@@ -138,6 +154,49 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   // Check if current tool is a drawing tool or AOE tool
   const isDrawingTool = selectedTool.startsWith('draw-');
   const isAoeTool = selectedTool.startsWith('aoe-');
+
+  // Handle SceneModal submission
+  const handleSceneSubmit = (data: {
+    name: string;
+    backgroundUrl?: string;
+    gridSettings: import('../types').GridSettings;
+    copyFromCurrent: boolean;
+  }) => {
+    const newSceneId = useGameStore.getState().createScene(
+      data.name,
+      data.backgroundUrl,
+      data.copyFromCurrent
+    );
+    
+    // Update grid settings if not copying from current
+    if (!data.copyFromCurrent) {
+      useGameStore.getState().updateScene(newSceneId, { gridSettings: data.gridSettings });
+    }
+    
+    // Broadcast new scene to peers
+    const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
+    if (newScene) {
+      room.broadcastSceneUpdate(newScene);
+    }
+    
+    setSceneModalOpened(false);
+    setEditingScene(undefined);
+  };
+
+  // Handle scene manager actions
+  const handleDeleteScene = (sceneId: string) => {
+    useGameStore.getState().deleteScene(sceneId);
+    setSceneManagerOpened(false);
+  };
+
+  const handleRenameScene = (sceneId: string, newName: string) => {
+    useGameStore.getState().updateScene(sceneId, { name: newName });
+    const updatedScene = useGameStore.getState().game?.scenes.find(s => s.id === sceneId);
+    if (updatedScene) {
+      room.broadcastSceneUpdate(updatedScene);
+    }
+    setEditingSceneName('');
+  };
 
   return (
     <Group h="100%" px="md" justify="space-between">
@@ -207,8 +266,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                 <Menu.Item
                   leftSection={<IconPlus size={16} />}
                   onClick={() => {
-                    // TODO: Open Scene Creation Modal
-                    console.log('Create new scene');
+                    setEditingScene(undefined);
+                    setSceneModalOpened(true);
                   }}
                 >
                   New Scene
@@ -232,8 +291,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                 <Menu.Item
                   leftSection={<IconSettings size={16} />}
                   onClick={() => {
-                    // TODO: Open Scene Manager Modal
-                    console.log('Manage scenes');
+                    setSceneManagerOpened(true);
                   }}
                 >
                   Manage Scenes
@@ -631,6 +689,99 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
         onClose={() => setExportImportOpened(false)}
         mode={exportImportMode}
       />
+
+      {/* Scene Modal */}
+      <SceneModal
+        opened={sceneModalOpened}
+        onClose={() => {
+          setSceneModalOpened(false);
+          setEditingScene(undefined);
+        }}
+        onSubmit={handleSceneSubmit}
+        scene={editingScene}
+        defaultGridSettings={{
+          cellSize: 50,
+          width: 30,
+          height: 30,
+          showGrid: true,
+          snapToGrid: true,
+          gridColor: 'rgba(255, 255, 255, 0.2)',
+          gridType: 'square',
+        }}
+      />
+
+      {/* Scene Manager Modal */}
+      <Modal
+        opened={sceneManagerOpened}
+        onClose={() => {
+          setSceneManagerOpened(false);
+          setEditingSceneName('');
+        }}
+        title="Manage Scenes"
+        size="md"
+      >
+        <Stack gap="md">
+          {game?.scenes.map((scene) => (
+            <Group key={scene.id} justify="space-between" align="center">
+              {editingSceneName === scene.id ? (
+                <Group gap="xs" style={{ flex: 1 }}>
+                  <TextInput
+                    defaultValue={scene.name}
+                    size="sm"
+                    style={{ flex: 1 }}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameScene(scene.id, e.currentTarget.value);
+                      } else if (e.key === 'Escape') {
+                        setEditingSceneName('');
+                      }
+                    }}
+                  />
+                  <Button size="xs" onClick={() => {
+                    const input = document.querySelector(`input[defaultValue="${scene.name}"]`) as HTMLInputElement;
+                    if (input) handleRenameScene(scene.id, input.value);
+                  }}>
+                    Save
+                  </Button>
+                </Group>
+              ) : (
+                <Text size="sm" style={{ flex: 1 }}>{scene.name}</Text>
+              )}
+              <Group gap="xs">
+                {editingSceneName !== scene.id && (
+                  <>
+                    <MantineActionIcon
+                      size="sm"
+                      variant="subtle"
+                      onClick={() => setEditingSceneName(scene.id)}
+                    >
+                      <IconEdit size={16} />
+                    </MantineActionIcon>
+                    {game.scenes.length > 1 && (
+                      <MantineActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDeleteScene(scene.id)}
+                      >
+                        <IconTrash size={16} />
+                      </MantineActionIcon>
+                    )}
+                  </>
+                )}
+              </Group>
+            </Group>
+          ))}
+          <Button onClick={() => {
+            setSceneManagerOpened(false);
+            setEditingScene(undefined);
+            setSceneModalOpened(true);
+          }}>
+            Create New Scene
+          </Button>
+        </Stack>
+      </Modal>
     </Group>
   );
 }
