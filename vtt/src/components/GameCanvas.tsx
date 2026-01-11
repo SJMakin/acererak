@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Stage } from 'react-konva';
 import type Konva from 'konva';
+import { useGesture } from '@use-gesture/react';
 import { useGameStore } from '../stores/gameStore';
 import { useClipboard } from '../hooks/useClipboard';
 import { useCursorInterpolation } from '../hooks/useCursorInterpolation';
@@ -45,6 +46,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+  
+  // Touch gesture state
+  const initialPinchDistance = useRef<number | null>(null);
+  const initialPinchCenter = useRef<Point | null>(null);
+  const initialViewportScale = useRef(1);
+  const initialViewportOffset = useRef<Point>({ x: 0, y: 0 });
+  const isTwoFingerGesture = useRef(false);
   
   // Drawing state
   const isDrawing = useRef(false);
@@ -252,6 +260,85 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     panViewport({ x: pos.x - viewportOffset.x, y: pos.y - viewportOffset.y });
   }, [selectedTool, panViewport, viewportOffset]);
 
+  // Calculate distance between two touch points
+  const getTouchDistance = useCallback((touches: Touch[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, []);
+
+  // Calculate center point between two touch points
+  const getTouchCenter = useCallback((touches: Touch[]) => {
+    if (touches.length < 2) return { x: 0, y: 0 };
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }, []);
+
+  // Handle pinch-zoom gesture
+  const handlePinch = useCallback((state: any) => {
+    const { touches, first, memo } = state;
+    
+    if (first) {
+      // Initialize pinch gesture
+      initialPinchDistance.current = getTouchDistance(touches);
+      initialPinchCenter.current = getTouchCenter(touches);
+      initialViewportScale.current = viewportScale;
+      initialViewportOffset.current = { ...viewportOffset };
+      isTwoFingerGesture.current = true;
+      return memo;
+    }
+    
+    if (touches.length < 2) {
+      isTwoFingerGesture.current = false;
+      return memo;
+    }
+    
+    const currentDistance = getTouchDistance(touches);
+    const currentCenter = getTouchCenter(touches);
+    
+    if (initialPinchDistance.current && initialPinchCenter.current) {
+      // Calculate scale factor
+      const scaleDelta = currentDistance / initialPinchDistance.current;
+      const newScale = Math.max(0.1, Math.min(5, initialViewportScale.current * scaleDelta));
+      
+      // Calculate pan offset (two-finger pan)
+      const dx = currentCenter.x - initialPinchCenter.current.x;
+      const dy = currentCenter.y - initialPinchCenter.current.y;
+      
+      // Apply zoom centered on pinch center
+      const zoomCenter = {
+        x: initialPinchCenter.current.x - initialViewportOffset.current.x,
+        y: initialPinchCenter.current.y - initialViewportOffset.current.y,
+      };
+      
+      const newOffset = {
+        x: initialPinchCenter.current.x - zoomCenter.x * (newScale / initialViewportScale.current) + dx,
+        y: initialPinchCenter.current.y - zoomCenter.y * (newScale / initialViewportScale.current) + dy,
+      };
+      
+      // Update viewport
+      zoomViewport(newScale - initialViewportScale.current, initialPinchCenter.current);
+      panViewport({ x: newOffset.x - viewportOffset.x, y: newOffset.y - viewportOffset.y });
+    }
+    
+    return memo;
+  }, [getTouchDistance, getTouchCenter, viewportScale, viewportOffset, zoomViewport, panViewport]);
+
+  // Set up touch gesture handlers
+  const bind = useGesture({
+    onPinch: handlePinch,
+    onPinchEnd: () => {
+      isTwoFingerGesture.current = false;
+      initialPinchDistance.current = null;
+      initialPinchCenter.current = null;
+    },
+  }, {
+    pinch: { from: () => [0, 0], scaleBounds: { min: 0.1, max: 5 } },
+  });
+
   // Finish polygon helper function - defined early so it can be used by handlers below
   const finishPolygon = useCallback(() => {
     if (polygonPoints.length >= 3 && game) {
@@ -291,6 +378,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle mouse/touch down for drawing
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Ignore touch events during two-finger gestures (handled by useGesture)
+    if (isTwoFingerGesture.current && 'touches' in e.evt) {
+      return;
+    }
+    
     // Handle polygon tool - click to add points
     if (selectedTool === 'draw-polygon' && e.target === e.target.getStage()) {
       const stage = stageRef.current;
@@ -455,6 +547,11 @@ export default function GameCanvas({ room }: GameCanvasProps) {
 
   // Handle mouse/touch move for drawing
   const handleMouseMoveForDrawing = useCallback((_e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Ignore touch events during two-finger gestures (handled by useGesture)
+    if (isTwoFingerGesture.current && 'touches' in _e.evt) {
+      return;
+    }
+    
     // Broadcast cursor position (throttled: 10Hz max, 5px min delta)
     const stage = stageRef.current;
     if (stage) {
@@ -511,7 +608,12 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   }, [isDrawingTool, selectedTool, drawStartPoint, measureWaypoints, room, viewportOffset, viewportScale]);
 
   // Handle mouse up for drawing
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Reset two-finger gesture flag on touch end
+    if (e && 'touches' in e.evt && e.evt.touches.length === 0) {
+      isTwoFingerGesture.current = false;
+    }
+    
     // Handle marquee selection finalization
     if (isMarqueeSelecting.current && marqueeStart && marqueeEnd) {
       isMarqueeSelecting.current = false;
