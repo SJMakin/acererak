@@ -253,18 +253,20 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** Basic TipTap editor working in a modal, editable rich text
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Install TipTap dependencies
-- [ ] Create `src/components/character/CharacterSheetEditor.tsx`
+- [x] Install TipTap dependencies
+- [x] Create `src/components/character/CharacterSheetEditor.tsx`
   - Basic TipTap editor with StarterKit
   - Read-only toggle
   - Markdown import/export via `@tiptap/pm`
-- [ ] Create `src/components/character/CharacterSheetModal.tsx`
+- [x] Create `src/components/character/CharacterSheetModal.tsx`
   - Modal wrapper for editor
   - Save/cancel buttons
   - Links to a Character by ID
-- [ ] Create `src/types/character.ts`
+- [x] Create `src/types/character.ts`
   ```typescript
   export interface Character {
     id: string;
@@ -280,18 +282,25 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
     updatedAt: string;
   }
   ```
-- [ ] Add `characters: Character[]` to `GameState` in `src/types/index.ts`
-- [ ] Add `characterId?: string` to `TokenElement` interface
-- [ ] Create `src/stores/characterStore.ts` with Zustand
+- [x] Add `characters: Character[]` to `GameState` in `src/types/index.ts`
+- [x] Add `characterId?: string` to `TokenElement` interface
+- [x] Create `src/stores/characterStore.ts` with Zustand
   - `addCharacter(character: Character)`
   - `updateCharacter(id: string, updates: Partial<Character>)`
   - `deleteCharacter(id: string)`
   - `getCharacterById(id: string)`
+- [x] Add IndexedDB persistence for characters (GM only)
+- [x] Integrate "Create Character" button into LibraryPanel
+- [x] Add CharacterLibraryPanel component for character management
+- [x] Add P2P message types for character updates (prepared for later phases)
 
 **Acceptance Criteria:**
-- [ ] Can open modal and type rich text
-- [ ] Content persists when modal closes and reopens
-- [ ] Character data saved in game state
+- [x] Can open modal and type rich text
+- [x] Content persists when modal closes and reopens
+- [x] Character data saved in game state
+- [x] Character store CRUD operations work correctly
+- [x] Markdown import/export functional
+- [x] IndexedDB persistence for GM
 
 ---
 

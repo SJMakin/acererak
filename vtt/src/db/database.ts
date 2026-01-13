@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { GameState, LibraryItem, LibraryItemType } from '../types';
+import type { GameState, LibraryItem, LibraryItemType, Character } from '../types';
 
 export interface SavedGame {
   id: string;
@@ -15,10 +15,15 @@ export interface SavedLibraryItem extends LibraryItem {
   // Additional DB-specific fields if needed
 }
 
+export interface SavedCharacter extends Character {
+  // Additional DB-specific fields if needed
+}
+
 // Use factory function pattern instead of class extension to avoid bundling issues
 const db = new Dexie('LychgateVTTDatabase') as Dexie & {
   games: Table<SavedGame, string>;
   library: Table<SavedLibraryItem, string>;
+  characters: Table<SavedCharacter, string>;
 };
 
 db.version(1).stores({
@@ -29,6 +34,13 @@ db.version(1).stores({
 db.version(2).stores({
   games: 'id, name, lastUpdated, isGM',
   library: 'id, type, name, *tags, createdAt, updatedAt',
+});
+
+// Version 3: Add characters table
+db.version(3).stores({
+  games: 'id, name, lastUpdated, isGM',
+  library: 'id, type, name, *tags, createdAt, updatedAt',
+  characters: 'id, name, createdAt, updatedAt',
 });
 
 export { db };
@@ -104,4 +116,27 @@ export async function searchLibraryItems(query: string): Promise<SavedLibraryIte
     item.description?.toLowerCase().includes(lowerQuery) ||
     item.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
   ).toArray();
+}
+
+// Character operations
+export async function saveCharacters(characters: Character[]): Promise<void> {
+  // Clear existing and bulk add for simplicity
+  await db.characters.clear();
+  await db.characters.bulkPut(characters as SavedCharacter[]);
+}
+
+export async function loadCharacters(): Promise<Character[]> {
+  return db.characters.toArray() as Promise<Character[]>;
+}
+
+export async function saveCharacter(character: Character): Promise<void> {
+  await db.characters.put(character as SavedCharacter);
+}
+
+export async function getCharacter(id: string): Promise<Character | undefined> {
+  return db.characters.get(id) as Promise<Character | undefined>;
+}
+
+export async function deleteCharacter(id: string): Promise<void> {
+  await db.characters.delete(id);
 }

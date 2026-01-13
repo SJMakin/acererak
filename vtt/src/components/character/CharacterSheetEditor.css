@@ -1,0 +1,147 @@
+.character-sheet-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1a1a2e;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.character-sheet-editor__toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-wrap: wrap;
+}
+
+.character-sheet-editor__toolbar button {
+  padding: 6px 12px;
+  background: #0f3460;
+  border: none;
+  border-radius: 4px;
+  color: #e8e8e8;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.character-sheet-editor__toolbar button:hover {
+  background: #1a4a7a;
+}
+
+.character-sheet-editor__toolbar button.active {
+  background: #7c3aed;
+}
+
+.character-sheet-editor__toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.character-sheet-editor__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.character-sheet-editor__content .tiptap {
+  outline: none;
+  min-height: 200px;
+  color: #e8e8e8;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.character-sheet-editor__content .tiptap p {
+  margin: 0 0 8px 0;
+}
+
+.character-sheet-editor__content .tiptap h1 {
+  font-size: 1.75em;
+  font-weight: bold;
+  margin: 16px 0 12px 0;
+}
+
+.character-sheet-editor__content .tiptap h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 14px 0 10px 0;
+}
+
+.character-sheet-editor__content .tiptap h3 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 12px 0 8px 0;
+}
+
+.character-sheet-editor__content .tiptap ul,
+.character-sheet-editor__content .tiptap ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.character-sheet-editor__content .tiptap li {
+  margin: 4px 0;
+}
+
+.character-sheet-editor__content .tiptap blockquote {
+  border-left: 3px solid #7c3aed;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: #a0a0a0;
+  font-style: italic;
+}
+
+.character-sheet-editor__content .tiptap code {
+  background: #0f3460;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 0.9em;
+}
+
+.character-sheet-editor__content .tiptap pre {
+  background: #0f3460;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.character-sheet-editor__content .tiptap pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.character-sheet-editor__content .tiptap hr {
+  border: none;
+  border-top: 1px solid #0f3460;
+  margin: 16px 0;
+}
+
+/* Markdown import/export panel */
+.character-sheet-editor__markdown-panel {
+  padding: 12px;
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+}
+
+.character-sheet-editor__markdown-panel textarea {
+  width: 100%;
+  min-height: 100px;
+  background: #0f3460;
+  border: 1px solid #1a4a7a;
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 8px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.character-sheet-editor__markdown-panel textarea:focus {
+  outline: none;
+  border-color: #7c3aed;
+}

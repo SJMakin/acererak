@@ -151,6 +151,89 @@ Comprehensive code review of P2P state synchronization revealed critical gaps.
 
 ---
 
-## Future Sessions
+## 2026-01-13: Phase 1 - Reactive Character Sheet System Foundation
+
+### Overview
+Implemented the foundation for the Reactive Character Sheet System using TipTap editor integration.
+
+### What Was Implemented
+
+**1. Dependencies Installed:**
+- `@tiptap/react` - Core React bindings
+- `@tiptap/starter-kit` - Basic editor extensions (bold, italic, headings, lists, etc.)
+- `@tiptap/extension-mention` - Autocomplete foundation
+- `@tiptap/pm` - Markdown serialization
+- `expr-eval` - Expression evaluation (for future phases)
+
+**2. New Files Created:**
+
+| File | Purpose |
+|------|---------|
+| `src/types/character.ts` | Character interface definition |
+| `src/stores/characterStore.ts` | Zustand store with CRUD operations |
+| `src/components/character/CharacterSheetEditor.tsx` | TipTap editor component |
+| `src/components/character/CharacterSheetModal.tsx` | Modal wrapper for editor |
+| `src/components/character/CharacterLibraryPanel.tsx` | Character library UI |
+| `src/components/character/CharacterSheetEditor.css` | Editor styling |
+| `src/components/character/CharacterSheetModal.css` | Modal styling |
+| `src/components/character/CharacterLibraryPanel.css` | Library panel styling |
+
+**3. Type Modifications:**
+
+- **`src/types/index.ts`:**
+  - Added `characters?: Character[]` to `GameState` interface
+  - Added `characterId?: string` to `TokenElement` interface
+  - Re-exported `Character` and `CharacterP2PMessage` types
+  - Made `fontWeight` optional in `StyleProps` (backward compat)
+
+- **`src/types/character.ts`:**
+  - Defined `Character` interface with content (TipTap JSON), shadowState, projections
+  - Added `CharacterUpdateMessage` and `CharacterDeleteMessage` P2P types
+
+**4. Database Updates:**
+
+- **`src/db/database.ts`:**
+  - Added `characters` table to IndexedDB (version 3)
+  - Added `saveCharacters()`, `loadCharacters()`, `saveCharacter()`, `getCharacter()`, `deleteCharacter()` functions
+
+**5. Store Implementation:**
+
+- **`src/stores/characterStore.ts`:**
+  - Zustand store with `characters`, `isLoading`, `isGM` state
+  - CRUD actions: `addCharacter()`, `updateCharacter()`, `deleteCharacter()`, `getCharacterById()`
+  - IndexedDB persistence for GM mode
+  - Helper function `setCharacterStoreGM()` for GM initialization
+
+**6. Component Integration:**
+
+- **`src/components/LibraryPanel.tsx`:**
+  - Added "Create Character" button
+  - Character list section showing all characters
+  - Edit/Delete actions for each character
+  - `CharacterSheetModal` integration
+
+**7. Editor Features:**
+
+- Formatting: Bold, Italic, Strike, Code, Headings (H1-H3)
+- Lists: Bullet lists, Ordered lists
+- Block elements: Blockquote, Code block, Horizontal rule
+- Markdown import/export panel
+- Read-only toggle support
+
+### Key Design Decisions
+
+1. **Character Storage**: Characters stored separately from game state in IndexedDB (GM only) for better scalability
+2. **Backward Compatibility**: `characterId` on tokens is optional; existing tokens work unchanged
+3. **Phase 1 Scope**: Only rich text editing - no custom nodes yet (stat declarations, expressions, widgets in later phases)
+4. **Minimal Dependencies**: Using only StarterKit for now, Mention extension included but not configured
+
+### Files Modified
+
+- `vtt/package.json` - Dependencies added
+- `vtt/src/types/index.ts` - Character types added
+- `vtt/src/db/database.ts` - Character storage functions
+- `vtt/src/components/LibraryPanel.tsx` - Character integration
+
+### Future Sessions
 
 *Add new session notes above this line*

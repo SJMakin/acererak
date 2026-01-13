@@ -17,13 +17,15 @@ import {
 } from '@mantine/core';
 import { useLibraryStore } from '../stores/libraryStore';
 import { useGameStore } from '../stores/gameStore';
-import type { 
-  LibraryItem, 
-  LibraryItemType, 
+import { useCharacterStore } from '../stores/characterStore';
+import type {
+  LibraryItem,
+  LibraryItemType,
   TokenTemplateData,
   TokenElement,
-  CanvasElement 
+  CanvasElement,
 } from '../types';
+import { CharacterSheetModal } from './character/CharacterSheetModal';
 
 interface LibraryPanelProps {
   room: {
@@ -44,6 +46,8 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
     updateLibraryItem,
   } = useLibraryStore();
 
+  const { characters, deleteCharacter } = useCharacterStore();
+
   const { game, addElement } = useGameStore();
 
   // Get active scene
@@ -53,6 +57,10 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
+
+  // Character modal state
+  const [characterModalOpen, setCharacterModalOpen] = useState(false);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
 
   // Load library on mount
   useEffect(() => {
@@ -80,7 +88,6 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
       const fullToken = { ...newToken, id } as TokenElement;
       room.broadcastElementUpdate(fullToken);
     }
-    // TODO: Handle map and scene types
   };
 
   const handleEditItem = (item: LibraryItem) => {
@@ -105,6 +112,23 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   const handleDeleteItem = async (id: string) => {
     if (confirm('Delete this library item?')) {
       await deleteLibraryItem(id);
+    }
+  };
+
+  const handleCreateCharacter = () => {
+    setSelectedCharacterId(null);
+    setCharacterModalOpen(true);
+  };
+
+  const handleEditCharacter = (characterId: string) => {
+    setSelectedCharacterId(characterId);
+    setCharacterModalOpen(true);
+  };
+
+  const handleDeleteCharacter = (characterId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to delete this character?')) {
+      deleteCharacter(characterId);
     }
   };
 
@@ -133,6 +157,17 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
 
   return (
     <Stack gap="sm">
+      {/* Create Character Button */}
+      <Button
+        variant="light"
+        color="violet"
+        size="xs"
+        onClick={handleCreateCharacter}
+        fullWidth
+      >
+        + Create Character
+      </Button>
+
       {/* Search */}
       <TextInput
         placeholder="Search library..."
@@ -154,7 +189,7 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
       />
 
       {/* Items list */}
-      <ScrollArea h="calc(100vh - 350px)">
+      <ScrollArea h="calc(100vh - 400px)">
         <Stack gap="xs">
           {filteredItems.length === 0 ? (
             <Text size="sm" c="dimmed" ta="center" py="lg">
@@ -237,6 +272,59 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
               </Paper>
             ))
           )}
+
+          {/* Character List Section */}
+          {characters.length > 0 && (
+            <>
+              <Text size="sm" fw={500} mt="md" c="dimmed">
+                Characters ({characters.length})
+              </Text>
+              {characters.map((character) => (
+                <Paper
+                  key={character.id}
+                  p="xs"
+                  withBorder
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="xs">
+                      <Text size="lg">📜</Text>
+                      <Stack gap={2}>
+                        <Text size="sm" fw={500} truncate>
+                          {character.name}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          Updated {new Date(character.updatedAt).toLocaleDateString()}
+                        </Text>
+                      </Stack>
+                    </Group>
+                    <Group gap={4}>
+                      <Tooltip label="Edit Character">
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="violet"
+                          onClick={() => handleEditCharacter(character.id)}
+                        >
+                          ✏️
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Delete Character">
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="red"
+                          onClick={(e) => handleDeleteCharacter(character.id, e)}
+                        >
+                          🗑️
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </>
+          )}
         </Stack>
       </ScrollArea>
 
@@ -280,6 +368,16 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Character Sheet Modal */}
+      <CharacterSheetModal
+        isOpen={characterModalOpen}
+        onClose={() => {
+          setCharacterModalOpen(false);
+          setSelectedCharacterId(null);
+        }}
+        characterId={selectedCharacterId}
+      />
     </Stack>
   );
 }

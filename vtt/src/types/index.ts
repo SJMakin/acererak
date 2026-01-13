@@ -4,6 +4,9 @@ export type ElementType = 'token' | 'image' | 'shape' | 'text';
 export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
 export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer IDs
 
+// Re-export Character types
+export type { Character, CharacterP2PMessage } from './character';
+
 export interface Point {
   x: number;
   y: number;
@@ -62,6 +65,7 @@ export interface TokenElement extends BaseElement {
   conditions?: string[];
   notes?: string;
   controlledBy?: string; // peer ID who can move this token
+  characterId?: string;  // links to Character.id for character sheet
 }
 
 export interface ImageElement extends BaseElement {
@@ -147,6 +151,7 @@ export interface GameState {
   diceRolls?: DiceRoll[];    // dice roll history
   campaignNotes?: CampaignNote[]; // Campaign journal notes
   chatMessages?: ChatMessage[]; // In-game chat messages
+  characters?: Character[];  // Character sheets (Phase 1)
 
   // Legacy fields for migration (deprecated - use scenes instead)
   /** @deprecated Use scenes[].gridSettings instead */
@@ -357,6 +362,7 @@ export const DEFAULT_STYLE: StyleProps = {
   lineWidth: 2,
   fontSize: 16,
   fontFamily: 'sans-serif',
+  fontWeight: 'normal',
   opacity: 1,
 };
 
