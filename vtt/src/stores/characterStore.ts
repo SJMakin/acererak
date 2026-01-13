@@ -13,6 +13,9 @@ interface CharacterStore {
   updateCharacter: (id: string, updates: Partial<Character>) => void;
   deleteCharacter: (id: string) => void;
 
+  // Stat operations (for action buttons)
+  updateCharacterStat: (characterId: string, statKey: string, statValue: string | number) => void;
+
   // Queries
   getCharacterById: (id: string) => Character | undefined;
 
@@ -85,6 +88,64 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
       }
 
       return { characters: filteredCharacters };
+    });
+  },
+
+  updateCharacterStat: (characterId, statKey, statValue) => {
+    set((state) => {
+      const character = state.characters.find((char) => char.id === characterId);
+      if (!character) return state;
+
+      // Parse the content to update the stat in the sheet
+      try {
+        const content = JSON.parse(character.content);
+        
+        // Recursively find and update stat declarations
+        const updateStatInNode = (node: { type: string; attrs?: Record<string, unknown>; content?: unknown[] }): boolean => {
+          if (node.type === 'statDeclaration' && node.attrs) {
+            const attrs = node.attrs as { key?: string };
+            if (attrs.key === statKey) {
+              (node.attrs as Record<string, unknown>).value = statValue;
+              return true;
+            }
+          }
+          if (node.content) {
+            for (const child of node.content) {
+              if (updateStatInNode(child as { type: string; attrs?: Record<string, unknown>; content?: unknown[] })) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        if (content.content) {
+          for (const node of content.content) {
+            if (updateStatInNode(node as { type: string; attrs?: Record<string, unknown>; content?: unknown[] })) {
+              break;
+            }
+          }
+        }
+
+        const now = new Date().toISOString();
+        const updatedCharacters = state.characters.map((char) =>
+          char.id === characterId
+            ? { ...char, content: JSON.stringify(content), updatedAt: now }
+            : char
+        );
+
+        // Persist to IndexedDB if GM
+        if (state.isGM) {
+          saveCharacters(updatedCharacters).catch((err) => {
+            console.error('Failed to save characters:', err);
+          });
+        }
+
+        return { characters: updatedCharacters };
+      } catch (e) {
+        console.error('Failed to update character stat:', e);
+        return state;
+      }
     });
   },
 

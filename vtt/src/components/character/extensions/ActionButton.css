@@ -1,0 +1,88 @@
+.action-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.action-button--editing {
+  background: #f0f4f8;
+  border-radius: 4px;
+  padding: 4px 8px;
+  border: 1px solid #4a90d9;
+}
+
+.action-button__bracket {
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0 1px;
+}
+
+.action-button__separator {
+  color: #9ca3af;
+  font-size: 0.9em;
+}
+
+.action-button__input {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: #1e40af;
+  outline: none;
+  padding: 2px 4px;
+  border-bottom: 1px solid #d0d8e0;
+  min-width: 60px;
+}
+
+.action-button__input:focus {
+  border-bottom-color: #4a90d9;
+}
+
+.action-button__input--small {
+  min-width: 40px;
+  font-size: 0.85em;
+}
+
+.action-button__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.action-button__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+}
+
+.action-button__btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(102, 126, 234, 0.3);
+}
+
+.action-button__btn--rolling {
+  animation: action-button__pulse 0.5s ease-in-out;
+}
+
+.action-button__cost {
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+
+@keyframes action-button__pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+}

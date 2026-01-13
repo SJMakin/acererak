@@ -2,12 +2,18 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { StatDeclaration } from './extensions/StatDeclaration';
+import { Expression } from './extensions/Expression';
+import { ActionButton } from './extensions/ActionButton';
 import { debouncedParse, parseShadowState, type ShadowState } from '../../services/shadowStateService';
+import { useGameStore } from '../../stores/gameStore';
+import type { ChatMessage } from '../../types';
 import './CharacterSheetEditor.css';
 
 interface CharacterSheetEditorProps {
   content: string;
   onChange: (content: string, shadowState?: ShadowState) => void;
+  onUpdateStat?: (key: string, newValue: string | number) => void;
+  onBroadcastRoll?: (message: ChatMessage) => void;
   readOnly?: boolean;
   showMarkdownPanel?: boolean;
 }
@@ -15,6 +21,8 @@ interface CharacterSheetEditorProps {
 export function CharacterSheetEditor({
   content,
   onChange,
+  onUpdateStat,
+  onBroadcastRoll,
   readOnly = false,
   showMarkdownPanel = false,
 }: CharacterSheetEditorProps) {
@@ -60,6 +68,16 @@ export function CharacterSheetEditor({
       StatDeclaration.configure({
         HTMLAttributes: {
           class: 'stat-declaration',
+        },
+      }),
+      Expression.configure({
+        HTMLAttributes: {
+          class: 'expression',
+        },
+      }),
+      ActionButton.configure({
+        HTMLAttributes: {
+          class: 'action-button',
         },
       }),
     ],
@@ -121,6 +139,24 @@ export function CharacterSheetEditor({
     [editor]
   );
 
+  const insertExpression = useCallback(
+    (formula: string) => {
+      if (!editor) return;
+      
+      editor.commands.insertExpression({ formula });
+    },
+    [editor]
+  );
+
+  const insertActionButton = useCallback(
+    (label: string, action: string, cost?: string) => {
+      if (!editor) return;
+      
+      editor.commands.insertActionButton({ label, action, cost });
+    },
+    [editor]
+  );
+
   const exportMarkdown = useCallback(() => {
     if (!editor) return;
     const json = editor.getJSON();
@@ -157,6 +193,21 @@ export function CharacterSheetEditor({
           const value = (attrs.value as string) || '';
           const projections = (attrs.projections as string[]) || [];
           markdown += `${key}:: ${value}${projections.map((p: string) => ` #${p}`).join('')}\n\n`;
+          break;
+        }
+        case 'expression': {
+          const attrs = nodeAny.attrs || {};
+          const formula = (attrs.formula as string) || '';
+          markdown += `{{ ${formula} }}\n\n`;
+          break;
+        }
+        case 'actionButton': {
+          const attrs = nodeAny.attrs || {};
+          const label = (attrs.label as string) || 'Action';
+          const action = (attrs.action as string) || '';
+          const cost = (attrs.cost as string);
+          const costPart = cost ? `; cost: ${cost}` : '';
+          markdown += `[${label}](action: ${action}${costPart})\n\n`;
           break;
         }
       }

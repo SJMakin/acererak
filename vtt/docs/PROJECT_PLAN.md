@@ -365,41 +365,54 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** `{{ expression }}` shows computed values, `[Action](action: dice)` creates roll buttons
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Create `src/components/character/extensions/Expression.ts`
-  ```typescript
-  // TipTap Node extension
-  // Matches: {{ expression }}
-  // Evaluates using expr-eval with shadowState as variables
-  // Renders computed result inline
-  ```
-- [ ] Create `src/components/character/extensions/ExpressionComponent.tsx`
-  - Shows computed value
+- [x] Create `src/components/character/extensions/Expression.ts`
+  - TipTap Node extension for `{{ expression }}` pattern
+  - Evaluates using expr-eval with shadowState as variables
+  - Renders computed result inline
+  - Commands: insertExpression, setExpressionFormula
+- [x] Create `src/components/character/extensions/ExpressionComponent.tsx`
+  - Shows computed value inline
   - Tooltip shows formula on hover
-  - Re-evaluates when shadowState changes
-- [ ] Create `src/components/character/extensions/ActionButton.ts`
-  ```typescript
-  // TipTap Node extension
-  // Matches: [Label](action: diceFormula) or [Label](action: diceFormula; cost: Variable)
-  // Renders as clickable button
-  ```
-- [ ] Create `src/components/character/extensions/ActionButtonComponent.tsx`
-  - Styled button with label
-  - On click: parse dice formula, resolve variables from shadowState
-  - Execute roll via existing dice service
-  - If `cost` specified: decrement variable in shadowState
-  - Broadcast roll to P2P
-- [ ] Integrate with `src/services/diceParser.ts`
-  - Add variable resolution: `1d20+Strength` → `1d20+18`
-  - Support `{{ expression }}` in formulas
+  - Re-evaluates when shadowState changes via useEffect
+  - Graceful error handling (shows "Error" for invalid formulas)
+  - Sandboxed evaluation using expr-eval
+- [x] Create `src/components/character/extensions/ActionButton.ts`
+  - TipTap Node extension for `[Label](action: diceFormula)` pattern
+  - Supports optional cost: `[Label](action: diceFormula; cost: Variable)`
+  - Renders as clickable button
+  - Commands: insertActionButton, setActionButtonLabel, setActionButtonAction, setActionButtonCost
+- [x] Create `src/components/character/extensions/ActionButtonComponent.tsx`
+  - Styled button with label and optional cost indicator
+  - On click: parses dice formula, resolves variables from shadowState
+  - Executes roll via existing dice service
+  - If `cost` specified: decrements variable in shadowState via callback
+  - Broadcasts roll to P2P via onBroadcastRoll callback
+- [x] Create `src/services/diceParser.ts` enhancements
+  - Added `resolveVariables(formula, shadowState)` function
+  - Replaces variable names with values: `1d20+Strength` → `1d20+18`
+  - Supports `{{ expression }}` in formulas (evaluates first)
+  - Handles missing variables gracefully
+- [x] Integrate extensions into CharacterSheetEditor
+  - Registered Expression and ActionButton extensions
+  - Pass shadowState to ExpressionComponent for reactivity
+  - Pass onRoll callback and onUpdateStat callback to ActionButtonComponent
+  - Export/import markdown support for expressions and action buttons
+- [x] Update characterStore.ts
+  - Added `updateCharacterStat()` function for action button cost deduction
+  - Updates stat values in character content JSON
 
 **Acceptance Criteria:**
-- [ ] `{{ (Strength - 10) / 2 }}` shows `4` when Strength is 18
-- [ ] Expression updates when stat changes
-- [ ] `[Attack](action: 1d20+5)` renders as button
-- [ ] Clicking button rolls dice and broadcasts
-- [ ] `[Smite](action: 2d8; cost: Slots)` decrements Slots on use
+- [x] `{{ (Strength - 10) / 2 }}` shows `4` when Strength is 18
+- [x] Expression updates when stat changes (reactive via shadowState prop)
+- [x] `[Attack](action: 1d20+5)` renders as styled button
+- [x] Clicking button rolls dice and broadcasts to chat
+- [x] `[Smite](action: 2d8; cost: Slots)` decrements Slots on use
+- [x] Variable resolution works in dice formulas
+- [x] Expression errors handled gracefully (shows "Error")
 
 ---
 

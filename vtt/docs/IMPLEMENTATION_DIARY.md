@@ -331,6 +331,116 @@ Implemented the custom node system for stat declarations using the `Key:: Value`
 - Phase 5: Token integration (link characters to tokens)
 - Phase 6: Transclusion and polish
 
-### Future Sessions
+---
+
+## 2026-01-13: Phase 3 - Custom Nodes - Expressions and Actions
+
+### Overview
+Implemented expression evaluation and action button nodes for the Reactive Character Sheet System. Expressions allow computed values like `{{ (Strength - 10) / 2 }}` to display dynamically. Action buttons enable dice rolls with optional resource costs.
+
+### What Was Implemented
+
+**1. Expression Extension:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/Expression.ts` | TipTap Node extension for `{{ expression }}` pattern |
+| `src/components/character/extensions/ExpressionComponent.tsx` | React component displaying computed value with tooltip |
+| `src/components/character/extensions/Expression.css` | Styling with tooltip animation |
+
+- **Pattern Matching**: `{{ expression }}` with sandboxed expr-eval evaluation
+- **Reactivity**: Re-evaluates when shadowState changes via useEffect
+- **Error Handling**: Shows "Error" for invalid formulas gracefully
+- **Tooltip**: Hover shows original formula for debugging
+
+**2. ActionButton Extension:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/ActionButton.ts` | TipTap Node extension for `[Label](action: dice)` pattern |
+| `src/components/character/extensions/ActionButtonComponent.tsx` | Interactive button component with dice rolling |
+| `src/components/character/extensions/ActionButton.css` | Gradient button styling |
+
+- **Pattern**: `[Label](action: diceFormula)` or `[Label](action: diceFormula; cost: Variable)`
+- **Dice Rolling**: Resolves variables, executes roll via diceParser service
+- **Resource Costs**: Optional `cost:` parameter decrements stat on use
+- **P2P Broadcast**: Calls onBroadcastRoll callback for chat integration
+
+**3. Dice Parser Enhancement:**
+
+- Added `resolveVariables(formula, shadowState)` function
+- Replaces variable names with numeric values: `1d20+Strength` → `1d20+18`
+- Supports `{{ expression }}` nested in dice formulas
+- Handles missing variables gracefully (leaves as-is)
+
+**4. Store Updates:**
+
+- Added `updateCharacterStat()` to `characterStore.ts`
+- Updates stat values directly in character content JSON
+- Enables action buttons to modify stats (e.g., decrementing Slots)
+
+**5. Editor Integration:**
+
+- Registered Expression and ActionButton extensions in CharacterSheetEditor
+- Pass shadowState to ExpressionComponent for reactivity
+- Pass onBroadcastRoll and onUpdateStat callbacks for action button functionality
+- Markdown export/import supports new node types
+
+### Key Design Decisions
+
+1. **Sandboxed Evaluation**: Using expr-eval library for safe expression evaluation (not raw eval())
+2. **Variable Resolution Order**: Expressions evaluated first, then variable names replaced with values
+3. **Error Gracefulness**: Invalid expressions show "Error" instead of breaking the UI
+4. **Callback Pattern**: Action buttons use callbacks for stat updates to avoid direct store dependency
+5. **Cost Deduction**: Only decrements if current value is numeric and > 0
+
+### Files Created
+
+- `vtt/src/components/character/extensions/Expression.ts`
+- `vtt/src/components/character/extensions/ExpressionComponent.tsx`
+- `vtt/src/components/character/extensions/Expression.css`
+- `vtt/src/components/character/extensions/ActionButton.ts`
+- `vtt/src/components/character/extensions/ActionButtonComponent.tsx`
+- `vtt/src/components/character/extensions/ActionButton.css`
+
+### Files Modified
+
+- `vtt/src/services/diceParser.ts` - Added resolveVariables function
+- `vtt/src/stores/characterStore.ts` - Added updateCharacterStat function
+- `vtt/src/components/character/CharacterSheetEditor.tsx` - Registered extensions, added callbacks
+- `vtt/docs/PROJECT_PLAN.md` - Marked Phase 3 as completed
+
+### Usage Examples
+
+**Expression:**
+```
+Strength:: 18
+{{ (Strength - 10) / 2 }}   → displays "4"
+```
+
+**Action Button (simple):**
+```
+[Attack](action: 1d20+5)    → button that rolls d20+5
+```
+
+**Action Button (with cost):**
+```
+Slots:: 3
+[Smite](action: 2d8; cost: Slots)   → button rolls 2d8, decrements Slots to 2
+```
+
+**Dice formula with variables:**
+```
+Strength:: 18
+[Melee](action: 1d20+Strength)      → rolls 1d20+18
+```
+
+### Next Steps
+
+- Phase 4: Widgets (`[bar: HP/MaxHP]`, `[dots: 3/5]`)
+- Phase 5: Token integration (link characters to tokens)
+- Phase 6: Transclusion and polish
+
+---
 
 *Add new session notes above this line*

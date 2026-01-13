@@ -210,3 +210,127 @@ export function getDiceFromFormula(formula: string): Array<{ sides: number }> {
 
   return dice;
 }
+
+/**
+ * Resolve variables in a dice formula using shadow state values
+ * Replaces variable names like "Strength" with their numeric values
+ * Also handles {{ expression }} by evaluating nested expressions
+ */
+export function resolveVariables(
+  formula: string,
+  shadowState: Record<string, string | number>
+): string {
+  let resolved = formula;
+  
+  // Handle nested {{ expressions }} first
+  const expressionRegex = /\{\{([^}]+)\}\}/g;
+  let expressionMatch;
+  
+  // We'll use expr-eval for expressions if available
+  let Parser;
+  try {
+    Parser = require('expr-eval').Parser;
+  } catch {
+    // expr-eval not available, leave expressions as-is
+    Parser = null;
+  }
+  
+  const expressions: Array<{ start: number; end: number; value: string; result: string }> = [];
+  
+  while ((expressionMatch = expressionRegex.exec(resolved)) !== null) {
+    const expression = expressionMatch[1].trim();
+    let result = expression;
+    
+    if (Parser) {
+      try {
+        const parser = new Parser();
+        const expr = parser.parse(expression);
+        
+        // Prepare variables from shadow state
+        const variables: Record<string, number> = {};
+        for (const [key, value] of Object.entries(shadowState)) {
+          if (typeof value === 'number') {
+            variables[key] = value;
+          } else if (typeof value === 'string') {
+            const parsed = parseFloat(value);
+            if (!isNaN(parsed)) {
+              variables[key] = parsed;
+            }
+          }
+        }
+        
+        const evalResult = expr.evaluate(variables);
+        if (typeof evalResult === 'number') {
+          result = Number.isInteger(evalResult) ? evalResult.toString() : evalResult.toFixed(2).replace(/\.?0+$/, '');
+        }
+      } catch {
+        // Keep original if evaluation fails
+        result = expression;
+      }
+    }
+    
+    expressions.push({
+      start: expressionMatch.index,
+      end: expressionMatch.index + expressionMatch[0].length,
+      value: expressionMatch[0],
+      result,
+    });
+  }
+  
+  // Replace expressions in reverse order to preserve positions
+  for (let i = expressions.length - 1; i >= 0; i--) {
+    const exp = expressions[i];
+    resolved = resolved.substring(0, exp.start) + exp.result + resolved.substring(exp.end);
+  }
+  
+  // Replace variable names with their values
+  // Variable names must start with a letter and contain only letters, numbers, underscores
+  const variableRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+  let varMatch;
+  const variableReplacements: Array<{ start: number; end: number; value: string }> = [];
+  
+  // Keywords that shouldn't be replaced
+  const keywords = new Set([
+    'd4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100',
+    'drop', 'lowest', 'highest', 'advantage', 'disadvantage', 'adv', 'dis',
+  ]);
+  
+  while ((varMatch = variableRegex.exec(resolved)) !== null) {
+    const varName = varMatch[1];
+    
+    // Skip if it's a dice notation (d followed by number)
+    if (/^d\d+$/.test(varName)) continue;
+    
+    // Skip if it's a keyword
+    if (keywords.has(varName.toLowerCase())) continue;
+    
+    // Check if this variable exists in shadow state
+    if (varName in shadowState) {
+      const value = shadowState[varName];
+      if (typeof value === 'number') {
+        variableReplacements.push({
+          start: varMatch.index,
+          end: varMatch.index + varName.length,
+          value: value.toString(),
+        });
+      } else if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed)) {
+          variableReplacements.push({
+            start: varMatch.index,
+            end: varMatch.index + varName.length,
+            value: parsed.toString(),
+          });
+        }
+      }
+    }
+  }
+  
+  // Replace variables in reverse order
+  for (let i = variableReplacements.length - 1; i >= 0; i--) {
+    const v = variableReplacements[i];
+    resolved = resolved.substring(0, v.start) + v.value + resolved.substring(v.end);
+  }
+  
+  return resolved;
+}
