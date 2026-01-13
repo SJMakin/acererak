@@ -884,6 +884,7 @@ These features don't fit the decentralized design:
 | v1.8.0 | Scene System | Multi-scene architecture, scene picker, image tool, dice/chat integration, export v3 format |
 | v1.8.1 | Bug Fixes | Ping P2P visibility fix |
 | v1.8.2 | Bug Fixes | Code review fixes - active scene data access, scene import logic |
+| v1.9.0 | Character Sheets | Reactive character sheet system with TipTap editor, stat declarations, expressions, actions, widgets, token integration, transclusion, templates, and P2P sync |
 | v2.0.0 | Integration | *(Future)* Main app integration |
 
 ---
