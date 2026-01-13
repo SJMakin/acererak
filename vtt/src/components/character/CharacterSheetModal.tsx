@@ -38,9 +38,10 @@ export function CharacterSheetModal({
         setIsEditing(true);
       }
     } else {
-      // New character
+      // New character - check for pending template
+      const pendingTemplate = localStorage.getItem('pendingTemplate');
       setName('');
-      setContent('{"type":"doc","content":[{"type":"paragraph"}]}');
+      setContent(pendingTemplate || '{"type":"doc","content":[{"type":"paragraph"}]}');
       setShadowState({});
       setProjections({});
       setIsEditing(false);

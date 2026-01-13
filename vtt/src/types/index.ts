@@ -8,6 +8,9 @@ export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer ID
 export type { Character } from './character';
 export type { CharacterP2PMessage, CharacterUpdateMessage, CharacterDeleteMessage } from './character';
 
+// Re-export Snippet types
+export type { Snippet, SnippetCategory, SnippetCreateInput, SnippetUpdateInput } from './snippet';
+
 export interface Point {
   x: number;
   y: number;

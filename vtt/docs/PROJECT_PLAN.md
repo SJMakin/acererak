@@ -146,7 +146,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 
 A system-agnostic character sheet system using TipTap WYSIWYG editor with reactive data binding between documents, shadow state, and map tokens.
 
-**Status:** Ready for Implementation
+**Status:** ✅ COMPLETED
 
 **Complexity:** High (4-6 weeks across 5 phases)
 
@@ -541,32 +541,68 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** `![[SpellName]]` embeds content; templates; migration
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Create `src/components/character/extensions/Transclusion.ts`
+- [x] Create `src/components/character/extensions/Transclusion.ts`
   - Matches: `![[Name]]`
   - Looks up content from a global "snippets" library
   - Renders embedded content inline (read-only)
-- [ ] Create `src/stores/snippetStore.ts`
+- [x] Create `src/components/character/extensions/TransclusionComponent.tsx`
+  - Displays embedded content from snippet
+  - Shows snippet name as header
+  - Read-only display (can't edit embedded content)
+  - Handle missing snippets gracefully
+- [x] Create `src/stores/snippetStore.ts`
   - Store reusable text blocks (spells, abilities, rules)
-  - IndexedDB persistence
-- [ ] Create character templates
+  - IndexedDB persistence (GM only)
+  - P2P sync support
+- [x] Create `src/types/snippet.ts`
+  - Snippet interface with id, name, content, category, tags
+- [x] Create character templates in `src/services/characterTemplates.ts`
   - D&D 5e template with standard stats
   - OSR template (simpler)
   - Blank template
-- [ ] Migration for existing tokens
+- [x] Create migration service `src/services/tokenMigration.ts`
   - Tokens with `notes` field → offer to convert to Character
   - Keep `hp`/`ac`/`conditions` working for unlinked tokens
-- [ ] Keyboard shortcuts in editor
-  - `/` for slash commands (insert stat, action, widget)
+- [x] Keyboard shortcuts in editor
+  - `/` for slash commands (command palette)
   - `[[` for transclusion autocomplete
   - `{{` for expression autocomplete
+  - `Ctrl/Cmd + B` for Bold
+  - `Ctrl/Cmd + I` for Italic
+  - `Ctrl/Cmd + K` for Link
+- [x] Create `src/components/character/SnippetLibraryPanel.tsx`
+  - List saved snippets
+  - Create/edit/delete snippets
+  - Categorize snippets (spells, abilities, rules, custom)
+  - Search functionality
+  - Insert snippet into character sheet
+- [x] Integrate Transclusion into CharacterSheetEditor
+  - Register Transclusion extension
+  - Add transclusion autocomplete for `[[`
+  - Pass snippet store to TransclusionComponent
+- [x] Update CharacterLibraryPanel
+  - Add template picker when creating new Character
+  - Add import/export characters
+  - Add duplicate character functionality
+- [x] Update database for snippets
+  - Add snippets table to IndexedDB
+  - Add storage functions for snippets
+  - Ensure GM-only persistence
 
 **Acceptance Criteria:**
-- [ ] `![[Fireball]]` embeds spell text
-- [ ] Template picker when creating new Character
-- [ ] Existing games still work (backward compatible)
-- [ ] Slash commands work for inserting elements
+- [x] `![[Fireball]]` embeds spell text from snippet
+- [x] Template picker shows when creating new Character
+- [x] Existing games still work (backward compatible)
+- [x] Slash commands work for inserting elements
+- [x] Snippet library allows creating/editing snippets
+- [x] Transclusion autocomplete works with `[[`
+- [x] Migration option available for old tokens
+- [x] Keyboard shortcuts work in editor
+- [x] Default snippets included (Fireball, Cure Wounds, Sneak Attack, Second Wind, Opportunity Attack)
 
 ---
 

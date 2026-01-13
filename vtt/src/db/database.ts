@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { GameState, LibraryItem, LibraryItemType, Character } from '../types';
+import type { Snippet } from '../types/snippet';
 
 export interface SavedGame {
   id: string;
@@ -19,11 +20,16 @@ export interface SavedCharacter extends Character {
   // Additional DB-specific fields if needed
 }
 
+export interface SavedSnippet extends Snippet {
+  // Additional DB-specific fields if needed
+}
+
 // Use factory function pattern instead of class extension to avoid bundling issues
 const db = new Dexie('LychgateVTTDatabase') as Dexie & {
   games: Table<SavedGame, string>;
   library: Table<SavedLibraryItem, string>;
   characters: Table<SavedCharacter, string>;
+  snippets: Table<SavedSnippet, string>;
 };
 
 db.version(1).stores({
@@ -41,6 +47,14 @@ db.version(3).stores({
   games: 'id, name, lastUpdated, isGM',
   library: 'id, type, name, *tags, createdAt, updatedAt',
   characters: 'id, name, createdAt, updatedAt',
+});
+
+// Version 4: Add snippets table (GM only)
+db.version(4).stores({
+  games: 'id, name, lastUpdated, isGM',
+  library: 'id, type, name, *tags, createdAt, updatedAt',
+  characters: 'id, name, createdAt, updatedAt',
+  snippets: 'id, name, category, *tags, createdAt, updatedAt',
 });
 
 export { db };
@@ -139,4 +153,43 @@ export async function getCharacter(id: string): Promise<Character | undefined> {
 
 export async function deleteCharacter(id: string): Promise<void> {
   await db.characters.delete(id);
+}
+
+// Snippet operations (GM only)
+export async function saveSnippets(snippets: Snippet[]): Promise<void> {
+  await db.snippets.clear();
+  await db.snippets.bulkPut(snippets as SavedSnippet[]);
+}
+
+export async function loadSnippets(): Promise<Snippet[]> {
+  return db.snippets.toArray() as Promise<Snippet[]>;
+}
+
+export async function addSnippet(snippet: Snippet): Promise<void> {
+  await db.snippets.put(snippet as SavedSnippet);
+}
+
+export async function updateSnippet(snippet: Snippet): Promise<void> {
+  await db.snippets.put(snippet as SavedSnippet);
+}
+
+export async function deleteSnippet(id: string): Promise<void> {
+  await db.snippets.delete(id);
+}
+
+export async function getSnippet(id: string): Promise<Snippet | undefined> {
+  return db.snippets.get(id) as Promise<Snippet | undefined>;
+}
+
+export async function searchSnippets(query: string): Promise<Snippet[]> {
+  const lowerQuery = query.toLowerCase();
+  const results: Snippet[] = [];
+  await db.snippets.each((snippet) => {
+    if (snippet.name.toLowerCase().includes(lowerQuery) ||
+        (snippet.description && snippet.description.toLowerCase().includes(lowerQuery)) ||
+        (snippet.tags && snippet.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))) {
+      results.push(snippet);
+    }
+  });
+  return results;
 }

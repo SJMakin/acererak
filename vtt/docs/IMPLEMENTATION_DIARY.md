@@ -688,4 +688,180 @@ Token displays HP bar (45/52) and AC badge (18)
 
 ---
 
+## 2026-01-13: Phase 6 - Transclusion, Templates, and Polish
+
+### Overview
+Implemented the final phase of the Reactive Character Sheet System, including transclusion for reusable content, character templates, keyboard shortcuts, migration tools, and the snippet library. This completes the character sheet system with all 6 phases implemented.
+
+### What Was Implemented
+
+**1. Transclusion System:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/Transclusion.ts` | TipTap Node extension matching `[[Name]]` pattern |
+| `src/components/character/extensions/TransclusionComponent.tsx` | React component rendering embedded snippet content |
+| `src/components/character/extensions/Transclusion.css` | Styling for transclusion blocks with category indicators |
+
+- Matches `[[SnippetName]]` pattern with input rule
+- Looks up content from snippet store by name
+- Renders embedded content inline (read-only display)
+- Shows snippet header with category badge (spell/ability/rule/custom)
+- Handles missing snippets gracefully with fallback UI
+- Click to view original snippet info
+
+**2. Snippet Store and Types:**
+
+| File | Purpose |
+|------|---------|
+| `src/types/snippet.ts` | Snippet interface definition (id, name, content, category, tags) |
+| `src/stores/snippetStore.ts` | Zustand store with CRUD operations, IndexedDB persistence |
+| `src/db/database.ts` | Added snippets table (version 4) and storage functions |
+
+- CRUD operations: `addSnippet()`, `updateSnippet()`, `deleteSnippet()`
+- Queries: `getSnippetByName()`, `getSnippetsByCategory()`, `searchSnippets()`
+- IndexedDB persistence (GM only) with P2P sync support
+- 5 default snippets included: Fireball, Cure Wounds, Sneak Attack, Second Wind, Opportunity Attack
+
+**3. Character Templates:**
+
+| File | Purpose |
+|------|---------|
+| `src/services/characterTemplates.ts` | Template definitions for D&D 5e, OSR, and Blank templates |
+
+- **D&D 5e Template**: Standard stats (HP, AC, STR, DEX, CON, INT, WIS, CHA, Speed, Proficiency)
+- **OSR Template**: Simplified stats (HP, AC, STR, DEX, WIL)
+- **Blank Template**: Empty document for custom sheets
+- Template picker modal appears when creating new character
+- Templates stored as TipTap JSON documents
+
+**4. Token Migration Service:**
+
+| File | Purpose |
+|------|---------|
+| `src/services/tokenMigration.ts` | Migration utilities for converting old tokens to Characters |
+
+- `migrateTokenToCharacter()` - Convert token with notes to Character
+- `migrateTokensToCharacters()` - Batch migration
+- `checkGameNeedsMigration()` - Detect if game has legacy tokens
+- Preserves `hp`/`ac`/`conditions` for unlinked tokens
+- HTML-to-TipTap conversion for legacy notes
+
+**5. Keyboard Shortcuts and Command Palette:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/CharacterSheetEditor.tsx` | Added command palette and keyboard shortcuts |
+
+- `/` - Opens command palette for inserting stats, actions, widgets
+- `[[` - Transclusion autocomplete (logs available snippets)
+- `{{` - Expression autocomplete support
+- `Ctrl/Cmd + B` - Bold
+- `Ctrl/Cmd + I` - Italic
+- `Ctrl/Cmd + K` - Insert link
+- `Escape` - Close command palette
+- Arrow keys + Enter - Navigate and select commands
+
+**6. Snippet Library Panel:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/SnippetLibraryPanel.tsx` | UI for managing snippets |
+| `src/components/character/SnippetLibraryPanel.css` | Panel styling |
+
+- List all saved snippets with search and category filter
+- Create, edit, delete snippets (GM only)
+- Insert snippets directly into character sheet
+- Category badges (spell, ability, rule, custom)
+- Snippet editor with JSON content editing
+
+**7. Character Library Panel Enhancements:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/CharacterLibraryPanel.tsx` | Added template picker, import/export, duplicate |
+| `src/components/character/CharacterLibraryPanel.css` | Template picker and modal styling |
+
+- Template picker modal when creating new character
+- Import character from JSON file or pasted text
+- Export individual character to JSON file
+- Export all characters at once
+- Duplicate character functionality
+
+**8. Database Updates:**
+
+- Added `snippets` table to IndexedDB (version 4)
+- Storage functions: `saveSnippets()`, `loadSnippets()`, `addSnippet()`, `updateSnippet()`, `deleteSnippet()`
+- Search function: `searchSnippets()` with name/description/tag matching
+- GM-only persistence pattern (consistent with characters)
+
+### Key Design Decisions
+
+1. **Transclusion Read-Only**: Embedded content cannot be edited directly - must edit original snippet
+2. **Default Snippets**: 5 common D&D snippets included to demonstrate system
+3. **Backward Compatibility**: Existing games work unchanged (snippets are opt-in)
+4. **P2P Sync**: Snippets sync across peers like characters
+5. **Category System**: Spells (purple), Abilities (green), Rules (orange), Custom (gray)
+6. **Command Palette**: Organized by category (stats, actions, widgets, format)
+7. **Template Storage**: Templates as TipTap JSON for direct loading
+
+### Files Created
+
+- `vtt/src/types/snippet.ts`
+- `vtt/src/stores/snippetStore.ts`
+- `vtt/src/components/character/extensions/Transclusion.ts`
+- `vtt/src/components/character/extensions/TransclusionComponent.tsx`
+- `vtt/src/components/character/extensions/Transclusion.css`
+- `vtt/src/services/characterTemplates.ts`
+- `vtt/src/services/tokenMigration.ts`
+- `vtt/src/components/character/SnippetLibraryPanel.tsx`
+- `vtt/src/components/character/SnippetLibraryPanel.css`
+
+### Files Modified
+
+- `vtt/src/db/database.ts` - Added snippets table and functions
+- `vtt/src/types/index.ts` - Re-exported Snippet types
+- `vtt/src/components/character/CharacterSheetEditor.tsx` - Command palette, keyboard shortcuts, Transclusion integration
+- `vtt/src/components/character/CharacterSheetEditor.css` - Command palette styles
+- `vtt/src/components/character/CharacterLibraryPanel.tsx` - Template picker, import/export
+- `vtt/src/components/character/CharacterLibraryPanel.css` - Template picker styles
+- `vtt/src/components/character/CharacterSheetModal.tsx` - Template support
+- `vtt/docs/PROJECT_PLAN.md` - Marked Phase 6 as completed
+
+### Usage Examples
+
+**Transclusion:**
+```
+[[Fireball]]   → Embeds the Fireball spell snippet
+```
+
+**Command Palette:**
+1. Press `/` to open command palette
+2. Type to filter (e.g., "HP" or "Attack")
+3. Navigate with arrow keys
+4. Press Enter to insert
+
+**Template Picker:**
+1. Click "+ New" in Character Library
+2. Select template (D&D 5e, OSR, or Blank)
+3. Character sheet opens with template content
+
+**Snippet Management:**
+1. Open Snippet Library Panel
+2. Click "+ New" to create snippet
+3. Set name, category, and content (TipTap JSON)
+4. Use `[[SnippetName]]` to embed in character sheets
+
+### Reactive Character Sheet System - Complete!
+
+All 6 phases now implemented:
+- Phase 1: Foundation - TipTap integration
+- Phase 2: Custom Nodes - Stat Declarations
+- Phase 3: Expressions and Action Buttons
+- Phase 4: Widgets (Bars and Dots)
+- Phase 5: Token Integration
+- Phase 6: Transclusion and Polish
+
+---
+
 *Add new session notes above this line*

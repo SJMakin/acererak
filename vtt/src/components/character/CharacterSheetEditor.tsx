@@ -6,8 +6,10 @@ import { Expression } from './extensions/Expression';
 import { ActionButton } from './extensions/ActionButton';
 import { BarWidget } from './extensions/BarWidget';
 import { DotsWidget } from './extensions/DotsWidget';
+import { Transclusion } from './extensions/Transclusion';
 import { debouncedParse, parseShadowState, type ShadowState } from '../../services/shadowStateService';
 import { useGameStore } from '../../stores/gameStore';
+import { useSnippetStore } from '../../stores/snippetStore';
 import type { ChatMessage } from '../../types';
 import './CharacterSheetEditor.css';
 
@@ -19,6 +21,14 @@ interface CharacterSheetEditorProps {
   readOnly?: boolean;
   showMarkdownPanel?: boolean;
   shadowState?: ShadowState;
+}
+
+interface CommandItem {
+  label: string;
+  description?: string;
+  icon: string;
+  action: () => void;
+  category: 'stat' | 'action' | 'widget' | 'format';
 }
 
 export function CharacterSheetEditor({
@@ -33,11 +43,45 @@ export function CharacterSheetEditor({
   const [showMarkdown, setShowMarkdown] = useState(showMarkdownPanel);
   const [markdownText, setMarkdownText] = useState('');
   const [localShadowState, setLocalShadowState] = useState<ShadowState>({ stats: {}, projections: {} });
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandFilter, setCommandFilter] = useState('');
+  const [commandCategory, setCommandCategory] = useState<string>('all');
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousJsonRef = useRef<string>('');
+  const { snippets } = useSnippetStore();
   
   // Use external shadowState if provided, otherwise use local
-  const shadowState = externalShadowState || localShadowState;
+  const currentShadowState = externalShadowState || localShadowState;
+
+  const commandItems: CommandItem[] = [
+    // Stat declarations
+    { label: 'Stat: HP', description: 'Hit points', icon: '❤️', category: 'stat', action: () => insertStatDeclaration('HP', '10', ['bar']) },
+    { label: 'Stat: AC', description: 'Armor class', icon: '🛡️', category: 'stat', action: () => insertStatDeclaration('AC', '10', ['badge']) },
+    { label: 'Stat: Strength', description: 'Strength score', icon: '💪', category: 'stat', action: () => insertStatDeclaration('STR', '10') },
+    { label: 'Stat: Dexterity', description: 'Dexterity score', icon: '🏃', category: 'stat', action: () => insertStatDeclaration('DEX', '10') },
+    { label: 'Stat: Constitution', description: 'Constitution score', icon: '❤️', category: 'stat', action: () => insertStatDeclaration('CON', '10') },
+    { label: 'Stat: Intelligence', description: 'Intelligence score', icon: '🧠', category: 'stat', action: () => insertStatDeclaration('INT', '10') },
+    { label: 'Stat: Wisdom', description: 'Wisdom score', icon: '👁️', category: 'stat', action: () => insertStatDeclaration('WIS', '10') },
+    { label: 'Stat: Charisma', description: 'Charisma score', icon: '🎭', category: 'stat', action: () => insertStatDeclaration('CHA', '10') },
+    
+    // Actions
+    { label: 'Action: Attack', description: 'Melee attack', icon: '⚔️', category: 'action', action: () => insertActionButton('Attack', '1d20 + @STR', '1 action') },
+    { label: 'Action: Dash', description: 'Move extra distance', icon: '💨', category: 'action', action: () => insertActionButton('Dash', '@DEX * 2', '1 action') },
+    { label: 'Action: Hide', description: 'Attempt to hide', icon: '👁️', category: 'action', action: () => insertActionButton('Hide', '@DEX + @PROF', '1 action') },
+    
+    // Widgets
+    { label: 'Widget: HP Bar', description: 'Health bar', icon: '📊', category: 'widget', action: () => insertBarWidget('HP', 'MaxHP') },
+    { label: 'Widget: Spell Slots', description: 'Spell slots dots', icon: '✨', category: 'widget', action: () => insertDotsWidget('3', '4') },
+  ];
+
+  const filteredCommands = commandItems.filter(cmd => {
+    const matchesSearch = cmd.label.toLowerCase().includes(commandFilter.toLowerCase()) ||
+      cmd.description?.toLowerCase().includes(commandFilter.toLowerCase());
+    const matchesCategory = commandCategory === 'all' || cmd.category === commandCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const parseAndNotifyShadowState = useCallback(
     (json: string) => {
@@ -51,12 +95,10 @@ export function CharacterSheetEditor({
           setLocalShadowState(result);
         }
         
-        // Cancel any pending debounce
         if (debounceTimerRef.current) {
           clearTimeout(debounceTimerRef.current);
         }
 
-        // Debounce the callback
         debounceTimerRef.current = setTimeout(() => {
           onChange(json, result);
         }, 300);
@@ -99,6 +141,11 @@ export function CharacterSheetEditor({
           class: 'dots-widget',
         },
       }),
+      Transclusion.configure({
+        HTMLAttributes: {
+          class: 'transclusion-node',
+        },
+      }),
     ],
     content,
     editable: !readOnly,
@@ -111,17 +158,80 @@ export function CharacterSheetEditor({
         class: 'tiptap',
       },
       handleKeyDown: (view, event) => {
-        // Handle "::" shortcut for stat declarations
-        if (event.key === ':') {
+        // Handle "/" for command palette
+        if (event.key === '/' && !readOnly) {
           const { from } = view.state.selection;
-          const textBefore = view.state.doc.textBetween(Math.max(0, from - 2), from);
+          const textBefore = view.state.doc.textBetween(Math.max(0, from - 1), from);
           
-          if (textBefore.endsWith(':')) {
-            // Double colon typed, insert stat declaration
-            // We'll let the normal input happen, then trigger suggestion
-            return false;
+          if (!textBefore || textBefore === '/') {
+            event.preventDefault();
+            setCommandFilter('');
+            setCommandCategory('all');
+            setShowCommandPalette(true);
+            setSelectedCommandIndex(0);
+            return true;
           }
         }
+
+        // Handle "[[" for transclusion autocomplete
+        if (event.key === '[' && !readOnly) {
+          const { from } = view.state.selection;
+          const textBefore = view.state.doc.textBetween(Math.max(0, from - 1), from);
+          
+          if (textBefore === '[') {
+            // Open transclusion autocomplete - simplified for now
+            const snippetNames = snippets.map(s => s.name);
+            console.log('Available snippets:', snippetNames);
+          }
+        }
+
+        // Handle keyboard navigation in command palette
+        if (showCommandPalette) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setSelectedCommandIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+            return true;
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setSelectedCommandIndex(i => Math.max(i - 1, 0));
+            return true;
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            if (filteredCommands[selectedCommandIndex]) {
+              filteredCommands[selectedCommandIndex].action();
+              setShowCommandPalette(false);
+            }
+            return true;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setShowCommandPalette(false);
+            return true;
+          }
+        }
+
+        // Standard keyboard shortcuts
+        if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+          event.preventDefault();
+          editor.chain().focus().toggleBold().run();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
+          event.preventDefault();
+          editor.chain().focus().toggleItalic().run();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+          event.preventDefault();
+          const url = prompt('Enter link URL:');
+          if (url) {
+            editor.chain().focus().setLink({ href: url }).run();
+          }
+          return true;
+        }
+
         return false;
       },
     },
@@ -152,7 +262,6 @@ export function CharacterSheetEditor({
   const insertStatDeclaration = useCallback(
     (key: string, value: string | number = '', projections: string[] = []) => {
       if (!editor) return;
-      
       editor.commands.insertStatDeclaration({ key, value, projections });
     },
     [editor]
@@ -161,7 +270,6 @@ export function CharacterSheetEditor({
   const insertExpression = useCallback(
     (formula: string) => {
       if (!editor) return;
-      
       editor.commands.insertExpression({ formula });
     },
     [editor]
@@ -170,7 +278,6 @@ export function CharacterSheetEditor({
   const insertActionButton = useCallback(
     (label: string, action: string, cost?: string) => {
       if (!editor) return;
-      
       editor.commands.insertActionButton({ label, action, cost });
     },
     [editor]
@@ -179,7 +286,6 @@ export function CharacterSheetEditor({
   const insertBarWidget = useCallback(
     (current: string, max: string) => {
       if (!editor) return;
-      
       editor.commands.insertBarWidget({ current, max });
     },
     [editor]
@@ -188,8 +294,15 @@ export function CharacterSheetEditor({
   const insertDotsWidget = useCallback(
     (current: string, max: string) => {
       if (!editor) return;
-      
       editor.commands.insertDotsWidget({ current, max });
+    },
+    [editor]
+  );
+
+  const insertTransclusion = useCallback(
+    (snippetName: string) => {
+      if (!editor) return;
+      editor.commands.insertTransclusion({ snippetName });
     },
     [editor]
   );
@@ -243,22 +356,28 @@ export function CharacterSheetEditor({
           const label = (attrs.label as string) || 'Action';
           const action = (attrs.action as string) || '';
           const cost = (attrs.cost as string);
-          const costPart = cost ? `; cost: ${cost}` : '';
-          markdown += `[${label}](action: ${action}${costPart})\n\n`;
+          const costPart = cost ? '; cost: ' + cost : '';
+          markdown += '[' + label + '](action: ' + action + costPart + ')\n\n';
           break;
         }
         case 'barWidget': {
           const attrs = nodeAny.attrs || {};
           const current = (attrs.current as string) || '0';
           const max = (attrs.max as string) || '100';
-          markdown += `[bar: ${current}/${max}]\n\n`;
+          markdown += '[bar: ' + current + '/' + max + ']\n\n';
           break;
         }
         case 'dotsWidget': {
           const attrs = nodeAny.attrs || {};
           const current = (attrs.current as string) || '0';
           const max = (attrs.max as string) || '5';
-          markdown += `[dots: ${current}/${max}]\n\n`;
+          markdown += '[dots: ' + current + '/' + max + ']\n\n';
+          break;
+        }
+        case 'transclusion': {
+          const attrs = nodeAny.attrs || {};
+          const snippetName = (attrs.snippetName as string) || '';
+          markdown += ' ![[' + snippetName + ']]\n\n';
           break;
         }
       }
@@ -276,24 +395,23 @@ export function CharacterSheetEditor({
     
     lines.forEach((line) => {
       if (line.startsWith('# ')) {
-        html += `<h1>${line.slice(2)}</h1>`;
+        html += '<h1>' + line.slice(2) + '</h1>';
       } else if (line.startsWith('## ')) {
-        html += `<h2>${line.slice(3)}</h2>`;
+        html += '<h2>' + line.slice(3) + '</h2>';
       } else if (line.startsWith('### ')) {
-        html += `<h3>${line.slice(4)}</h3>`;
+        html += '<h3>' + line.slice(4) + '</h3>';
       } else if (line.startsWith('- ')) {
-        html += `<ul><li>${line.slice(2)}</li></ul>`;
+        html += '<ul><li>' + line.slice(2) + '</li></ul>';
       } else if (line.match(/^\d+\. /)) {
-        html += `<ol><li>${line.slice(line.indexOf('. ') + 2)}</li></ol>`;
+        html += '<ol><li>' + line.slice(line.indexOf('. ') + 2) + '</li></ol>';
       } else if (line.startsWith('> ')) {
-        html += `<blockquote>${line.slice(2)}</blockquote>`;
+        html += '<blockquote>' + line.slice(2) + '</blockquote>';
       } else if (line === '---') {
         html += '<hr>';
       } else if (line.match(/^(\w+)::\s*(.+)$/)) {
-        // Stat declaration format - don't convert to HTML, let it be handled by the editor
-        html += `<p>${line}</p>`;
+        html += '<p>' + line + '</p>';
       } else if (line.trim()) {
-        html += `<p>${line}</p>`;
+        html += '<p>' + line + '</p>';
       }
     });
     
@@ -458,12 +576,77 @@ export function CharacterSheetEditor({
         <EditorContent editor={editor} />
       </div>
 
+      {/* Command Palette */}
+      {showCommandPalette && (
+        <div className="command-palette-overlay" onClick={() => setShowCommandPalette(false)}>
+          <div className="command-palette" onClick={(e) => e.stopPropagation()}>
+            <div className="command-palette__header">
+              <input
+                type="text"
+                placeholder="Search commands... (/)"
+                value={commandFilter}
+                onChange={(e) => {
+                  setCommandFilter(e.target.value);
+                  setSelectedCommandIndex(0);
+                }}
+                autoFocus
+              />
+              <select
+                value={commandCategory}
+                onChange={(e) => {
+                  setCommandCategory(e.target.value);
+                  setSelectedCommandIndex(0);
+                }}
+              >
+                <option value="all">All</option>
+                <option value="stat">Stats</option>
+                <option value="action">Actions</option>
+                <option value="widget">Widgets</option>
+                <option value="format">Format</option>
+              </select>
+            </div>
+            <div className="command-palette__list">
+              {filteredCommands.length === 0 ? (
+                <div className="command-palette__empty">No commands found</div>
+              ) : (
+                filteredCommands.map((cmd, index) => (
+                  <button
+                    key={cmd.label}
+                    className={`command-palette__item ${
+                      index === selectedCommandIndex ? 'command-palette__item--selected' : ''
+                    }`}
+                    onClick={() => {
+                      cmd.action();
+                      setShowCommandPalette(false);
+                    }}
+                    onMouseEnter={() => setSelectedCommandIndex(index)}
+                  >
+                    <span className="command-palette__icon">{cmd.icon}</span>
+                    <div className="command-palette__content">
+                      <span className="command-palette__label">{cmd.label}</span>
+                      {cmd.description && (
+                        <span className="command-palette__description">{cmd.description}</span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="command-palette__footer">
+              <span>↑↓ Navigate</span>
+              <span>Enter Select</span>
+              <span>Esc Close</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Shadow State Debug Panel (development) */}
       {process.env.NODE_ENV === 'development' && (
         <div className="character-sheet-editor__debug">
           <details>
-            <summary>Shadow State ({Object.keys(shadowState.stats).length} stats)</summary>
-            <pre>{JSON.stringify(shadowState, null, 2)}</pre>
+            <summary>Shadow State ({Object.keys(currentShadowState.stats).length} stats)</summary>
+            <pre>{JSON.stringify(currentShadowState, null, 2)}</pre>
           </details>
         </div>
       )}
@@ -482,6 +665,12 @@ export function CharacterSheetEditor({
             title="Insert dots [dots: 3/5]"
           >
             ⊝ Dots
+          </button>
+          <button
+            onClick={() => insertExpression('STR + PROF')}
+            title="Insert expression {{ STR + PROF }}"
+          >
+            {{ }}
           </button>
         </div>
       )}
