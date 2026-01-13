@@ -5,7 +5,8 @@ export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
 export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer IDs
 
 // Re-export Character types
-export type { Character, CharacterP2PMessage } from './character';
+export type { Character } from './character';
+export type { CharacterP2PMessage, CharacterUpdateMessage, CharacterDeleteMessage } from './character';
 
 export interface Point {
   x: number;

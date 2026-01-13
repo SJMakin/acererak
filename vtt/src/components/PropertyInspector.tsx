@@ -19,6 +19,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useGameStore } from '../stores/gameStore';
+import { useCharacterStore } from '../stores/characterStore';
 import type { CanvasElement, TokenElement, ShapeElement, TextElement, ImageElement, Visibility } from '../types';
 import MarkdownEditor from './MarkdownEditor';
 
@@ -27,10 +28,12 @@ interface PropertyInspectorProps {
     broadcastElementUpdate: (element: CanvasElement) => void;
     broadcastElementDelete: (elementId: string) => void;
   };
+  onOpenCharacterSheet?: (characterId: string) => void;
 }
 
-export default function PropertyInspector({ room }: PropertyInspectorProps) {
+export default function PropertyInspector({ room, onOpenCharacterSheet }: PropertyInspectorProps) {
   const { game, selectedElementId, isGM, updateElement, deleteElement, selectElement } = useGameStore();
+  const { characters, getCharacterById } = useCharacterStore();
 
   // Get active scene
   const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
@@ -48,6 +51,11 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
   useEffect(() => {
     setNewCondition('');
   }, [selectedElementId]);
+
+  // Check if token is linked to a character
+  const linkedCharacter = selectedElement?.type === 'token' && (selectedElement as TokenElement).characterId
+    ? getCharacterById((selectedElement as TokenElement).characterId!)
+    : undefined;
 
   if (!selectedElement) {
     return (
@@ -216,6 +224,52 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
               Token Properties
             </Text>
 
+            {/* Character Link Status */}
+            {linkedCharacter ? (
+              <Paper p="sm" withBorder style={{ backgroundColor: 'rgba(124, 58, 237, 0.05)' }}>
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm" fw={600}>Linked Character</Text>
+                  <Badge color="violet">{linkedCharacter.name}</Badge>
+                </Group>
+                <Text size="xs" c="dimmed" mb="xs">
+                  HP: {linkedCharacter.shadowState[linkedCharacter.projections.bar || 'HP'] || '—'} / 
+                  {linkedCharacter.shadowState[linkedCharacter.projections.barMax || 'MaxHP'] || '—'} • 
+                  AC: {linkedCharacter.shadowState[linkedCharacter.projections.badge || 'AC'] || '—'}
+                </Text>
+                {onOpenCharacterSheet && (
+                  <Button
+                    size="xs"
+                    fullWidth
+                    onClick={() => onOpenCharacterSheet(linkedCharacter.id)}
+                  >
+                    Edit Character Sheet
+                  </Button>
+                )}
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  fullWidth
+                  mt="xs"
+                  onClick={() => handleUpdate({ characterId: undefined })}
+                >
+                  Unlink Character
+                </Button>
+              </Paper>
+            ) : (
+              /* Character Link Selector for unlinked tokens */
+              <Select
+                label="Link Character"
+                placeholder="Select a character sheet..."
+                value={(selectedElement as TokenElement).characterId || null}
+                onChange={(val) => handleUpdate({ characterId: val || undefined })}
+                data={characters.map((char) => ({ value: char.id, label: char.name }))}
+                clearable
+                searchable
+                size="xs"
+              />
+            )}
+
             <TextInput
               label="Name"
               size="xs"
@@ -245,70 +299,74 @@ export default function PropertyInspector({ room }: PropertyInspectorProps) {
               step={1}
             />
 
-            {/* HP Section */}
-            <Divider label="Hit Points" labelPosition="center" />
-            <Group grow>
-              <NumberInput
-                label="Current HP"
-                size="xs"
-                value={(selectedElement as TokenElement).hp?.current ?? 10}
-                onChange={(val) => handleHPChange('current', val)}
-                min={0}
-              />
-              <NumberInput
-                label="Max HP"
-                size="xs"
-                value={(selectedElement as TokenElement).hp?.max ?? 10}
-                onChange={(val) => handleHPChange('max', val)}
-                min={1}
-              />
-            </Group>
-            <Group gap="xs" grow>
-              <Button
-                size="xs"
-                color="red"
-                variant="light"
-                onClick={() => handleHPAdjust(-1)}
-              >
-                -1 HP
-              </Button>
-              <Button
-                size="xs"
-                color="red"
-                variant="light"
-                onClick={() => handleHPAdjust(-5)}
-              >
-                -5 HP
-              </Button>
-              <Button
-                size="xs"
-                color="green"
-                variant="light"
-                onClick={() => handleHPAdjust(5)}
-              >
-                +5 HP
-              </Button>
-              <Button
-                size="xs"
-                color="green"
-                variant="light"
-                onClick={() => handleHPAdjust(1)}
-              >
-                +1 HP
-              </Button>
-            </Group>
+            {/* HP Section - only show for unlinked tokens */}
+            {!linkedCharacter && (
+              <>
+                <Divider label="Hit Points" labelPosition="center" />
+                <Group grow>
+                  <NumberInput
+                    label="Current HP"
+                    size="xs"
+                    value={(selectedElement as TokenElement).hp?.current ?? 10}
+                    onChange={(val) => handleHPChange('current', val)}
+                    min={0}
+                  />
+                  <NumberInput
+                    label="Max HP"
+                    size="xs"
+                    value={(selectedElement as TokenElement).hp?.max ?? 10}
+                    onChange={(val) => handleHPChange('max', val)}
+                    min={1}
+                  />
+                </Group>
+                <Group gap="xs" grow>
+                  <Button
+                    size="xs"
+                    color="red"
+                    variant="light"
+                    onClick={() => handleHPAdjust(-1)}
+                  >
+                    -1 HP
+                  </Button>
+                  <Button
+                    size="xs"
+                    color="red"
+                    variant="light"
+                    onClick={() => handleHPAdjust(-5)}
+                  >
+                    -5 HP
+                  </Button>
+                  <Button
+                    size="xs"
+                    color="green"
+                    variant="light"
+                    onClick={() => handleHPAdjust(5)}
+                  >
+                    +5 HP
+                  </Button>
+                  <Button
+                    size="xs"
+                    color="green"
+                    variant="light"
+                    onClick={() => handleHPAdjust(1)}
+                  >
+                    +1 HP
+                  </Button>
+                </Group>
 
-            {/* AC */}
-            <NumberInput
-              label="Armor Class (AC)"
-              size="xs"
-              value={(selectedElement as TokenElement).ac ?? 10}
-              onChange={(val) => handleUpdate({ ac: Number(val) || 10 })}
-              min={1}
-              max={30}
-            />
+                {/* AC */}
+                <NumberInput
+                  label="Armor Class (AC)"
+                  size="xs"
+                  value={(selectedElement as TokenElement).ac ?? 10}
+                  onChange={(val) => handleUpdate({ ac: Number(val) || 10 })}
+                  min={1}
+                  max={30}
+                />
+              </>
+            )}
 
-            {/* Conditions */}
+            {/* Conditions - always show for token */}
             <Divider label="Conditions" labelPosition="center" />
             <Group gap="xs">
               <TextInput

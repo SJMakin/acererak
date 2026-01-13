@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
+import { useCharacterStore, handleIncomingCharacterUpdate, handleIncomingCharacterDelete } from '../stores/characterStore';
 import type {
   GameState,
   CanvasElement,
@@ -11,6 +12,7 @@ import type {
   GridSettings,
   ChatMessage,
   Scene,
+  Character,
 } from '../types';
 
 const APP_ID = 'lychgate-vtt-v1';
@@ -147,6 +149,8 @@ export function useRoom() {
     sendChat?: ActionSender<ChatMessage>;
     sendSceneSwitch?: ActionSender<string>;
     sendSceneUpdate?: ActionSender<Scene>;
+    sendCharacterUpdate?: ActionSender<Character>;
+    sendCharacterDelete?: ActionSender<string>;
   }>({});
 
   const {
@@ -298,6 +302,8 @@ export function useRoom() {
     const [sendChat, onChat] = room.makeAction<any>('chat');
     const [sendSceneSwitch, onSceneSwitch] = room.makeAction<any>('sceneSwi');
     const [sendSceneUpdate, onSceneUpdate] = room.makeAction<any>('sceneUpd');
+    const [sendCharacterUpdate, onCharacterUpdate] = room.makeAction<any>('charUpd');
+    const [sendCharacterDelete, onCharacterDelete] = room.makeAction<any>('charDel');
 
     // Store senders
     actionsRef.current = {
@@ -315,7 +321,23 @@ export function useRoom() {
       sendChat,
       sendSceneSwitch,
       sendSceneUpdate,
+      sendCharacterUpdate,
+      sendCharacterDelete,
     };
+
+    // Setup character store P2P handlers
+    useCharacterStore.getState().setP2PHandlers(
+      (character) => {
+        if (actionsRef.current.sendCharacterUpdate) {
+          actionsRef.current.sendCharacterUpdate(character);
+        }
+      },
+      (characterId) => {
+        if (actionsRef.current.sendCharacterDelete) {
+          actionsRef.current.sendCharacterDelete(characterId);
+        }
+      }
+    );
 
     // Handle peer events
     room.onPeerJoin((peerId: string) => {
@@ -591,6 +613,18 @@ export function useRoom() {
         });
       }
     });
+
+    // Handle character updates (from any peer)
+    onCharacterUpdate((character: Character, _peerId: string) => {
+      console.log('Received character update:', character.name);
+      handleIncomingCharacterUpdate(character);
+    });
+
+    // Handle character deletions (from any peer)
+    onCharacterDelete((characterId: string, _peerId: string) => {
+      console.log('Received character delete:', characterId);
+      handleIncomingCharacterDelete(characterId);
+    });
   }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene, addPing]);
 
   // Broadcast element updates
@@ -686,6 +720,20 @@ export function useRoom() {
     }
   }, [roomState.isHost]);
 
+  // Broadcast character update (any peer)
+  const broadcastCharacterUpdate = useCallback((character: Character) => {
+    if (actionsRef.current.sendCharacterUpdate) {
+      actionsRef.current.sendCharacterUpdate(character);
+    }
+  }, []);
+
+  // Broadcast character delete (any peer)
+  const broadcastCharacterDelete = useCallback((characterId: string) => {
+    if (actionsRef.current.sendCharacterDelete) {
+      actionsRef.current.sendCharacterDelete(characterId);
+    }
+  }, []);
+
   // Leave room
   const leaveRoom = useCallback(() => {
     if (roomRef.current) {
@@ -738,5 +786,7 @@ export function useRoom() {
     broadcastChat,
     broadcastSceneSwitch,
     broadcastSceneUpdate,
+    broadcastCharacterUpdate,
+    broadcastCharacterDelete,
   };
 }

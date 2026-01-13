@@ -2,10 +2,12 @@ import type { TokenElement } from '@/types';
 import type Konva from 'konva';
 import { Group, Image, Circle, Rect, Text } from 'react-konva';
 import useImage from '../hooks/useImage';
+import { useCharacterStore } from '../stores/characterStore';
 
-// Token component
+// Token component with character sheet integration
 export function Token({
   element, cellSize, isSelected, isCurrentTurn, onSelect, onShiftSelect, onDragStart, onDragEnd, isGM, showMetadata = true,
+  onDamage, // Optional callback for damage clicks (bidirectional sync)
 }: {
   element: TokenElement;
   cellSize: number;
@@ -17,10 +19,51 @@ export function Token({
   onDragEnd: (x: number, y: number) => void;
   isGM: boolean;
   showMetadata?: boolean;
+  onDamage?: (amount: number) => void; // For character sync damage
 }) {
   const [image] = useImage(element.imageUrl);
   const width = element.width * cellSize;
   const height = element.height * cellSize;
+
+  // Get linked character data
+  const character = element.characterId 
+    ? useCharacterStore.getState().getCharacterById(element.characterId)
+    : undefined;
+  
+  // Subscribe to character store updates for reactive updates
+  const characterStore = useCharacterStore();
+  
+  // Determine display name: character name if linked, otherwise token name
+  const displayName = character?.name || element.name;
+
+  // Get HP data from character or token
+  const hpData = (() => {
+    if (character && character.shadowState && character.projections) {
+      const barKey = character.projections.bar || 'HP';
+      const barMaxKey = character.projections.barMax || 'MaxHP';
+      const hp = character.shadowState[barKey];
+      const maxHp = character.shadowState[barMaxKey];
+      
+      if (hp !== undefined && maxHp !== undefined) {
+        return { 
+          current: typeof hp === 'number' ? hp : parseInt(String(hp)) || 0,
+          max: typeof maxHp === 'number' ? maxHp : parseInt(String(maxHp)) || 1
+        };
+      }
+    }
+    return element.hp;
+  })();
+
+  // Get AC data from character or token
+  const acValue = (() => {
+    if (character && character.shadowState && character.projections?.badge) {
+      const ac = character.shadowState[character.projections.badge];
+      if (ac !== undefined) {
+        return typeof ac === 'number' ? ac : parseInt(String(ac)) || undefined;
+      }
+    }
+    return element.ac;
+  })();
 
   // Check visibility
   const visible = element.visibleTo === 'all' ||
@@ -29,7 +72,7 @@ export function Token({
   if (!visible) return null;
 
   // Calculate HP percentage and color
-  const hpPercent = element.hp ? (element.hp.current / element.hp.max) : 1;
+  const hpPercent = hpData ? (hpData.current / hpData.max) : 1;
   const hpColor = hpPercent > 0.66 ? '#22c55e' : hpPercent > 0.33 ? '#f59e0b' : '#ef4444';
 
   // Scale factors for metadata
@@ -44,6 +87,13 @@ export function Token({
       onShiftSelect();
     } else {
       onSelect();
+    }
+  };
+
+  // Handle damage click on HP bar (GM only, for character sync)
+  const handleHpBarClick = () => {
+    if (isGM && onDamage && character) {
+      onDamage(-1); // -1 damage by default (could be made configurable)
     }
   };
 
@@ -103,7 +153,7 @@ export function Token({
       {showMetadata && (
         <>
           {/* Name label with background */}
-          {element.name && (
+          {displayName && (
             <Group y={height + 2}>
               <Rect
                 x={-2}
@@ -116,7 +166,7 @@ export function Token({
                 x={0}
                 y={3}
                 width={width}
-                text={element.name}
+                text={displayName}
                 fontSize={fontSize}
                 fill="white"
                 align="center"
@@ -125,26 +175,32 @@ export function Token({
           )}
 
           {/* HP bar with text */}
-          {element.hp && (
-            <Group y={height + (element.name ? fontSize + 10 : 4)}>
+          {hpData && (
+            <Group 
+              y={height + (displayName ? fontSize + 10 : 4)}
+              onClick={handleHpBarClick}
+              onTap={handleHpBarClick}
+            >
               {/* HP bar background */}
               <Rect
                 width={width}
                 height={6 * scale}
                 fill="#1f2937"
-                cornerRadius={3} />
+                cornerRadius={3}
+                listening={isGM && !!onDamage} />
               {/* HP bar foreground */}
               <Rect
                 width={hpPercent * width}
                 height={6 * scale}
                 fill={hpColor}
-                cornerRadius={3} />
+                cornerRadius={3}
+                listening={false} />
               {/* HP text */}
               <Text
                 x={0}
                 y={8 * scale}
                 width={width}
-                text={`${element.hp.current}/${element.hp.max}`}
+                text={`${hpData.current}/${hpData.max}`}
                 fontSize={fontSize * 0.85}
                 fill="white"
                 align="center"
@@ -152,12 +208,13 @@ export function Token({
                 shadowColor="black"
                 shadowBlur={3}
                 shadowOffsetX={1}
-                shadowOffsetY={1} />
+                shadowOffsetY={1}
+                listening={false} />
             </Group>
           )}
 
           {/* AC badge (top-right corner) */}
-          {element.ac !== undefined && (
+          {acValue !== undefined && (
             <Group x={width - badgeSize / 2} y={badgeSize / 2}>
               {/* Shield background */}
               <Circle
@@ -171,7 +228,7 @@ export function Token({
                 y={-badgeSize / 2}
                 width={badgeSize}
                 height={badgeSize}
-                text={String(element.ac)}
+                text={String(acValue)}
                 fontSize={fontSize * 0.9}
                 fill="white"
                 align="center"

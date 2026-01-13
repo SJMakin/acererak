@@ -7,6 +7,8 @@ interface CharacterStore {
   characters: Character[];
   isLoading: boolean;
   isGM: boolean;
+  onP2PUpdate?: (character: Character) => void;
+  onP2PDelete?: (characterId: string) => void;
 
   // CRUD operations
   addCharacter: (character: Omit<Character, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -25,6 +27,9 @@ interface CharacterStore {
 
   // Sync with game state
   syncToGameState: () => Character[];
+
+  // P2P sync setup
+  setP2PHandlers: (onUpdate: (character: Character) => void, onDelete: (characterId: string) => void) => void;
 }
 
 const CHARACTERS_STORAGE_KEY = 'vtt-characters';
@@ -55,6 +60,12 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
       return { characters: newCharacters };
     });
 
+    // Broadcast to P2P peers
+    const { onP2PUpdate } = get();
+    if (onP2PUpdate) {
+      onP2PUpdate(character);
+    }
+
     return id;
   },
 
@@ -74,6 +85,13 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
 
       return { characters: updatedCharacters };
     });
+
+    // Broadcast to P2P peers
+    const { onP2PUpdate, characters } = get();
+    const updatedCharacter = characters.find((char) => char.id === id);
+    if (onP2PUpdate && updatedCharacter) {
+      onP2PUpdate(updatedCharacter);
+    }
   },
 
   deleteCharacter: (id) => {
@@ -89,6 +107,12 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
 
       return { characters: filteredCharacters };
     });
+
+    // Broadcast to P2P peers
+    const { onP2PDelete } = get();
+    if (onP2PDelete) {
+      onP2PDelete(id);
+    }
   },
 
   updateCharacterStat: (characterId, statKey, statValue) => {
@@ -147,6 +171,13 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
         return state;
       }
     });
+
+    // Broadcast to P2P peers
+    const { onP2PUpdate, characters } = get();
+    const updatedCharacter = characters.find((char) => char.id === characterId);
+    if (onP2PUpdate && updatedCharacter) {
+      onP2PUpdate(updatedCharacter);
+    }
   },
 
   getCharacterById: (id) => {
@@ -172,7 +203,40 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
   syncToGameState: () => {
     return get().characters;
   },
+
+  setP2PHandlers: (onUpdate, onDelete) => {
+    set({ onP2PUpdate: onUpdate, onP2PDelete: onDelete });
+  },
 }));
+
+// Helper function to handle incoming P2P character updates
+export function handleIncomingCharacterUpdate(character: Character) {
+  const store = useCharacterStore.getState();
+  const existing = store.getCharacterById(character.id);
+  
+  if (existing) {
+    // Update existing character
+    store.updateCharacter(character.id, character);
+  } else {
+    // Add new character
+    store.addCharacter({
+      name: character.name,
+      content: character.content,
+      shadowState: character.shadowState,
+      projections: character.projections,
+    });
+  }
+}
+
+// Helper function to handle incoming P2P character deletions
+export function handleIncomingCharacterDelete(characterId: string) {
+  const store = useCharacterStore.getState();
+  const existing = store.getCharacterById(characterId);
+  
+  if (existing) {
+    store.deleteCharacter(characterId);
+  }
+}
 
 // Helper function to set GM mode (called from game initialization)
 export function setCharacterStoreGM(isGM: boolean) {

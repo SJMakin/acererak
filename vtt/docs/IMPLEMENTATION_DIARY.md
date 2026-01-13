@@ -443,4 +443,249 @@ Strength:: 18
 
 ---
 
+## 2026-01-13: Phase 4 - Custom Nodes - Visual Widgets (Bars and Dots)
+
+### Overview
+Implemented visual widget extensions for the Reactive Character Sheet System. Bar widgets provide progress bar visualization for resources like HP, while dot widgets provide the classic filled/empty dot tracker style common in World of Darkness and other narrative RPGs.
+
+### What Was Implemented
+
+**1. BarWidget Extension:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/BarWidget.ts` | TipTap Node extension for `[bar: current/max]` pattern |
+| `src/components/character/extensions/BarWidgetComponent.tsx` | Interactive progress bar component |
+| `src/components/character/extensions/BarWidget.css` | Styling with color transitions |
+
+- **Pattern Matching**: `[bar: HP/MaxHP]` or `[bar: 45/100]`
+- **Progress Bar**: Horizontal bar with percentage fill
+- **Color Coding**:
+  - > 50%: Green (#22c55e)
+  - 25-50%: Yellow (#eab308)
+  - < 25%: Red (#ef4444)
+- **Interactive Controls**: Click bar to reveal +/- buttons
+- **Reactivity**: Parses variable names (HP, MaxHP) from shadowState for live updates
+- **Markdown Export**: `[bar: HP/MaxHP]`
+
+**2. DotsWidget Extension:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/DotsWidget.ts` | TipTap Node extension for `[dots: current/max]` pattern |
+| `src/components/character/extensions/DotsWidgetComponent.tsx` | Interactive dot tracker component |
+| `src/components/character/extensions/DotsWidget.css` | Styling with pop animations |
+
+- **Pattern Matching**: `[dots: 3/5]` or `[dots: Slots/MaxSlots]`
+- **Dot Visualization**: Filled (●) and empty (○) circles
+- **Interactive**: Click dots to toggle fill state
+  - Clicking filled dot empties it and all after
+  - Clicking empty dot fills it and all before
+- **Limit**: Maximum 10 dots
+- **Color Themes**: Default amber, plus success (green), damage (red), magic (purple), health (pink)
+- **Markdown Export**: `[dots: 3/5]`
+
+**3. Editor Integration:**
+
+- Registered BarWidget and DotsWidget extensions in CharacterSheetEditor
+- Added `shadowState` prop to allow external shadowState (for reactive updates)
+- Added `insertBarWidget` and `insertDotsWidget` commands
+- Added widget toolbar with buttons for quick insertion
+- Markdown export/import supports widget syntax
+- Widget toolbar appears below formatting toolbar when not read-only
+
+**4. Styling:**
+
+- Dark theme compatible (follows existing editor color scheme)
+- Smooth CSS transitions for bar fill and color changes
+- Pop animation for dot toggles
+- Hover effects for interactivity feedback
+
+### Key Design Decisions
+
+1. **Variable Resolution**: Widgets can use either hardcoded numbers (`[bar: 45/100]`) or variable names (`[bar: HP/MaxHP]`) that resolve from shadowState
+2. **Two-Way Binding**: Widgets update shadowState when modified, and re-render when shadowState changes externally
+3. **Max Dots Limit**: Capped at 10 dots to prevent UI overflow
+4. **Color Theming**: DotsWidget CSS includes color variant classes for different resource types
+5. **Widget Toolbar**: Added below main toolbar for easy widget insertion without typing syntax
+
+### Files Created
+
+- `vtt/src/components/character/extensions/BarWidget.ts`
+- `vtt/src/components/character/extensions/BarWidgetComponent.tsx`
+- `vtt/src/components/character/extensions/BarWidget.css`
+- `vtt/src/components/character/extensions/DotsWidget.ts`
+- `vtt/src/components/character/extensions/DotsWidgetComponent.tsx`
+- `vtt/src/components/character/extensions/DotsWidget.css`
+
+### Files Modified
+
+- `vtt/src/components/character/CharacterSheetEditor.tsx`
+  - Added BarWidget and DotsWidget imports and registration
+  - Added shadowState prop for reactive widget updates
+  - Added insertBarWidget and insertDotsWidget commands
+  - Added widget toolbar with insertion buttons
+  - Updated markdown export to include widgets
+- `vtt/src/components/character/CharacterSheetEditor.css`
+  - Added widget toolbar styles
+- `vtt/docs/PROJECT_PLAN.md` - Marked Phase 4 as completed
+
+### Usage Examples
+
+**Bar Widget:**
+```
+HP:: 45 #bar
+MaxHP:: 52 #bar
+[bar: HP/MaxHP]   → displays 87% filled bar (green)
+```
+
+**Dots Widget:**
+```
+Slots:: 3
+MaxSlots:: 5
+[dots: Slots/MaxSlots]   → displays ●●●○○
+[dots: 3/5]              → displays ●●●○○ (hardcoded)
+```
+
+### Next Steps
+
+- Phase 5: Token integration (link characters to tokens, sync HP bars)
+- Phase 6: Transclusion and polish (spell/ability snippets, templates)
+
+---
+
+## 2026-01-13: Phase 5 - Token Integration with Bidirectional Character Sync
+
+### Overview
+Implemented the integration between Character Sheets and Map Tokens, enabling bidirectional data sync. When a token is linked to a character, it displays HP and AC from the character's shadowState. Changes in either the token or character sheet sync to both.
+
+### What Was Implemented
+
+**1. Token Component Enhancement (`src/components/Token.tsx`):**
+
+- Added character sheet integration using `useCharacterStore`
+- Token reads HP/AC from linked Character.shadowState when `characterId` is set
+- Uses `projections.bar`, `projections.barMax`, and `projections.badge` keys from Character
+- Falls back to token's own hp/ac when no character is linked
+- Displays character name instead of token name when linked
+- Added `onDamage` callback prop for damage clicks (GM only)
+- Subscribes to character store updates for reactive updates
+
+**2. Token Config Modal Enhancement (`src/components/TokenConfigModal.tsx`):**
+
+- Added "Link Character" dropdown/selector
+- Shows available Characters from characterStore with searchable dropdown
+- Option to create new Character directly from the modal
+- Option to unlink character from existing selection
+- Displays linked character info (HP/AC preview) when selected
+- Auto-fills HP/AC from character projections when linking
+- Saves `characterId` to token configuration
+
+**3. Combat Tracker Enhancement (`src/components/CombatTracker.tsx`):**
+
+- Reads HP from linked Character if available (using `getHpFromToken` helper)
+- Displays character name instead of token name when linked
+- Added "Linked" badge indicator for character-connected combatants
+- HP changes sync to Character shadowState via `updateCharacterStat()`
+- Falls back to token HP when no character linked
+- Added `Linked` badge to show which tokens have characters
+
+**4. Property Inspector Enhancement (`src/components/PropertyInspector.tsx`):**
+
+- Removed token-specific HP/AC/conditions UI when character is linked
+- Added "Edit Character Sheet" button when character linked (opens CharacterSheetModal)
+- Shows character link status with linked character info
+- Added character selector dropdown for linking/unlinking characters
+- Unlink button to remove character reference
+- Smooth transition between linked/unlinked states
+
+**5. Character Store P2P Sync (`src/stores/characterStore.ts`):**
+
+- Added `onP2PUpdate` and `onP2PDelete` callback hooks
+- Added `setP2PHandlers()` method for registering P2P handlers
+- Added `handleIncomingCharacterUpdate()` helper for applying remote updates
+- Added `handleIncomingCharacterDelete()` helper for processing deletions
+- All CRUD operations (add/update/delete) now broadcast to P2P peers
+- Integrated with useRoom.ts for message handling
+
+**6. P2P Message Handlers (`src/hooks/useRoom.ts`):**
+
+- Added `sendCharacterUpdate` and `sendCharacterDelete` actions (shortened action names for Trystero)
+- Added `broadcastCharacterUpdate()` and `broadcastCharacterDelete()` functions
+- Added `onCharacterUpdate` and `onCharacterDelete` handlers
+- Integrated character store P2P handlers via `setP2PHandlers()`
+- All character changes sync across all connected peers
+
+**7. Type Exports (`src/types/index.ts`):**
+
+- Re-exported `CharacterUpdateMessage` and `CharacterDeleteMessage` from character.ts
+- Ensured all P2P message types are properly typed and accessible
+
+### Key Design Decisions
+
+1. **Backward Compatibility**: Token's own `hp`/`ac` fields remain functional for unlinked tokens
+2. **Bidirectional Sync**: Changes in CombatTracker sync to Character, changes in Character Sheet sync to tokens
+3. **P2P Strategy**: All character updates broadcast to all peers (no GM-only restriction for characters)
+4. **Error Handling**: Graceful fallback when character is deleted or stats are missing
+5. **Reactive Updates**: Token component subscribes to character store state changes
+
+### Token Integration Flow
+
+```
+Token (characterId: "char-123")
+  ↓
+CharacterStore.getCharacter("char-123")
+  ↓
+Character.shadowState { HP: 45, MaxHP: 52, AC: 18 }
+  ↓
+Token displays HP bar (45/52) and AC badge (18)
+```
+
+### Bidirectional Sync
+
+- **Token damage click** → `characterStore.updateCharacterStat("char-123", "HP", 40)`
+- **Character sheet edit** → shadowState updates → token re-renders
+- **Combat HP change** → updates both combatant and character shadowState
+- **P2P update** → all peers receive and apply character changes
+
+### Files Modified
+
+- `vtt/src/components/Token.tsx` - Character integration, HP/AC from shadowState
+- `vtt/src/components/TokenConfigModal.tsx` - Character linking UI
+- `vtt/src/components/CombatTracker.tsx` - Character-aware HP reading and sync
+- `vtt/src/components/PropertyInspector.tsx` - Character link status and actions
+- `vtt/src/stores/characterStore.ts` - P2P broadcast hooks and handlers
+- `vtt/src/hooks/useRoom.ts` - P2P message handlers for character updates
+- `vtt/src/types/index.ts` - Re-exported character message types
+
+### Files Created
+
+- None (all implementation via modification of existing files)
+
+### Usage Examples
+
+**Linking a Token to a Character:**
+1. Select a token on the map
+2. Open Property Inspector
+3. Select a character from the "Link Character" dropdown
+4. Token now displays character HP/AC and name
+
+**Creating a New Character from Token Config:**
+1. Click "Create New Character" in TokenConfigModal
+2. Enter character name
+3. Set HP/AC for initial values
+4. Click "Create & Link" to create and link in one step
+
+**Sync from Combat Tracker:**
+1. Add linked token to combat
+2. HP changes via +/- buttons update both combatant and character
+3. Character sheet shows updated HP in shadowState
+
+### Next Steps
+
+- Phase 6: Transclusion (`[[SpellName]]`) and character templates
+- Optional: Character migration for existing tokens with `notes` field
+
+---
+
 *Add new session notes above this line*

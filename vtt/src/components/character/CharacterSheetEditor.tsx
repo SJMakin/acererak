@@ -4,6 +4,8 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { StatDeclaration } from './extensions/StatDeclaration';
 import { Expression } from './extensions/Expression';
 import { ActionButton } from './extensions/ActionButton';
+import { BarWidget } from './extensions/BarWidget';
+import { DotsWidget } from './extensions/DotsWidget';
 import { debouncedParse, parseShadowState, type ShadowState } from '../../services/shadowStateService';
 import { useGameStore } from '../../stores/gameStore';
 import type { ChatMessage } from '../../types';
@@ -16,6 +18,7 @@ interface CharacterSheetEditorProps {
   onBroadcastRoll?: (message: ChatMessage) => void;
   readOnly?: boolean;
   showMarkdownPanel?: boolean;
+  shadowState?: ShadowState;
 }
 
 export function CharacterSheetEditor({
@@ -25,12 +28,16 @@ export function CharacterSheetEditor({
   onBroadcastRoll,
   readOnly = false,
   showMarkdownPanel = false,
+  shadowState: externalShadowState,
 }: CharacterSheetEditorProps) {
   const [showMarkdown, setShowMarkdown] = useState(showMarkdownPanel);
   const [markdownText, setMarkdownText] = useState('');
-  const [shadowState, setLocalShadowState] = useState<ShadowState>({ stats: {}, projections: {} });
+  const [localShadowState, setLocalShadowState] = useState<ShadowState>({ stats: {}, projections: {} });
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousJsonRef = useRef<string>('');
+  
+  // Use external shadowState if provided, otherwise use local
+  const shadowState = externalShadowState || localShadowState;
 
   const parseAndNotifyShadowState = useCallback(
     (json: string) => {
@@ -40,7 +47,9 @@ export function CharacterSheetEditor({
       try {
         const document = JSON.parse(json);
         const result = parseShadowState(document);
-        setLocalShadowState(result);
+        if (!externalShadowState) {
+          setLocalShadowState(result);
+        }
         
         // Cancel any pending debounce
         if (debounceTimerRef.current) {
@@ -55,7 +64,7 @@ export function CharacterSheetEditor({
         console.error('Failed to parse shadow state:', e);
       }
     },
-    [onChange]
+    [onChange, externalShadowState]
   );
 
   const editor = useEditor({
@@ -78,6 +87,16 @@ export function CharacterSheetEditor({
       ActionButton.configure({
         HTMLAttributes: {
           class: 'action-button',
+        },
+      }),
+      BarWidget.configure({
+        HTMLAttributes: {
+          class: 'bar-widget',
+        },
+      }),
+      DotsWidget.configure({
+        HTMLAttributes: {
+          class: 'dots-widget',
         },
       }),
     ],
@@ -157,6 +176,24 @@ export function CharacterSheetEditor({
     [editor]
   );
 
+  const insertBarWidget = useCallback(
+    (current: string, max: string) => {
+      if (!editor) return;
+      
+      editor.commands.insertBarWidget({ current, max });
+    },
+    [editor]
+  );
+
+  const insertDotsWidget = useCallback(
+    (current: string, max: string) => {
+      if (!editor) return;
+      
+      editor.commands.insertDotsWidget({ current, max });
+    },
+    [editor]
+  );
+
   const exportMarkdown = useCallback(() => {
     if (!editor) return;
     const json = editor.getJSON();
@@ -208,6 +245,20 @@ export function CharacterSheetEditor({
           const cost = (attrs.cost as string);
           const costPart = cost ? `; cost: ${cost}` : '';
           markdown += `[${label}](action: ${action}${costPart})\n\n`;
+          break;
+        }
+        case 'barWidget': {
+          const attrs = nodeAny.attrs || {};
+          const current = (attrs.current as string) || '0';
+          const max = (attrs.max as string) || '100';
+          markdown += `[bar: ${current}/${max}]\n\n`;
+          break;
+        }
+        case 'dotsWidget': {
+          const attrs = nodeAny.attrs || {};
+          const current = (attrs.current as string) || '0';
+          const max = (attrs.max as string) || '5';
+          markdown += `[dots: ${current}/${max}]\n\n`;
           break;
         }
       }
@@ -414,6 +465,24 @@ export function CharacterSheetEditor({
             <summary>Shadow State ({Object.keys(shadowState.stats).length} stats)</summary>
             <pre>{JSON.stringify(shadowState, null, 2)}</pre>
           </details>
+        </div>
+      )}
+
+      {/* Widget insertion toolbar */}
+      {!readOnly && (
+        <div className="character-sheet-editor__widget-toolbar">
+          <button
+            onClick={() => insertBarWidget('HP', 'MaxHP')}
+            title="Insert HP bar [bar: HP/MaxHP]"
+          >
+            ⊞ Bar
+          </button>
+          <button
+            onClick={() => insertDotsWidget('3', '5')}
+            title="Insert dots [dots: 3/5]"
+          >
+            ⊝ Dots
+          </button>
         </div>
       )}
 

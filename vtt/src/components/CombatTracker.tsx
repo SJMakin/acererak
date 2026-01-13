@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Stack,
   Paper,
@@ -14,7 +14,8 @@ import {
   ScrollArea,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import type { TokenElement } from '../types';
+import { useCharacterStore } from '../stores/characterStore';
+import type { TokenElement, Combatant } from '../types';
 
 interface CombatTrackerProps {
   onBroadcastCombat: () => void;
@@ -33,6 +34,8 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     previousTurn,
   } = useGameStore();
 
+  const { updateCharacterStat, getCharacterById } = useCharacterStore();
+
   const [selectedTokenId, setSelectedTokenId] = useState<string>('');
   const [initiative, setInitiative] = useState<number | string>(10);
   const [dexterity, setDexterity] = useState<number | string>('');
@@ -46,6 +49,36 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
   const availableTokens = tokens.filter(
     (t) => !combat?.combatants.some((c) => c.id === t.id)
   );
+
+  // Helper function to get HP from character or token
+  const getHpFromToken = (token: TokenElement): { current: number; max: number } => {
+    if (token.characterId) {
+      const character = getCharacterById(token.characterId);
+      if (character && character.shadowState && character.projections) {
+        const barKey = character.projections.bar || 'HP';
+        const barMaxKey = character.projections.barMax || 'MaxHP';
+        const hp = character.shadowState[barKey];
+        const maxHp = character.shadowState[barMaxKey];
+        
+        if (hp !== undefined && maxHp !== undefined) {
+          return {
+            current: typeof hp === 'number' ? hp : parseInt(String(hp)) || 0,
+            max: typeof maxHp === 'number' ? maxHp : parseInt(String(maxHp)) || 1
+          };
+        }
+      }
+    }
+    return token.hp || { current: 10, max: 10 };
+  };
+
+  // Helper function to get display name from character or token
+  const getDisplayName = (token: TokenElement): string => {
+    if (token.characterId) {
+      const character = getCharacterById(token.characterId);
+      if (character) return character.name;
+    }
+    return token.name;
+  };
 
   const handleStartCombat = () => {
     startCombat();
@@ -90,10 +123,25 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
   const handleUpdateHP = (id: string, current: number) => {
     const combatant = combat?.combatants.find((c) => c.id === id);
     if (!combatant) return;
+
+    // Find the token to check for character link
+    const token = tokens.find((t) => t.id === id);
+    const newHp = { ...combatant.hp, current: Math.max(0, Math.min(current, combatant.hp.max)) };
     
-    updateCombatant(id, {
-      hp: { ...combatant.hp, current: Math.max(0, Math.min(current, combatant.hp.max)) },
-    });
+    // Update combatant
+    updateCombatant(id, { hp: newHp });
+    
+    // If token is linked to a character, sync HP to character
+    if (token?.characterId) {
+      const character = getCharacterById(token.characterId);
+      if (character?.projections?.bar) {
+        updateCharacterStat(token.characterId, character.projections.bar, newHp.current);
+      }
+      if (character?.projections?.barMax && newHp.max !== combatant.hp.max) {
+        updateCharacterStat(token.characterId, character.projections.barMax, newHp.max);
+      }
+    }
+    
     onBroadcastCombat();
   };
 
@@ -118,6 +166,18 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
       conditions: combatant.conditions.filter((c) => c !== condition),
     });
     onBroadcastCombat();
+  };
+
+  // Get combatant data with character-aware HP
+  const getCombatantData = (combatant: Combatant): { hp: { current: number; max: number }; name: string } => {
+    const token = tokens.find((t) => t.id === combatant.id);
+    if (token) {
+      return {
+        hp: getHpFromToken(token),
+        name: getDisplayName(token),
+      };
+    }
+    return { hp: combatant.hp, name: combatant.name };
   };
 
   if (!combat) {
@@ -150,7 +210,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     );
   }
 
-  const currentCombatant = combat.combatants[combat.currentTurn];
+  const currentCombatant = getCombatantData(combat.combatants[combat.currentTurn]);
 
   return (
     <Stack h="100%">
@@ -194,7 +254,10 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
               placeholder="Select token"
               value={selectedTokenId}
               onChange={(val) => setSelectedTokenId(val || '')}
-              data={availableTokens.map((t) => ({ value: t.id, label: t.name }))}
+              data={availableTokens.map((t) => ({ 
+                value: t.id, 
+                label: t.characterId ? `${getDisplayName(t)} (${t.name})` : t.name 
+              }))}
               size="xs"
             />
             <Group gap="xs">
@@ -236,6 +299,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
           ) : (
             combat.combatants.map((combatant, index) => {
               const isCurrentTurn = index === combat.currentTurn;
+              const combatantData = getCombatantData(combatant);
               
               return (
                 <Paper
@@ -251,10 +315,14 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                     <Group gap="xs">
                       <Badge size="sm" color="violet">{combatant.initiative}</Badge>
                       <Text size="sm" fw={600}>
-                        {combatant.name}
+                        {combatantData.name}
                       </Text>
                       {isCurrentTurn && (
                         <Badge size="xs" color="violet">Active</Badge>
+                      )}
+                      {/* Character indicator */}
+                      {tokens.find(t => t.id === combatant.id)?.characterId && (
+                        <Badge size="xs" color="blue">Linked</Badge>
                       )}
                     </Group>
                     {isGM && (
@@ -272,21 +340,21 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                   {/* HP Bar */}
                   <Group gap="xs" mb="xs">
                     <Text size="xs" c="dimmed" style={{ minWidth: 50 }}>
-                      HP: {combatant.hp.current}/{combatant.hp.max}
+                      HP: {combatantData.hp.current}/{combatantData.hp.max}
                     </Text>
                     {isGM && (
                       <Group gap={4} style={{ flex: 1 }}>
                         <ActionIcon
                           size="xs"
                           variant="light"
-                          onClick={() => handleUpdateHP(combatant.id, combatant.hp.current - 1)}
+                          onClick={() => handleUpdateHP(combatant.id, combatantData.hp.current - 1)}
                         >
                           -
                         </ActionIcon>
                         <ActionIcon
                           size="xs"
                           variant="light"
-                          onClick={() => handleUpdateHP(combatant.id, combatant.hp.current + 1)}
+                          onClick={() => handleUpdateHP(combatant.id, combatantData.hp.current + 1)}
                         >
                           +
                         </ActionIcon>
@@ -307,12 +375,12 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                   >
                     <div
                       style={{
-                        width: `${(combatant.hp.current / combatant.hp.max) * 100}%`,
+                        width: `${(combatantData.hp.current / combatantData.hp.max) * 100}%`,
                         height: '100%',
                         backgroundColor:
-                          combatant.hp.current > combatant.hp.max * 0.5
+                          combatantData.hp.current > combatantData.hp.max * 0.5
                             ? '#22c55e'
-                            : combatant.hp.current > combatant.hp.max * 0.25
+                            : combatantData.hp.current > combatantData.hp.max * 0.25
                             ? '#f59e0b'
                             : '#ef4444',
                         transition: 'width 0.3s ease',

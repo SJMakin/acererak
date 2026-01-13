@@ -1,0 +1,127 @@
+.dots-widget {
+  display: inline-block;
+  margin: 0.25rem 0;
+}
+
+.dots-widget__container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.dots-widget__container:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dots-widget__label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.dots-widget__dots {
+  display: flex;
+  gap: 3px;
+}
+
+.dots-widget__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 2px solid transparent;
+}
+
+.dots-widget__dot--empty {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dots-widget__dot--empty:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.dots-widget__dot--filled {
+  background-color: var(--dots-filled, #f59e0b);
+  border-color: var(--dots-filled-border, #d97706);
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+}
+
+.dots-widget__dot--filled:hover {
+  background-color: var(--dots-filled-hover, #fbbf24);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+/* Alternative color schemes for different types */
+.dots-widget[data-type="success"] .dots-widget__dot--filled {
+  --dots-filled: #22c55e;
+  --dots-filled-border: #16a34a;
+  --dots-filled-hover: #4ade80;
+}
+
+.dots-widget[data-type="damage"] .dots-widget__dot--filled {
+  --dots-filled: #ef4444;
+  --dots-filled-border: #dc2626;
+  --dots-filled-hover: #f87171;
+}
+
+.dots-widget[data-type="magic"] .dots-widget__dot--filled {
+  --dots-filled: #8b5cf6;
+  --dots-filled-border: #7c3aed;
+  --dots-filled-hover: #a78bfa;
+}
+
+.dots-widget[data-type="health"] .dots-widget__dot--filled {
+  --dots-filled: #ec4899;
+  --dots-filled-border: #db2777;
+  --dots-filled-hover: #f472b6;
+}
+
+/* Keyboard focus styles */
+.dots-widget__dot:focus {
+  outline: none;
+}
+
+.dots-widget__dot:focus-visible {
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Animation for filling/emptying dots */
+@keyframes dots-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.dots-widget__dot {
+  animation: dots-pop 0.15s ease-out;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .dots-widget__container:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .dots-widget__dot--empty {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .dots-widget__dot--empty:hover {
+  background-color: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.3);
+}

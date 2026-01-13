@@ -1,0 +1,126 @@
+.bar-widget {
+  display: inline-block;
+  margin: 0.25rem 0;
+}
+
+.bar-widget__container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.bar-widget__container:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.bar-widget__bar-container {
+  position: relative;
+  width: 120px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bar-widget__bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+.bar-widget__label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.bar-widget__percentage {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 40px;
+  text-align: right;
+}
+
+.bar-widget__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background-color: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  animation: bar-widget-fade-in 0.15s ease;
+}
+
+@keyframes bar-widget-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bar-widget__button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bar-widget__button--minus {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.bar-widget__button--minus:hover {
+  background-color: rgba(239, 68, 68, 0.4);
+}
+
+.bar-widget__button--plus {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.bar-widget__button--plus:hover {
+  background-color: rgba(34, 197, 94, 0.4);
+}
+
+.bar-widget__value {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .bar-widget__bar-container {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .bar-widget__container:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}

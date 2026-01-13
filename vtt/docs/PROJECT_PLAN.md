@@ -420,34 +420,59 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** `[bar: HP/MaxHP]` and `[dots: 3/5]` render visual trackers
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Create `src/components/character/extensions/BarWidget.ts`
-  ```typescript
-  // Matches: [bar: Variable/MaxVariable]
-  // Renders as horizontal progress bar
-  // Clickable to adjust value
-  ```
-- [ ] Create `src/components/character/extensions/BarWidgetComponent.tsx`
-  - Progress bar visualization
-  - Click to open quick +/- buttons
-  - Color changes based on percentage (green → yellow → red)
-- [ ] Create `src/components/character/extensions/DotsWidget.ts`
-  ```typescript
-  // Matches: [dots: N/Max] or [dots: Variable/Max]
-  // Renders as filled/empty dots (like WoD games)
-  ```
-- [ ] Create `src/components/character/extensions/DotsWidgetComponent.tsx`
+- [x] Create `src/components/character/extensions/BarWidget.ts`
+  - TipTap Node extension for `[bar: current/max]` pattern
+  - Matches: `[bar: Variable/MaxVariable]` or `[bar: 45/100]`
+  - Renders as horizontal progress bar
+  - Stores current and max as node attributes
+  - Commands: insertBarWidget, setBarWidgetValue
+- [x] Create `src/components/character/extensions/BarWidgetComponent.tsx`
+  - Progress bar visualization with percentage display
+  - Color changes based on percentage (>50% green, 25-50% yellow, <25% red)
+  - Click to open quick +/- buttons for value adjustment
+  - Parses variable names from shadowState for reactive updates
+  - Updates shadowState when value changes via callback
+  - Handles missing variables gracefully
+- [x] Create `src/components/character/extensions/BarWidget.css`
+  - Dark theme compatible styling
+  - Smooth transitions and animations
+  - Hover effects on bar and controls
+- [x] Create `src/components/character/extensions/DotsWidget.ts`
+  - TipTap Node extension for `[dots: current/max]` pattern
+  - Matches: `[dots: N/Max]` or `[dots: Variable/Max]`
+  - Renders as filled/empty dots (like World of Darkness games)
+  - Supports up to 10 dots
+  - Commands: insertDotsWidget, setDotsWidgetValue
+- [x] Create `src/components/character/extensions/DotsWidgetComponent.tsx`
   - Dot visualization (●●●○○)
-  - Click dots to fill/unfill
-  - Updates shadowState
+  - Click dots to fill/unfill (toggle behavior)
+  - Updates shadowState when value changes via callback
+  - Handles missing variables gracefully
+  - Keyboard accessible
+- [x] Create `src/components/character/extensions/DotsWidget.css`
+  - Dark theme compatible styling
+  - Smooth pop animation on toggle
+  - Alternative color schemes (success, damage, magic, health)
+- [x] Integrate extensions into CharacterSheetEditor
+  - Register BarWidget and DotsWidget extensions
+  - Pass shadowState to components for reactivity
+  - Pass onUpdateStat callback for widget interactions
+  - Add widget toolbar buttons for quick insertion
+  - Markdown export includes widget syntax
 
 **Acceptance Criteria:**
-- [ ] `[bar: HP/MaxHP]` shows progress bar
-- [ ] Bar reflects current HP value and updates live
-- [ ] Clicking bar shows +/- controls
-- [ ] `[dots: 3/5]` shows 3 filled, 2 empty dots
-- [ ] Clicking changes dot count
+- [x] `[bar: HP/MaxHP]` shows progress bar with correct percentage
+- [x] Bar reflects current HP value and updates live (reactive to shadowState)
+- [x] Bar color changes based on percentage (green/yellow/red)
+- [x] Clicking bar shows +/- controls
+- [x] `[dots: 3/5]` shows 3 filled, 2 empty dots
+- [x] Clicking dots changes dot count (fills/empties)
+- [x] Widget updates sync with shadowState
+- [x] Widgets work with both variables (HP) and hardcoded numbers (45/100)
 
 ---
 
@@ -455,35 +480,60 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** Tokens with `characterId` display stats from Character; bidirectional sync
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Modify `src/components/Token.tsx`
-  - If `characterId` set, read HP/AC from linked Character.shadowState
-  - Use `projections.bar` / `projections.barMax` / `projections.badge` keys
-  - Fall back to token's own hp/ac if no character linked
-- [ ] Add "Link Character" button to token config modal
-  - Dropdown of available Characters
-  - Or create new Character from scratch
-- [ ] Implement bidirectional sync
-  - Token damage click → update Character.shadowState → update document
-  - Character sheet edit → update shadowState → update token display
-- [ ] Modify `src/components/CombatTracker.tsx`
-  - Read HP from linked Character if available
-  - HP changes in combat update Character shadowState
-- [ ] Add P2P broadcast for character updates
-  - New message type: `character-update`
-  - Sync Character changes to all peers
-- [ ] Create `src/components/character/CharacterLibraryPanel.tsx`
-  - List saved Characters
-  - Create / duplicate / delete
-  - Import/export characters
+- [x] Modify `src/components/Token.tsx`
+  - [x] If `characterId` set, read HP/AC from linked Character.shadowState
+  - [x] Use `projections.bar` / `projections.barMax` / `projections.badge` keys
+  - [x] Fall back to token's own hp/ac if no character linked
+  - [x] Display character name if linked (override token name)
+  - [x] Ensure token updates when character shadowState changes
+- [x] Add "Link Character" dropdown/selector to token config modal
+  - [x] Show available Characters from characterStore
+  - [x] Option to create new Character from scratch
+  - [x] Option to unlink character
+  - [x] Display linked character info when selected
+  - [x] Save characterId to token
+- [x] Implement bidirectional sync
+  - [x] Token damage click → update Character.shadowState → update document
+  - [x] Character sheet edit → update shadowState → update token display
+  - [x] Use characterStore.updateCharacterStat() for stat updates
+- [x] Modify `src/components/CombatTracker.tsx`
+  - [x] Read HP from linked Character if available
+  - [x] Display character name if linked
+  - [x] HP changes in combat update Character shadowState
+  - [x] Use characterStore.updateCharacterStat() for updates
+  - [x] Fall back to token HP if no character linked
+- [x] Add P2P broadcast for character updates
+  - [x] New message type: `character-update`
+  - [x] New message type: `character-delete`
+  - [x] Broadcast Character changes to all peers
+  - [x] Handle incoming character updates
+- [x] Update Character Store for P2P Sync
+  - [x] Add P2P sync for character updates
+  - [x] Ensure character updates broadcast to peers
+  - [x] Handle incoming character updates from peers
+- [x] Update Property Inspector
+  - [x] Remove token-specific HP/AC/conditions UI when character linked
+  - [x] Add "Edit Character Sheet" button when character linked
+  - [x] Show character link status
+  - [x] Open CharacterSheetModal for linked character
+- [x] Update Game Types for P2P Messages
+  - [x] Add CharacterUpdateMessage interface
+  - [x] Add CharacterDeleteMessage interface
+  - [x] Ensure message types are properly typed
 
 **Acceptance Criteria:**
-- [ ] Token HP bar reads from linked Character
-- [ ] Changing HP in Character Sheet updates token display
-- [ ] Clicking token damage updates Character shadowState
-- [ ] Combat tracker uses Character HP
-- [ ] Characters sync across P2P
+- [x] Token HP bar reads from linked Character
+- [x] Token AC badge reads from linked Character
+- [x] Changing HP in Character Sheet updates token display
+- [x] Clicking token damage updates Character shadowState
+- [x] Combat tracker uses Character HP when linked
+- [x] Characters sync across P2P
+- [x] Token config modal allows linking/unlinking characters
+- [x] Property inspector shows "Edit Character Sheet" button
 
 ---
 
