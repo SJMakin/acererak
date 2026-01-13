@@ -1,0 +1,168 @@
+.stat-declaration {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  margin: 0 2px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #3a4a6b;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.875rem;
+}
+
+.stat-declaration:hover {
+  border-color: #5a6a9b;
+  background: linear-gradient(135deg, #1f1f3a 0%, #1a2a4a 100%);
+}
+
+.stat-declaration--selected {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+}
+
+.stat-declaration--editing {
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.stat-declaration__bracket {
+  color: #6b7280;
+  font-weight: bold;
+}
+
+.stat-declaration__key {
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+.stat-declaration__separator {
+  color: #6b7280;
+}
+
+.stat-declaration__value {
+  color: #34d399;
+  font-weight: 500;
+}
+
+.stat-declaration__dropdown {
+  color: #6b7280;
+  margin-left: 2px;
+  font-size: 0.75rem;
+}
+
+.stat-declaration__projection-icons {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.stat-declaration__icon {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.stat-declaration__edit-trigger {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.stat-declaration__key-input,
+.stat-declaration__value-input {
+  background: #0f172a;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.stat-declaration__key-input:focus,
+.stat-declaration__value-input:focus {
+  border-color: #7c3aed;
+}
+
+.stat-declaration__key-input {
+  width: 100px;
+}
+
+.stat-declaration__value-input {
+  width: 80px;
+}
+
+.stat-declaration__projections {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.stat-declaration__projection-btn {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stat-declaration__projection-btn:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.stat-declaration__projection-btn--active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.stat-declaration__actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.stat-declaration__save-btn,
+.stat-declaration__cancel-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.stat-declaration__save-btn {
+  background: #22c55e;
+  color: white;
+}
+
+.stat-declaration__save-btn:hover {
+  background: #16a34a;
+}
+
+.stat-declaration__cancel-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.stat-declaration__cancel-btn:hover {
+  background: #dc2626;
+}
+
+/* Inline node view styles */
+[data-component="stat-declaration"] {
+  display: inline;
+}

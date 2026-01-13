@@ -234,6 +234,103 @@ Implemented the foundation for the Reactive Character Sheet System using TipTap 
 - `vtt/src/db/database.ts` - Character storage functions
 - `vtt/src/components/LibraryPanel.tsx` - Character integration
 
+---
+
+## 2026-01-13: Phase 2 - Custom Nodes - Stat Declarations
+
+### Overview
+Implemented the custom node system for stat declarations using the `Key:: Value` syntax. This enables reactive stat pills that sync with shadow state.
+
+### What Was Implemented
+
+**1. New Extension Files:**
+
+| File | Purpose |
+|------|---------|
+| `src/components/character/extensions/StatDeclaration.ts` | TipTap Node extension for `Key:: Value` pattern |
+| `src/components/character/extensions/StatDeclarationComponent.tsx` | React component for rendering stat pills |
+| `src/components/character/extensions/StatDeclaration.css` | Styling for stat pills |
+| `src/services/shadowStateService.ts` | Parser for extracting stats from document |
+| `src/components/character/extensions/SuggestionMenu.tsx` | Autocomplete dropdown for stat names |
+| `src/components/character/extensions/SuggestionMenu.css` | Suggestion menu styling |
+| `src/components/character/extensions/StatSuggestion.ts` | Extension for triggering suggestions |
+
+**2. StatDeclaration Extension:**
+
+- Matches pattern: `Key:: Value` or `Key:: Value #bar` or `Key:: Value #badge`
+- Stores as inline, atomic node with attributes: `key`, `value`, `projections`
+- Commands: `insertStatDeclaration`, `setStatDeclarationValue`, `addStatDeclarationProjection`, `removeStatDeclarationProjection`
+- Renders using ReactNodeViewRenderer for rich interactivity
+
+**3. StatDeclarationComponent:**
+
+- Displays as `[Key: Value ▾]` pill with dark theme
+- Click to edit: shows inline inputs for key and value
+- Toggle projection tags: 📊 for #bar, 🏷️ for #badge
+- Keyboard support: Enter to save, Escape to cancel
+- Smooth transitions and visual feedback
+
+**4. ShadowStateService:**
+
+- `parseShadowState(document: JSONContent)` - Extracts all StatDeclaration nodes
+- Returns: `{ stats: { key: value }, projections: { bar, barMax, badge } }`
+- Auto-parses numeric values (integers and floats)
+- `parseStatDeclarationText()` - For initial import from text format
+- `debouncedParse()` - Utility for debounced parsing (300ms)
+- `shadowStateToJSON()` - Convert back to TipTap format
+
+**5. SuggestionMenu:**
+
+- Triggers when typing `::` or colon
+- 50+ common D&D stat suggestions (HP, AC, STR, DEX, etc.)
+- Categories: stat (📊), attribute (⚔️), derived (✨), resource (💎)
+- Keyboard navigation: ↑↓ arrows, Enter to select, Escape to close
+- Filter as you type
+
+**6. Editor Integration:**
+
+- Modified `CharacterSheetEditor.tsx`:
+  - Register StatDeclaration extension
+  - Parse shadow state on content change (300ms debounce)
+  - Pass shadowState to parent via callback
+  - Development debug panel shows current shadow state
+  - Markdown export includes stat declarations
+- Modified `CharacterSheetModal.tsx`:
+  - Receive shadowState updates from editor
+  - Auto-update projections when stats change
+
+### Key Design Decisions
+
+1. **Forgiving Parser**: `parseNumber()` handles edge cases gracefully, returning string if not parseable
+2. **Projection Auto-Detection**: First `#bar` becomes `bar`, second with "max" becomes `barMax`
+3. **Debounced Updates**: 300ms debounce prevents excessive re-parsing during rapid edits
+4. **Development Debug Panel**: Shows shadow state in development mode only
+5. **Backward Compatibility**: Existing content without stat nodes works unchanged
+
+### Files Created
+
+- `vtt/src/components/character/extensions/StatDeclaration.ts`
+- `vtt/src/components/character/extensions/StatDeclarationComponent.tsx`
+- `vtt/src/components/character/extensions/StatDeclaration.css`
+- `vtt/src/services/shadowStateService.ts`
+- `vtt/src/components/character/extensions/SuggestionMenu.tsx`
+- `vtt/src/components/character/extensions/SuggestionMenu.css`
+- `vtt/src/components/character/extensions/StatSuggestion.ts`
+
+### Files Modified
+
+- `vtt/src/components/character/CharacterSheetEditor.tsx` - Register extension, parse shadow state
+- `vtt/src/components/character/CharacterSheetModal.tsx` - Receive shadowState updates
+- `vtt/src/components/character/CharacterSheetEditor.css` - Add debug panel, toolbar separator, loading styles
+- `vtt/docs/PROJECT_PLAN.md` - Mark Phase 2 as completed
+
+### Next Steps
+
+- Phase 3: Expressions (`{{ expression }}`) and Action Buttons (`[Attack](action: 1d20+5)`)
+- Phase 4: Widgets (`[bar: HP/MaxHP]`, `[dots: 3/5]`)
+- Phase 5: Token integration (link characters to tokens)
+- Phase 6: Transclusion and polish
+
 ### Future Sessions
 
 *Add new session notes above this line*

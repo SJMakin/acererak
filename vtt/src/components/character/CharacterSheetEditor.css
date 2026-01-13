@@ -145,3 +145,47 @@
   outline: none;
   border-color: #7c3aed;
 }
+
+/* Toolbar separator */
+.toolbar__separator {
+  width: 1px;
+  background: #0f3460;
+  margin: 0 8px;
+}
+
+/* Loading state */
+.character-sheet-editor__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #6b7280;
+}
+
+/* Debug panel */
+.character-sheet-editor__debug {
+  padding: 8px;
+  background: #0f172a;
+  border-top: 1px solid #0f3460;
+  font-size: 11px;
+}
+
+.character-sheet-editor__debug summary {
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+}
+
+.character-sheet-editor__debug summary:hover {
+  color: #94a3b8;
+}
+
+.character-sheet-editor__debug pre {
+  margin: 8px 0 0 0;
+  padding: 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 200px;
+  color: #94a3b8;
+}

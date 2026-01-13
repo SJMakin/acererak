@@ -87,8 +87,12 @@ export function CharacterSheetModal({
     }
   }, [characterId, deleteCharacter, onClose]);
 
-  const handleContentChange = useCallback((newContent: string) => {
+  const handleContentChange = useCallback((newContent: string, newShadowState?: { stats: Record<string, string | number>; projections: { bar?: string; barMax?: string; badge?: string } }) => {
     setContent(newContent);
+    if (newShadowState) {
+      setShadowState(newShadowState.stats);
+      setProjections(newShadowState.projections);
+    }
   }, []);
 
   const handleProjectionsChange = useCallback((key: 'bar' | 'barMax' | 'badge', value: string) => {

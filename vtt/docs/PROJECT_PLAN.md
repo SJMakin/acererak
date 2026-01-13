@@ -308,38 +308,56 @@ In `src/types/index.ts`, the following `TokenElement` fields become optional/dep
 
 **Goal:** `Key:: Value` syntax creates editable stat pills, shadow state syncs
 
+**Status:** ✅ COMPLETED
+
 **Tasks:**
 
-- [ ] Create `src/components/character/extensions/StatDeclaration.ts`
-  ```typescript
-  // TipTap Node extension
-  // Matches pattern: "Key:: Value" or "Key:: Value #bar" or "Key:: Value #badge"
-  // Renders as: [Key: Value ▾] pill (clickable to edit)
-  // Parses projection tags: #bar, #badge
-  ```
-- [ ] Create `src/components/character/extensions/StatDeclarationComponent.tsx`
+- [x] Create `src/components/character/extensions/StatDeclaration.ts`
+  - TipTap Node extension for `Key:: Value` pattern
+  - Matches pattern: "Key:: Value" or "Key:: Value #bar" or "Key:: Value #badge"
+  - Renders as: [Key: Value ▾] pill (clickable to edit)
+  - Parses projection tags: #bar, #badge
+  - Stores key, value, and projections as node attributes
+  - Commands: insertStatDeclaration, setStatDeclarationValue, addStatDeclarationProjection
+- [x] Create `src/components/character/extensions/StatDeclarationComponent.tsx`
   - React component for rendering the node
-  - Inline editing on click
-  - Number input for numeric values
-  - Projection tag display (#bar, #badge icons)
-- [ ] Create `src/services/shadowStateService.ts`
-  ```typescript
-  // Extracts all StatDeclaration nodes from TipTap document
-  // Returns: { key: value } object
-  // Updates Character.shadowState on document change
-  ```
-- [ ] Wire shadow state updates
+  - Inline editing on click (number input for numeric values)
+  - Projection tag display with icons (📊 for #bar, 🏷️ for #badge)
+  - Update node attributes on edit
+- [x] Create `src/services/shadowStateService.ts`
+  - `parseShadowState(document: JSONContent): ShadowState`
+  - Extracts all StatDeclaration nodes from TipTap document
+  - Returns: { stats: { key: value }, projections: { bar, barMax, badge } }
+  - Handles projection tags
+  - `parseStatDeclarationText()` for initial import
+  - `debouncedParse()` for debounced updates
+- [x] Wire shadow state updates
   - On editor change → parse stats → update shadowState
   - Debounce parsing (300ms)
-- [ ] Create `src/components/character/extensions/SuggestionMenu.tsx`
+  - Pass shadowState updates to parent via callback
+  - Debug panel in development mode
+- [x] Create `src/components/character/extensions/SuggestionMenu.tsx`
   - Autocomplete when typing `::`
   - Suggests common stat names (HP, AC, STR, DEX, etc.)
+  - Keyboard navigation (arrow keys, Enter to select)
+  - Category icons (📊, ⚔️, ✨, 💎)
+  - STAT_SUGGESTIONS array with 50+ common D&D stats
+- [x] Create `src/components/character/extensions/StatSuggestion.ts`
+  - Extension for triggering suggestions after `::`
+- [x] Integrate extensions into CharacterSheetEditor
+  - Register StatDeclaration extension
+  - Parse shadow state on content change
+  - Update CharacterSheetModal to receive shadowState updates
+  - Export markdown includes stat declarations
 
 **Acceptance Criteria:**
-- [ ] Typing `Strength:: 18` creates a stat pill
-- [ ] Clicking pill allows editing value
-- [ ] Shadow state JSON updates automatically
-- [ ] Autocomplete shows suggestions when typing `::`
+- [x] Typing `Strength:: 18` creates a stat pill
+- [x] Clicking pill allows editing value
+- [x] Shadow state JSON updates automatically
+- [x] Autocomplete shows suggestions when typing `::`
+- [x] Projection tags (#bar, #badge) are parsed and stored
+- [x] Stat pills display correctly with icons for projections
+- [x] Development debug panel shows shadow state
 
 ---
 

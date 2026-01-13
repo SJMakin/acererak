@@ -1,11 +1,13 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
+import { StatDeclaration } from './extensions/StatDeclaration';
+import { debouncedParse, parseShadowState, type ShadowState } from '../../services/shadowStateService';
 import './CharacterSheetEditor.css';
 
 interface CharacterSheetEditorProps {
   content: string;
-  onChange: (content: string) => void;
+  onChange: (content: string, shadowState?: ShadowState) => void;
   readOnly?: boolean;
   showMarkdownPanel?: boolean;
 }
@@ -18,6 +20,35 @@ export function CharacterSheetEditor({
 }: CharacterSheetEditorProps) {
   const [showMarkdown, setShowMarkdown] = useState(showMarkdownPanel);
   const [markdownText, setMarkdownText] = useState('');
+  const [shadowState, setLocalShadowState] = useState<ShadowState>({ stats: {}, projections: {} });
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousJsonRef = useRef<string>('');
+
+  const parseAndNotifyShadowState = useCallback(
+    (json: string) => {
+      if (json === previousJsonRef.current) return;
+      previousJsonRef.current = json;
+
+      try {
+        const document = JSON.parse(json);
+        const result = parseShadowState(document);
+        setLocalShadowState(result);
+        
+        // Cancel any pending debounce
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+
+        // Debounce the callback
+        debounceTimerRef.current = setTimeout(() => {
+          onChange(json, result);
+        }, 300);
+      } catch (e) {
+        console.error('Failed to parse shadow state:', e);
+      }
+    },
+    [onChange]
+  );
 
   const editor = useEditor({
     extensions: [
@@ -26,25 +57,73 @@ export function CharacterSheetEditor({
           levels: [1, 2, 3],
         },
       }),
+      StatDeclaration.configure({
+        HTMLAttributes: {
+          class: 'stat-declaration',
+        },
+      }),
     ],
     content,
     editable: !readOnly,
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
-      onChange(json);
+      parseAndNotifyShadowState(json);
     },
     editorProps: {
       attributes: {
         class: 'tiptap',
       },
+      handleKeyDown: (view, event) => {
+        // Handle "::" shortcut for stat declarations
+        if (event.key === ':') {
+          const { from } = view.state.selection;
+          const textBefore = view.state.doc.textBetween(Math.max(0, from - 2), from);
+          
+          if (textBefore.endsWith(':')) {
+            // Double colon typed, insert stat declaration
+            // We'll let the normal input happen, then trigger suggestion
+            return false;
+          }
+        }
+        return false;
+      },
     },
   });
 
+  // Initialize shadow state from content
+  useEffect(() => {
+    if (content && editor) {
+      try {
+        const document = JSON.parse(content);
+        const result = parseShadowState(document);
+        setLocalShadowState(result);
+      } catch (e) {
+        // Ignore parse errors on initial load
+      }
+    }
+  }, [content, editor]);
+
+  // Cleanup debounce timer
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const insertStatDeclaration = useCallback(
+    (key: string, value: string | number = '', projections: string[] = []) => {
+      if (!editor) return;
+      
+      editor.commands.insertStatDeclaration({ key, value, projections });
+    },
+    [editor]
+  );
+
   const exportMarkdown = useCallback(() => {
     if (!editor) return;
-    // Simple markdown export (TipTap doesn't have built-in markdown export)
     const json = editor.getJSON();
-    // Convert to basic markdown representation
     let markdown = '';
     
     json.content?.forEach((node) => {
@@ -72,6 +151,14 @@ export function CharacterSheetEditor({
         case 'horizontalRule':
           markdown += '---\n\n';
           break;
+        case 'statDeclaration': {
+          const attrs = nodeAny.attrs || {};
+          const key = (attrs.key as string) || '';
+          const value = (attrs.value as string) || '';
+          const projections = (attrs.projections as string[]) || [];
+          markdown += `${key}:: ${value}${projections.map((p: string) => ` #${p}`).join('')}\n\n`;
+          break;
+        }
       }
     });
     
@@ -82,8 +169,6 @@ export function CharacterSheetEditor({
   const importMarkdown = useCallback(() => {
     if (!editor || !markdownText) return;
     
-    // Simple markdown import (converts basic markdown to HTML)
-    // For a real implementation, you'd use a markdown parser library
     const lines = markdownText.split('\n');
     let html = '';
     
@@ -102,6 +187,9 @@ export function CharacterSheetEditor({
         html += `<blockquote>${line.slice(2)}</blockquote>`;
       } else if (line === '---') {
         html += '<hr>';
+      } else if (line.match(/^(\w+)::\s*(.+)$/)) {
+        // Stat declaration format - don't convert to HTML, let it be handled by the editor
+        html += `<p>${line}</p>`;
       } else if (line.trim()) {
         html += `<p>${line}</p>`;
       }
@@ -156,7 +244,11 @@ export function CharacterSheetEditor({
   }, [editor]);
 
   if (!editor) {
-    return <div className="character-sheet-editor">Loading editor...</div>;
+    return (
+      <div className="character-sheet-editor">
+        <div className="character-sheet-editor__loading">Loading editor...</div>
+      </div>
+    );
   }
 
   return (
@@ -166,79 +258,95 @@ export function CharacterSheetEditor({
           <button
             onClick={setParagraph}
             className={!editor.isActive('paragraph') ? '' : 'active'}
+            title="Paragraph"
           >
             P
           </button>
           <button
             onClick={() => setHeading(1)}
             className={editor.isActive('heading', { level: 1 }) ? 'active' : ''}
+            title="Heading 1"
           >
             H1
           </button>
           <button
             onClick={() => setHeading(2)}
             className={editor.isActive('heading', { level: 2 }) ? 'active' : ''}
+            title="Heading 2"
           >
             H2
           </button>
           <button
             onClick={() => setHeading(3)}
             className={editor.isActive('heading', { level: 3 }) ? 'active' : ''}
+            title="Heading 3"
           >
             H3
           </button>
-          <span style={{ width: 1, background: '#0f3460', margin: '0 8px' }} />
+          <span className="toolbar__separator" />
           <button
             onClick={toggleBold}
             className={editor.isActive('bold') ? 'active' : ''}
+            title="Bold (Ctrl+B)"
           >
             B
           </button>
           <button
             onClick={toggleItalic}
             className={editor.isActive('italic') ? 'active' : ''}
+            title="Italic (Ctrl+I)"
           >
             I
           </button>
           <button
             onClick={toggleStrike}
             className={editor.isActive('strike') ? 'active' : ''}
+            title="Strikethrough"
           >
             S
           </button>
           <button
             onClick={toggleCode}
             className={editor.isActive('code') ? 'active' : ''}
+            title="Inline Code"
           >
             {'</>'}
           </button>
-          <span style={{ width: 1, background: '#0f3460', margin: '0 8px' }} />
+          <span className="toolbar__separator" />
           <button
             onClick={toggleBulletList}
             className={editor.isActive('bulletList') ? 'active' : ''}
+            title="Bullet List"
           >
             • List
           </button>
           <button
             onClick={toggleOrderedList}
             className={editor.isActive('orderedList') ? 'active' : ''}
+            title="Numbered List"
           >
             1. List
           </button>
           <button
             onClick={toggleBlockquote}
             className={editor.isActive('blockquote') ? 'active' : ''}
+            title="Quote"
           >
             "
           </button>
           <button
             onClick={toggleCodeBlock}
             className={editor.isActive('codeBlock') ? 'active' : ''}
+            title="Code Block"
           >
             {'{ }'}
           </button>
-          <span style={{ width: 1, background: '#0f3460', margin: '0 8px' }} />
-          <button onClick={exportMarkdown} disabled={readOnly}>
+          <span className="toolbar__separator" />
+          <button
+            onClick={exportMarkdown}
+            disabled={readOnly}
+            title="Export to Markdown"
+          >
             ↓ MD
           </button>
         </div>
@@ -247,6 +355,16 @@ export function CharacterSheetEditor({
       <div className="character-sheet-editor__content">
         <EditorContent editor={editor} />
       </div>
+
+      {/* Shadow State Debug Panel (development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="character-sheet-editor__debug">
+          <details>
+            <summary>Shadow State ({Object.keys(shadowState.stats).length} stats)</summary>
+            <pre>{JSON.stringify(shadowState, null, 2)}</pre>
+          </details>
+        </div>
+      )}
 
       {showMarkdown && (
         <div className="character-sheet-editor__markdown-panel">
