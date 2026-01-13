@@ -167,21 +167,37 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     gridSettings: import('../types').GridSettings;
     copyFromCurrent: boolean;
   }) => {
-    const newSceneId = useGameStore.getState().createScene(
-      data.name,
-      data.backgroundUrl,
-      data.copyFromCurrent
-    );
-    
-    // Update grid settings if not copying from current
-    if (!data.copyFromCurrent) {
-      useGameStore.getState().updateScene(newSceneId, { gridSettings: data.gridSettings });
-    }
-    
-    // Broadcast new scene to peers
-    const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
-    if (newScene) {
-      room.broadcastSceneUpdate(newScene);
+    if (editingScene) {
+      // Update existing scene
+      useGameStore.getState().updateScene(editingScene.id, {
+        name: data.name,
+        backgroundUrl: data.backgroundUrl,
+        gridSettings: data.gridSettings,
+      });
+      
+      // Broadcast updated scene to peers
+      const updatedScene = useGameStore.getState().game?.scenes.find(s => s.id === editingScene.id);
+      if (updatedScene) {
+        room.broadcastSceneUpdate(updatedScene);
+      }
+    } else {
+      // Create new scene
+      const newSceneId = useGameStore.getState().createScene(
+        data.name,
+        data.backgroundUrl,
+        data.copyFromCurrent
+      );
+      
+      // Update grid settings if not copying from current
+      if (!data.copyFromCurrent) {
+        useGameStore.getState().updateScene(newSceneId, { gridSettings: data.gridSettings });
+      }
+      
+      // Broadcast new scene to peers
+      const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
+      if (newScene) {
+        room.broadcastSceneUpdate(newScene);
+      }
     }
     
     setSceneModalOpened(false);
@@ -233,13 +249,13 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
             <Menu shadow="md" width={250}>
               <Menu.Target>
                 <Tooltip label="Switch Scene" position="bottom">
-                  <ActionIcon variant="subtle" size="lg">
-                    <Group gap={4}>
+                  <Button variant="subtle" color="gray" size="compact-lg" px="xs">
+                    <Group gap={6}>
                       <IconMap size={18} />
                       <Text size="sm" fw={500}>{activeScene?.name || 'Scene'}</Text>
                       <IconChevronDown size={12} />
                     </Group>
-                  </ActionIcon>
+                  </Button>
                 </Tooltip>
               </Menu.Target>
               <Menu.Dropdown>
@@ -291,6 +307,16 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                   }}
                 >
                   Duplicate Current Scene
+                </Menu.Item>
+
+                <Menu.Item
+                  leftSection={<IconEdit size={16} />}
+                  onClick={() => {
+                    setEditingScene(activeScene);
+                    setSceneModalOpened(true);
+                  }}
+                >
+                  Edit Current Scene
                 </Menu.Item>
 
                 <Menu.Item
@@ -817,7 +843,10 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                     <MantineActionIcon
                       size="sm"
                       variant="subtle"
-                      onClick={() => setEditingSceneName(scene.id)}
+                      onClick={() => {
+                        setEditingScene(scene);
+                        setSceneModalOpened(true);
+                      }}
                     >
                       <IconEdit size={16} />
                     </MantineActionIcon>

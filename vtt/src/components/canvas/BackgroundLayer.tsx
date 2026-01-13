@@ -1,10 +1,12 @@
-import { Layer, Rect } from 'react-konva';
+import { Layer, Rect, Image } from 'react-konva';
 import { Grid } from '../Grid';
+import useImage from '../../hooks/useImage';
 import type { GridSettings, Settings } from '../../types';
 
 interface BackgroundLayerProps {
   gridSettings: GridSettings;
   settings: Settings;
+  backgroundUrl?: string;
   layerVisibility: {
     grid: boolean;
     map: boolean;
@@ -18,20 +20,35 @@ interface BackgroundLayerProps {
 export function BackgroundLayer({
   gridSettings,
   settings,
+  backgroundUrl,
   layerVisibility,
 }: BackgroundLayerProps) {
   const gridWidth = gridSettings.width * gridSettings.cellSize;
   const gridHeight = gridSettings.height * gridSettings.cellSize;
+  const [bgImage] = useImage(backgroundUrl || '');
 
   return (
     <Layer listening={false}>
-      <Rect
-        x={0}
-        y={0}
-        width={gridWidth}
-        height={gridHeight}
-        fill={settings.backgroundColor}
-      />
+      {/* Background image or color */}
+      {bgImage ? (
+        <Image
+          image={bgImage}
+          x={0}
+          y={0}
+          width={gridWidth}
+          height={gridHeight}
+          listening={false}
+        />
+      ) : (
+        <Rect
+          x={0}
+          y={0}
+          width={gridWidth}
+          height={gridHeight}
+          fill={settings.backgroundColor}
+          listening={false}
+        />
+      )}
       {layerVisibility.grid && gridSettings.showGrid && (
         <Grid
           gridType={gridSettings.gridType || 'square'}

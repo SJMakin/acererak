@@ -852,6 +852,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         <BackgroundLayer
           gridSettings={gridSettings}
           settings={settings}
+          backgroundUrl={activeScene.backgroundUrl}
           layerVisibility={layerVisibility}
         />
 

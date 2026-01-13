@@ -29,6 +29,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Player cursors with throttling (10Hz max, 5px min delta)
 - [x] Client-side cursor interpolation for smooth movement
 - [x] Ping visualization with animated pulse effect
+- [x] Ping P2P broadcast and synchronization
 - [x] Join/leave notifications
 - [x] Enhanced connection state indicator (connected/syncing/disconnected/error)
 - [x] GM disconnect detection with warning modal (`GMDisconnectModal` component)
@@ -86,340 +87,504 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Shape properties (stroke color, fill color, stroke width)
 - [x] Text properties (font, size, color, alignment, background)
 
+### Scene Management
+- [x] Multi-scene architecture (scenes array, activeSceneId)
+- [x] Scene picker UI with dropdown in toolbar
+- [x] Scene creation/editing modal with grid settings per scene
+- [x] Scene duplication and management
+- [x] Background image as scene property (not canvas element)
+- [x] Per-scene grid settings, elements, and fog of war
+- [x] Global combat tracker and chat across scenes
+
 ### Persistence & Data Management
 - [x] Auto-save to IndexedDB (GM only)
 - [x] Recent games list in lobby
-- [x] Export/Import with selective categories (v2 format)
+- [x] Export/Import with selective categories (v3 format with multi-scene support)
 - [x] Merge vs replace import modes
-- [x] Token & Map Library with IndexedDB storage
+- [x] Scene import and export for sharing maps
+- [x] Token Library with IndexedDB storage (simplified from multi-type library)
 - [x] 8 default token templates (Goblin, Orc, Skeleton, etc.)
 - [x] Markdown notes on tokens, images, and standalone campaign journal
 
 ### UI/UX
 - [x] Toolbar with professional icons (Tabler)
 - [x] Drawing style controls (stroke/fill color, width)
+- [x] Image placement tool for overlays and handouts
 - [x] Undo/redo functionality
 - [x] Copy/paste elements
 - [x] Keyboard shortcuts
-- [x] Settings modal (grid, tokens, preferences)
+- [x] Settings modal (tokens, preferences)
 - [x] Preview as player mode (GM)
 - [x] Layer visibility controls (toggle grid, map, tokens, drawings, text, fog)
 - [x] Marquee/box selection (multi-select)
 - [x] Shift+click to add to selection
 - [x] Batch move/delete for multiple elements
+- [x] Game menu with Share Game option (Room ID, QR code, join link)
+- [x] Dice rolls integrated into chat timeline
 
 ---
 
-## Phase 3: Scene System & Core UX
+## Phase 3: Mobile Support & UX Polish
 
 **Status:** In Progress
 
-**Priority:** High (core functionality gaps blocking real gameplay)
-
-### 3.1 Multi-Scene Architecture ⭐ HIGH PRIORITY
-
-Refactor from single-scene to multi-scene game model.
-
-**New Data Model:**
-```typescript
-interface GameState {
-  scenes: Scene[];           // Array of scenes
-  activeSceneId: string;     // Currently displayed scene
-  players: Record<...>;      // Global - persist across scenes
-  combat?: CombatTracker;    // Global - persist across scenes
-  chatMessages?: ChatMessage[];  // Global
-  campaignNotes?: CampaignNote[];  // Global
-}
-
-interface Scene {
-  id: string;
-  name: string;
-  backgroundUrl?: string;    // THE MAP (first-class, not an element)
-  gridSettings: GridSettings; // Per-scene grid config
-  elements: CanvasElement[]; // Tokens, drawings, images, text
-  fogOfWar: FogOfWar;        // Per-scene fog
-}
-```
-
-**Key Design Decisions:**
-- **Background image** is a scene property, not an element (THE map identity)
-- **Grid settings** are per-scene (different maps need different grids)
-- **Combat tracker** is global (initiative persists when switching scenes)
-- **Tokens/elements** are per-scene (stay on their scene)
-- **Players** only see active scene (GM controls switching)
-- **Scene management** is GM-only (players don't see scene list)
-
-**Files to modify:**
-- `src/types/index.ts` - Add Scene interface, update GameState
-- `src/stores/gameStore.ts` - Refactor for multi-scene, add scene CRUD actions
-- `src/hooks/useRoom.ts` - Add `sceneSwitch` P2P action
-- `src/db/database.ts` - Update schema if needed
-
-**Complexity:** High (architectural change)
-
----
-
-### 3.2 Scene Picker UI ✅ DONE
-
-Add dropdown scene picker in toolbar for quick scene switching.
-
-**UI Components:**
-- Dropdown in toolbar showing current scene name
-- List of all scenes with click-to-switch
-- "+ New Scene" option at bottom
-- "Manage Scenes" option (opens modal for rename/delete/reorder)
-- "Duplicate Scene" option (copy current as new)
-
-**Scene Creation Modal:**
-```
-┌─────────────────────────────────────┐
-│ Create New Scene                    │
-├─────────────────────────────────────┤
-│ Scene Name: [___________________]   │
-│                                     │
-│ Background Image (optional):        │
-│ [https://...                     ]  │
-│ [Image preview if URL valid]        │
-│                                     │
-│ Grid Settings:                      │
-│ Type: [Square ▼]  Size: [32]px      │
-│ [x] Show grid   Color: [#ccc]       │
-│                                     │
-│ [ ] Copy elements from current scene│
-│                                     │
-│         [Cancel]  [Create Scene]    │
-└─────────────────────────────────────┘
-```
-
-**Grid Settings Migration:**
-- Remove grid settings from Settings modal (no longer game-wide)
-- Grid is configured per-scene in scene creation/edit modal
-- Each scene has its own `gridSettings` (type, size, color, opacity, visible)
-- Settings modal retains: token defaults, UI preferences, keybinds
-
-**Files to modify:**
-- `src/components/Toolbar.tsx` - Add scene dropdown
-- `src/components/SceneModal.tsx` - New component for create/edit scene
-- `src/components/SceneManager.tsx` - New component for list management
-
-**Complexity:** Medium (new UI components, gameStore integration)
-
----
-
-### 3.3 Image Tool ✅ DONE
-
-Add image placement tool to toolbar (for non-background images: handouts, props, overlays).
-
-**Behavior:**
-1. Click image tool icon in toolbar
-2. Click on canvas where image should be placed
-3. Modal opens asking for URL (and optional size)
-4. Image element created at click position
-5. Image properties editable in PropertyInspector sidebar
-
-**Files modified:**
-- `src/components/Toolbar.tsx` - Added image tool button with IconPhoto
-- `src/components/GameCanvas.tsx` - Added image tool click handler and ImageModal
-- `src/components/ImageModal.tsx` - Created new modal for URL/size/name input
-- `src/components/canvas/InteractiveElementsLayer.tsx` - Added ImageElement rendering for unlocked images
-
-**Complexity:** Low-Medium (follows token tool pattern)
-
----
-
-### 3.4 Dice/Chat Integration ✅ DONE
-
-Combine dice rolls into chat timeline as special message type.
-
-**Changes:**
-- Dice rolls become `ChatMessage` with `type: 'roll'`
-- ChatPanel renders roll messages with formula/result formatting
-- DiceRoller panel remains for quick-roll buttons but sends to chat
-- Remove separate `diceRolls[]` from game state (use chatMessages)
-
-**Files modified:**
-- `src/types/index.ts` - Added `type?: 'chat' | 'roll'` field to ChatMessage, plus roll-specific fields (formula, result, breakdown)
-- `src/components/DiceRoller.tsx` - Changed to send rolls as ChatMessage via addChatMessage, shows recent rolls from chat (last 10)
-- `src/components/ChatPanel.tsx` - Added special rendering for roll messages with violet background, dice icon badge, and larger result display
-- `src/stores/gameStore.ts` - Modified addDiceRoll to create roll-type chat messages, added backward compatibility in loadGame to migrate legacy diceRolls
-- `src/hooks/useRoom.ts` - Removed separate onDiceRoll handler, updated broadcastDiceRoll to send via chat, updated onChat to handle both regular and roll messages
-- `src/components/Sidebar.tsx` - Updated broadcastDiceRoll prop type from DiceRoll to ChatMessage
-
-**Complexity:** Medium (refactor two systems into one)
-
----
-
-### 3.5 Game Menu & Room Sharing ✅ DONE
-
-Fix missing room sharing after game starts + clean up Game menu.
-
-**Current Issue:** Once in-game, no way to share Room ID/QR with latecomers.
-
-**New Game Menu Structure:**
-```
-Game
-├─ Share Game
-│   ├─ Copy Room ID
-│   ├─ Show QR Code
-│   └─ Copy Join Link
-├─ ─────────────
-├─ Save/Load...      ← Combines Export/Import into one modal
-├─ Settings...
-└─ ─────────────
-└─ Leave Game
-```
-
-**Files modified:**
-- `src/components/ShareGameModal.tsx` - Created new modal with QR code, Room ID display, and copy buttons
-- `src/components/Toolbar.tsx` - Added ShareGameModal state, restructured Game menu with Share Game submenu, combined Export/Import into Save/Load... menu item
-
-**Complexity:** Low (UI reorganization)
-
----
-
-### 3.6 Bug Fixes ✅ DONE
-
-**Ping P2P visibility:**
-- Pings work locally but not across P2P sessions
-- `useRoom.ts` receives pings but doesn't expose them to GameCanvas
-- Need callback or store update so GameCanvas can render received pings
-
-**Solution Implemented:**
-- Added `pings` state and `addPing` action to game store
-- Updated `useRoom.ts` to call `addPing` when receiving pings from peers
-- Updated `GameCanvas.tsx` to use pings from game store instead of local hook
-
-**Files modified:**
-- `src/stores/gameStore.ts` - Added pings state and addPing action
-- `src/hooks/useRoom.ts` - Wire up onPing handler to call addPing
-- `src/components/GameCanvas.tsx` - Use pings from game store
-
-**Complexity:** Low (wire up existing systems)
-
----
-
-### 3.7 Library Simplification ✅ DONE
-
-Simplify Library to tokens only. Remove "scene" and "map" types.
-
-**Rationale:**
-- **Tokens** have valuable template data (HP, AC, conditions, size, notes) - worth saving
-- **Maps** are just image URLs - paste directly when creating scene background
-- **Scenes** are shared via file export (includes background, grid, elements, fog)
-- **Overlay images** are less reusable than tokens, can be in scene exports if needed
-
-**Changes:**
-- Library supports: `token` only (remove type filter entirely)
-- Remove scene-related code from libraryStore
-- Remove map-related code from libraryStore
-- Simplify LibraryPanel UI (no filter dropdown needed)
-- "Save to Library" option only appears for tokens
-
-**Files modified:**
-- `src/types/index.ts` - Simplified LibraryItemType to just 'token'
-- `src/stores/libraryStore.ts` - Removed addSceneToLibrary, addMapToLibrary, getSceneTemplates, getMapTemplates; removed unused imports (ImageElement, SceneExport, ImageTemplateData)
-- `src/components/LibraryPanel.tsx` - Removed map/scene filter options, simplified getItemIcon to only return token icon
-- `src/components/ExportImportModal.tsx` - Updated import logic to only handle token library items
-
-**Complexity:** Low (removal/simplification)
-
----
-
-### 3.8 Export/Import with Multi-Scene ✅ DONE
-
-Update export/import system to handle multi-scene game structure.
-
-**Export File Format (v3):**
-```typescript
-interface ExportFileV3 {
-  version: 3;
-  exportedAt: string;
-  gameName: string;
-  // Selective export - any combination of:
-  scenes?: Scene[];           // Selected scenes with all their data
-  combat?: CombatTracker;     // Global combat state
-  chatMessages?: ChatMessage[]; // Chat history
-  campaignNotes?: CampaignNote[]; // Notes
-  libraryItems?: LibraryItem[];  // Token/map templates
-}
-```
-
-**Export UI Changes:**
-- Tree view now shows scenes as top-level items with children:
-  ```
-  ☑ Scenes
-    ☑ Tavern (12 elements)
-    ☑ Dungeon Level 1 (8 elements)
-    ☐ Dungeon Level 2 (3 elements)
-  ☑ Combat Tracker
-  ☑ Chat History
-  ☑ Campaign Notes
-  ☑ Library (tokens/maps)
-  ```
-- "Export All" selects everything
-- "Export Current Scene" quick option
-- Individual scene selection for sharing specific maps
-
-**Import Behavior:**
-- **Scenes**: Add to game's scene list (don't replace)
-- **Combat/Chat/Notes**: Merge or replace option (as current)
-- **Library**: Merge into existing library
-- Importing scenes from another game = easy scene sharing
-
-**Scene Sharing Workflow:**
-1. GM A exports "Tavern" scene from their game
-2. GM B imports the `.vtt.json` file
-3. "Tavern" appears in GM B's scene dropdown
-4. No need for separate "scene library" - just file sharing
-
-**Files to modify:**
-- `src/types/index.ts` - Update ExportFile interface to v3
-- `src/components/ExportImportModal.tsx` - Update tree view for scenes
-- `src/stores/gameStore.ts` - Update import logic for scene merging
-
-**Complexity:** Medium (existing UI, new data structure)
-
----
-
-### 3.9 Code Review Bug Fixes ✅ DONE
-
-Fix major issues found during Phase 3 code review.
-
-**Issues Fixed:**
-
-1. **Sidebar.tsx - Stale References to Legacy Data Structure**
-   - Lines: 62, 78, 100, 108
-   - Problem: References `game?.elements` and `game?.fogOfWar` directly instead of through active scene
-   - Fix: Added `activeScene` helper and replaced all references
-
-2. **LibraryPanel.tsx - Same Legacy Data Issue**
-   - Lines: 66-73
-   - Problem: References `game.gridSettings` and `game.elements` directly
-   - Fix: Added `activeScene` helper and replaced all references
-
-3. **ExportImportModal.tsx - Scene Import Logic Bug**
-   - Lines: 442-461
-   - Problem: Calls `updateScene` before scene exists, then `loadGame` overwrites
-   - Fix: Collect all new scenes and add them in a single `loadGame` call
-
-**Files modified:**
-- `src/components/Sidebar.tsx` - Added activeScene helper, replaced game?.elements with activeScene?.elements, replaced game?.fogOfWar with activeScene?.fogOfWar
-- `src/components/LibraryPanel.tsx` - Added activeScene helper, replaced game.gridSettings with activeScene.gridSettings, replaced game.elements with activeScene.elements
-- `src/components/ExportImportModal.tsx` - Fixed scene import logic to avoid calling updateScene before scene exists
-
-**Complexity:** Low (data access refactoring)
-
----
+**Priority:** Medium
 
 ### 3.10 Mobile Support
 
 - [ ] Ensure create/join game forms fit on mobile screen
-- [ ] Touch gesture optimization (pinch zoom, two-finger pan)
+- [x] Touch gesture optimization (pinch zoom, two-finger pan)
 - [ ] Mobile-friendly toolbar layout
 - [ ] Responsive sidebar
-- [ ] Touch-friendly element selection
+- [x] Touch-friendly element selection
 
 **Complexity:** Medium (responsive design, touch events)
+
+---
+
+### 3.11 Reactive Character Sheet System
+
+A system-agnostic character sheet system using TipTap WYSIWYG editor with reactive data binding between documents, shadow state, and map tokens.
+
+**Status:** Ready for Implementation
+
+**Complexity:** High (4-6 weeks across 5 phases)
+
+---
+
+#### 3.11.1 System Overview
+
+**Core Concept:** Characters are stored as rich-text documents with embedded reactive elements. A "shadow state" JSON object syncs bidirectionally with the document, enabling fast lookups and token integration.
+
+**Key Syntax:**
+
+| Syntax | Purpose | Example |
+|--------|---------|---------|
+| `Key:: Value` | Stat declaration | `Strength:: 18` |
+| `{{ expression }}` | Reactive computed field | `{{ (Strength - 10) / 2 }}` |
+| `[Label](action: dice)` | Action button | `[Attack](action: 1d20+5)` |
+| `[Label](action: dice; cost: Var)` | Action with resource cost | `[Smite](action: 2d8; cost: Slots)` |
+| `[bar: Var/Max]` | Inline bar widget | `[bar: HP/MaxHP]` |
+| `[dots: N/Max]` | Dot tracker widget | `[dots: 3/5]` |
+| `#bar` | Project stat to token bar | `HP:: 45 #bar` |
+| `#badge` | Project stat to token badge | `AC:: 18 #badge` |
+| `![[Name]]` | Transclude external content | `![[Fireball]]` |
+
+**Data Flow:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Character Document                         │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  TipTap Editor                                          │   │
+│  │  - StatDeclaration nodes                                │   │
+│  │  - Expression nodes                                     │   │
+│  │  - ActionButton nodes                                   │   │
+│  │  - Widget nodes                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                           │                                     │
+│                           ▼                                     │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Shadow State JSON                                      │   │
+│  │  { Strength: 18, HP: 45, MaxHP: 52, AC: 18, ... }       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                           │                                     │
+└───────────────────────────┼─────────────────────────────────────┘
+                            │
+            ┌───────────────┼───────────────┐
+            ▼               ▼               ▼
+    ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+    │ Token #bar  │ │ Token #badge│ │ Combat      │
+    │ HP bar      │ │ AC display  │ │ Tracker     │
+    └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+---
+
+#### 3.11.2 Technology Stack
+
+**Required Dependencies:**
+
+| Package | Version | Purpose | Size |
+|---------|---------|---------|------|
+| `@tiptap/react` | ^2.x | Core React bindings | ~15kb |
+| `@tiptap/starter-kit` | ^2.x | Basic editor extensions | ~30kb |
+| `@tiptap/extension-mention` | ^2.x | Autocomplete foundation | ~5kb |
+| `@tiptap/pm` | ^2.x | Markdown serialization | ~10kb |
+| `expr-eval` | ^2.0 | Expression evaluation | ~12kb |
+
+**Total additional bundle:** ~70kb gzipped
+
+**Installation:**
+```bash
+npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-mention @tiptap/pm expr-eval
+```
+
+---
+
+#### 3.11.3 What Gets Removed/Deprecated
+
+**Files to Remove:**
+
+- [ ] `src/components/MarkdownEditor.tsx` - Replace with TipTap CharacterSheetEditor
+
+**Types to Deprecate (but keep for migration):**
+
+In `src/types/index.ts`, the following `TokenElement` fields become optional/deprecated:
+- `hp?: { current: number; max: number }` → Derived from shadow state
+- `ac?: number` → Derived from shadow state
+- `conditions?: string[]` → Derived from shadow state
+- `notes?: string` → Replaced by `characterId` link
+
+**Components to Modify:**
+
+- [ ] `src/components/PropertyInspector.tsx` - Remove token-specific HP/AC/conditions UI, add "Edit Character Sheet" button
+- [ ] `src/components/Token.tsx` - Read HP/AC from linked Character shadow state
+- [ ] `src/components/CombatTracker.tsx` - Read combatant HP from Character shadow state
+- [ ] `src/stores/libraryStore.ts` - Add Character library alongside token library
+
+---
+
+#### 3.11.4 Implementation Phases
+
+---
+
+##### Phase 1: Foundation - TipTap Integration
+
+**Goal:** Basic TipTap editor working in a modal, editable rich text
+
+**Tasks:**
+
+- [ ] Install TipTap dependencies
+- [ ] Create `src/components/character/CharacterSheetEditor.tsx`
+  - Basic TipTap editor with StarterKit
+  - Read-only toggle
+  - Markdown import/export via `@tiptap/pm`
+- [ ] Create `src/components/character/CharacterSheetModal.tsx`
+  - Modal wrapper for editor
+  - Save/cancel buttons
+  - Links to a Character by ID
+- [ ] Create `src/types/character.ts`
+  ```typescript
+  export interface Character {
+    id: string;
+    name: string;
+    content: string;          // TipTap JSON document
+    shadowState: Record<string, number | string>;  // Parsed stats
+    projections: {            // What shows on token
+      bar?: string;           // Key for HP bar (e.g., "HP")
+      barMax?: string;        // Key for HP max (e.g., "MaxHP")
+      badge?: string;         // Key for badge (e.g., "AC")
+    };
+    createdAt: string;
+    updatedAt: string;
+  }
+  ```
+- [ ] Add `characters: Character[]` to `GameState` in `src/types/index.ts`
+- [ ] Add `characterId?: string` to `TokenElement` interface
+- [ ] Create `src/stores/characterStore.ts` with Zustand
+  - `addCharacter(character: Character)`
+  - `updateCharacter(id: string, updates: Partial<Character>)`
+  - `deleteCharacter(id: string)`
+  - `getCharacterById(id: string)`
+
+**Acceptance Criteria:**
+- [ ] Can open modal and type rich text
+- [ ] Content persists when modal closes and reopens
+- [ ] Character data saved in game state
+
+---
+
+##### Phase 2: Custom Nodes - Stat Declarations
+
+**Goal:** `Key:: Value` syntax creates editable stat pills, shadow state syncs
+
+**Tasks:**
+
+- [ ] Create `src/components/character/extensions/StatDeclaration.ts`
+  ```typescript
+  // TipTap Node extension
+  // Matches pattern: "Key:: Value" or "Key:: Value #bar" or "Key:: Value #badge"
+  // Renders as: [Key: Value ▾] pill (clickable to edit)
+  // Parses projection tags: #bar, #badge
+  ```
+- [ ] Create `src/components/character/extensions/StatDeclarationComponent.tsx`
+  - React component for rendering the node
+  - Inline editing on click
+  - Number input for numeric values
+  - Projection tag display (#bar, #badge icons)
+- [ ] Create `src/services/shadowStateService.ts`
+  ```typescript
+  // Extracts all StatDeclaration nodes from TipTap document
+  // Returns: { key: value } object
+  // Updates Character.shadowState on document change
+  ```
+- [ ] Wire shadow state updates
+  - On editor change → parse stats → update shadowState
+  - Debounce parsing (300ms)
+- [ ] Create `src/components/character/extensions/SuggestionMenu.tsx`
+  - Autocomplete when typing `::`
+  - Suggests common stat names (HP, AC, STR, DEX, etc.)
+
+**Acceptance Criteria:**
+- [ ] Typing `Strength:: 18` creates a stat pill
+- [ ] Clicking pill allows editing value
+- [ ] Shadow state JSON updates automatically
+- [ ] Autocomplete shows suggestions when typing `::`
+
+---
+
+##### Phase 3: Custom Nodes - Expressions and Actions
+
+**Goal:** `{{ expression }}` shows computed values, `[Action](action: dice)` creates roll buttons
+
+**Tasks:**
+
+- [ ] Create `src/components/character/extensions/Expression.ts`
+  ```typescript
+  // TipTap Node extension
+  // Matches: {{ expression }}
+  // Evaluates using expr-eval with shadowState as variables
+  // Renders computed result inline
+  ```
+- [ ] Create `src/components/character/extensions/ExpressionComponent.tsx`
+  - Shows computed value
+  - Tooltip shows formula on hover
+  - Re-evaluates when shadowState changes
+- [ ] Create `src/components/character/extensions/ActionButton.ts`
+  ```typescript
+  // TipTap Node extension
+  // Matches: [Label](action: diceFormula) or [Label](action: diceFormula; cost: Variable)
+  // Renders as clickable button
+  ```
+- [ ] Create `src/components/character/extensions/ActionButtonComponent.tsx`
+  - Styled button with label
+  - On click: parse dice formula, resolve variables from shadowState
+  - Execute roll via existing dice service
+  - If `cost` specified: decrement variable in shadowState
+  - Broadcast roll to P2P
+- [ ] Integrate with `src/services/diceParser.ts`
+  - Add variable resolution: `1d20+Strength` → `1d20+18`
+  - Support `{{ expression }}` in formulas
+
+**Acceptance Criteria:**
+- [ ] `{{ (Strength - 10) / 2 }}` shows `4` when Strength is 18
+- [ ] Expression updates when stat changes
+- [ ] `[Attack](action: 1d20+5)` renders as button
+- [ ] Clicking button rolls dice and broadcasts
+- [ ] `[Smite](action: 2d8; cost: Slots)` decrements Slots on use
+
+---
+
+##### Phase 4: Custom Nodes - Widgets
+
+**Goal:** `[bar: HP/MaxHP]` and `[dots: 3/5]` render visual trackers
+
+**Tasks:**
+
+- [ ] Create `src/components/character/extensions/BarWidget.ts`
+  ```typescript
+  // Matches: [bar: Variable/MaxVariable]
+  // Renders as horizontal progress bar
+  // Clickable to adjust value
+  ```
+- [ ] Create `src/components/character/extensions/BarWidgetComponent.tsx`
+  - Progress bar visualization
+  - Click to open quick +/- buttons
+  - Color changes based on percentage (green → yellow → red)
+- [ ] Create `src/components/character/extensions/DotsWidget.ts`
+  ```typescript
+  // Matches: [dots: N/Max] or [dots: Variable/Max]
+  // Renders as filled/empty dots (like WoD games)
+  ```
+- [ ] Create `src/components/character/extensions/DotsWidgetComponent.tsx`
+  - Dot visualization (●●●○○)
+  - Click dots to fill/unfill
+  - Updates shadowState
+
+**Acceptance Criteria:**
+- [ ] `[bar: HP/MaxHP]` shows progress bar
+- [ ] Bar reflects current HP value and updates live
+- [ ] Clicking bar shows +/- controls
+- [ ] `[dots: 3/5]` shows 3 filled, 2 empty dots
+- [ ] Clicking changes dot count
+
+---
+
+##### Phase 5: Token Integration
+
+**Goal:** Tokens with `characterId` display stats from Character; bidirectional sync
+
+**Tasks:**
+
+- [ ] Modify `src/components/Token.tsx`
+  - If `characterId` set, read HP/AC from linked Character.shadowState
+  - Use `projections.bar` / `projections.barMax` / `projections.badge` keys
+  - Fall back to token's own hp/ac if no character linked
+- [ ] Add "Link Character" button to token config modal
+  - Dropdown of available Characters
+  - Or create new Character from scratch
+- [ ] Implement bidirectional sync
+  - Token damage click → update Character.shadowState → update document
+  - Character sheet edit → update shadowState → update token display
+- [ ] Modify `src/components/CombatTracker.tsx`
+  - Read HP from linked Character if available
+  - HP changes in combat update Character shadowState
+- [ ] Add P2P broadcast for character updates
+  - New message type: `character-update`
+  - Sync Character changes to all peers
+- [ ] Create `src/components/character/CharacterLibraryPanel.tsx`
+  - List saved Characters
+  - Create / duplicate / delete
+  - Import/export characters
+
+**Acceptance Criteria:**
+- [ ] Token HP bar reads from linked Character
+- [ ] Changing HP in Character Sheet updates token display
+- [ ] Clicking token damage updates Character shadowState
+- [ ] Combat tracker uses Character HP
+- [ ] Characters sync across P2P
+
+---
+
+##### Phase 6: Transclusion and Polish
+
+**Goal:** `![[SpellName]]` embeds content; templates; migration
+
+**Tasks:**
+
+- [ ] Create `src/components/character/extensions/Transclusion.ts`
+  - Matches: `![[Name]]`
+  - Looks up content from a global "snippets" library
+  - Renders embedded content inline (read-only)
+- [ ] Create `src/stores/snippetStore.ts`
+  - Store reusable text blocks (spells, abilities, rules)
+  - IndexedDB persistence
+- [ ] Create character templates
+  - D&D 5e template with standard stats
+  - OSR template (simpler)
+  - Blank template
+- [ ] Migration for existing tokens
+  - Tokens with `notes` field → offer to convert to Character
+  - Keep `hp`/`ac`/`conditions` working for unlinked tokens
+- [ ] Keyboard shortcuts in editor
+  - `/` for slash commands (insert stat, action, widget)
+  - `[[` for transclusion autocomplete
+  - `{{` for expression autocomplete
+
+**Acceptance Criteria:**
+- [ ] `![[Fireball]]` embeds spell text
+- [ ] Template picker when creating new Character
+- [ ] Existing games still work (backward compatible)
+- [ ] Slash commands work for inserting elements
+
+---
+
+#### 3.11.5 File Structure
+
+```
+src/
+├── components/
+│   └── character/
+│       ├── CharacterSheetEditor.tsx      # Main TipTap editor
+│       ├── CharacterSheetModal.tsx       # Modal wrapper
+│       ├── CharacterLibraryPanel.tsx     # Library UI
+│       └── extensions/
+│           ├── StatDeclaration.ts        # Key:: Value node
+│           ├── StatDeclarationComponent.tsx
+│           ├── Expression.ts             # {{ }} node
+│           ├── ExpressionComponent.tsx
+│           ├── ActionButton.ts           # [](action:) node
+│           ├── ActionButtonComponent.tsx
+│           ├── BarWidget.ts              # [bar:] node
+│           ├── BarWidgetComponent.tsx
+│           ├── DotsWidget.ts             # [dots:] node
+│           ├── DotsWidgetComponent.tsx
+│           ├── Transclusion.ts           # ![[]] node
+│           ├── TransclusionComponent.tsx
+│           └── SuggestionMenu.tsx        # Autocomplete UI
+├── services/
+│   └── shadowStateService.ts             # Parse document → JSON
+├── stores/
+│   ├── characterStore.ts                 # Character CRUD
+│   └── snippetStore.ts                   # Transclusion content
+└── types/
+    └── character.ts                      # Character interfaces
+```
+
+---
+
+#### 3.11.6 P2P Message Types
+
+Add to `src/types/index.ts`:
+
+```typescript
+export interface CharacterUpdateMessage {
+  type: 'character-update';
+  character: Character;
+}
+
+export interface CharacterDeleteMessage {
+  type: 'character-delete';
+  characterId: string;
+}
+```
+
+---
+
+#### 3.11.7 Testing Requirements
+
+- [ ] Unit tests for shadowStateService (parse document → JSON)
+- [ ] Unit tests for expression evaluation with variables
+- [ ] Unit tests for dice formula variable resolution
+- [ ] E2E test: create character, add stats, link to token, verify display
+- [ ] E2E test: edit character sheet, verify token updates
+- [ ] E2E test: P2P sync of character changes
+
+---
+
+#### 3.11.8 Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| TipTap bundle size | +70kb to bundle | Lazy load editor modal |
+| Expression injection | Security issue | Sandbox expr-eval, no eval() |
+| Complex parsing bugs | Bad UX | Forgiving parser, clear error messages |
+| Mobile keyboard issues | Poor mobile UX | Test extensively, add tap-to-edit shortcuts |
+| Migration breaks old games | Data loss | Keep backward compat, offer explicit migration |
+
+---
+
+### 3.12 Character Library System ✅ MERGED INTO 3.11
+
+*This feature has been merged into section 3.11 (Reactive Character Sheet System):*
+
+- **Phase 5:** CharacterLibraryPanel, token-character linking
+- **Phase 6:** Templates, transclusion snippets, import/export
+
+See [3.11.4 Phase 5](#phase-5-token-integration) and [3.11.4 Phase 6](#phase-6-transclusion-and-polish) for implementation details.
+
+---
+
+### 3.13 Arrow Key Token Movement
+
+Add keyboard controls for moving selected tokens with arrow keys.
+
+**Requirements:**
+- Arrow keys move selected token(s) by 1 grid cell
+- Shift+arrow moves by 1 pixel (fine positioning)
+- Respects grid snapping settings
+- Works with multi-select
+- Broadcasts movement to P2P
+- Integrates with undo/redo history
+
+**Files to modify:**
+- `src/hooks/useCanvasKeyboardShortcuts.ts` - Add arrow key handlers
+- `src/stores/gameStore.ts` - Ensure moveElement action supports keyboard input
+
+**Status:** Ready for implementation (straightforward feature)
+
+**Complexity:** Low (extends existing keyboard shortcut system)
 
 ---
 
