@@ -1,9 +1,16 @@
+import React from 'react';
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
-import { ReactNodeViewRenderer } from '@tiptap/react';
+import { ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { TransclusionComponent } from './TransclusionComponent';
 
 export interface TransclusionOptions {
   HTMLAttributes: Record<string, string>;
+}
+
+export interface TransclusionMarkdownToken {
+  type: 'transclusion';
+  raw: string;
+  snippetName: string;
 }
 
 declare module '@tiptap/core' {
@@ -63,7 +70,14 @@ export const Transclusion = Node.create<TransclusionOptions>({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(TransclusionComponent);
+    const TransclusionWrapper = (props: ReactNodeViewProps) => {
+      return React.createElement(TransclusionComponent, {
+        node: props.node as unknown as { attrs: { snippetName: string } },
+        updateAttributes: props.updateAttributes as (attrs: { snippetName: string }) => void,
+        readOnly: false,
+      });
+    };
+    return ReactNodeViewRenderer(TransclusionWrapper);
   },
 
   addInputRules() {
@@ -79,5 +93,19 @@ export const Transclusion = Node.create<TransclusionOptions>({
         },
       }),
     ];
+  },
+
+  parseMarkdown() {
+    return {
+      block: 'transclusion',
+      getAttrs: (token: TransclusionMarkdownToken) => ({
+        snippetName: token.snippetName,
+      }),
+    };
+  },
+
+  renderMarkdown({ node }) {
+    const snippetName = node.attrs.snippetName || '';
+    return `![[${snippetName}]]`;
   },
 });

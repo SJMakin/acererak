@@ -32,6 +32,7 @@ export function DotsWidgetComponent({
     } else {
       setParsedCurrent(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref, not a reactive dependency
   }, [node.attrs.current, shadowState]);
 
   // Parse max value (can be variable name or number)
@@ -83,6 +84,7 @@ export function DotsWidgetComponent({
         onUpdateStat(currentKey, newValue);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref
     [displayCurrent, node.attrs.current, shadowState, onUpdateStat]
   );
 

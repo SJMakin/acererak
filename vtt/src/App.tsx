@@ -61,6 +61,7 @@ function App() {
     room.broadcastStateHash();
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- specific room properties are tracked; adding room object would cause infinite re-renders
   }, [room.isHost, room.peers.length, room.broadcastStateHash]);
 
   // Show lobby if no game is loaded

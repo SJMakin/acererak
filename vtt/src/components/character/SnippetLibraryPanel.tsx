@@ -12,7 +12,7 @@ export function SnippetLibraryPanel({
   onInsertSnippet,
   isGM = false,
 }: SnippetLibraryPanelProps) {
-  const { snippets, searchSnippets, addSnippet, updateSnippet, deleteSnippet, loadFromDB } = useSnippetStore();
+  const { snippets, addSnippet, updateSnippet, deleteSnippet, loadFromDB } = useSnippetStore();
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<SnippetCategory | 'all'>('all');
   const [showEditor, setShowEditor] = useState(false);

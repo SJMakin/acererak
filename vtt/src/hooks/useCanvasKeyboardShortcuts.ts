@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import type { Point } from '../types';
+import { useGameStore } from '../stores/gameStore';
+import type { CanvasElement, Point } from '../types';
 
 interface Room {
-  broadcastElementUpdate: (element: any) => void;
+  broadcastElementUpdate: (element: CanvasElement) => void;
   broadcastElementDelete: (elementId: string) => void;
 }
 
@@ -10,7 +11,7 @@ interface Clipboard {
   copySelected: () => number | undefined;
   cutSelected: () => { count: number; deletedIds: string[] } | undefined;
   hasClipboard: () => boolean;
-  pasteElements: (mousePosition: Point) => { count: number; pastedElements: any[] } | undefined;
+  pasteElements: (mousePosition: Point) => { count: number; pastedElements: CanvasElement[] } | undefined;
 }
 
 interface UseCanvasKeyboardShortcutsOptions {
@@ -47,6 +48,11 @@ export function useCanvasKeyboardShortcuts({
         return;
       }
 
+      // Also skip if inside a contenteditable (e.g. TipTap editor)
+      if (target.isContentEditable) {
+        return;
+      }
+
       const ctrl = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
@@ -79,6 +85,55 @@ export function useCanvasKeyboardShortcuts({
           setMeasureWaypoints(prev => prev.slice(0, -1));
           return;
         }
+      }
+
+      // Arrow key token/element movement
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key) && selectedElementIds.length > 0) {
+        e.preventDefault();
+
+        const scene = useGameStore.getState().getActiveScene();
+        if (!scene) return;
+
+        const gridSize = scene.gridSettings.cellSize;
+        const snap = scene.gridSettings.snapToGrid;
+        // Shift = fine 1px movement; otherwise move by grid cell (or 10px if no snap)
+        const step = e.shiftKey ? 1 : (snap ? gridSize : 10);
+
+        let dx = 0;
+        let dy = 0;
+        if (key === 'arrowleft') dx = -step;
+        if (key === 'arrowright') dx = step;
+        if (key === 'arrowup') dy = -step;
+        if (key === 'arrowdown') dy = step;
+
+        const elements = scene.elements;
+        const updates: Array<{ id: string; updates: Partial<CanvasElement> }> = [];
+
+        for (const id of selectedElementIds) {
+          const el = elements.find(e => e.id === id);
+          if (!el || el.locked) continue;
+          updates.push({
+            id,
+            updates: { x: el.x + dx, y: el.y + dy },
+          });
+        }
+
+        if (updates.length === 0) return;
+
+        // Apply via store (handles undo history for position moves)
+        useGameStore.getState().updateElements(updates);
+
+        // Broadcast each moved element to P2P peers
+        const updatedElements = useGameStore.getState().getActiveScene()?.elements;
+        if (updatedElements) {
+          for (const u of updates) {
+            const updated = updatedElements.find(e => e.id === u.id);
+            if (updated) {
+              room.broadcastElementUpdate(updated);
+            }
+          }
+        }
+        return;
       }
 
       // Clipboard shortcuts

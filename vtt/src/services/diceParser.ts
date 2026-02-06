@@ -1,6 +1,8 @@
 // Dice formula parser for VTT
 // Supports formulas like: "2d6+3", "1d20", "4d6 drop lowest", "1d20 advantage", "1d20 disadvantage"
 
+import { Parser as ExprParser } from 'expr-eval';
+
 export interface DiceRollResult {
   formula: string;
   result: number;
@@ -51,7 +53,7 @@ export function parseDiceFormula(formula: string): ParsedFormula {
   }
 
   // Remove modifiers text for dice parsing
-  let cleanFormula = normalized
+  const cleanFormula = normalized
     .replace(/advantage|adv|disadvantage|dis/g, '')
     .replace(/drop\s+(lowest|highest)\s*\d*/g, '')
     .trim();
@@ -226,14 +228,8 @@ export function resolveVariables(
   const expressionRegex = /\{\{([^}]+)\}\}/g;
   let expressionMatch;
   
-  // We'll use expr-eval for expressions if available
-  let Parser;
-  try {
-    Parser = require('expr-eval').Parser;
-  } catch {
-    // expr-eval not available, leave expressions as-is
-    Parser = null;
-  }
+  // Use expr-eval for expression evaluation
+  const Parser = ExprParser;
   
   const expressions: Array<{ start: number; end: number; value: string; result: string }> = [];
   

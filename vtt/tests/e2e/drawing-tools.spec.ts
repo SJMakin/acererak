@@ -245,7 +245,7 @@ test.describe('Drawing Style Controls', () => {
     
     // Drawing controls should appear (color pickers, stroke width)
     // Look for color input or color swatches
-    const colorControls = page.locator('[type="color"], [class*="ColorInput"]').or(
+    const _colorControls = page.locator('[type="color"], [class*="ColorInput"]').or(
       page.locator('button[style*="background"]')
     );
     

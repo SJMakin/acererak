@@ -1,6 +1,5 @@
 // Token migration service for converting old tokens to Characters
 
-import type { Character } from '../types';
 import { useCharacterStore } from '../stores/characterStore';
 
 interface LegacyTokenData {

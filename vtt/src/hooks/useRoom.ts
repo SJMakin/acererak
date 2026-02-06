@@ -216,6 +216,7 @@ export function useRoom() {
     })();
 
     return roomId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setupRoomHandlers is defined after this callback; called inside async closure so ref is stable
   }, [myPeerId, setConnected]);
 
   // Join an existing room (as player)
@@ -287,23 +288,22 @@ export function useRoom() {
   // Setup room event handlers
   const setupRoomHandlers = useCallback((room: Room, isHost: boolean) => {
     // Define actions (names must be <=12 bytes for Trystero)
-    // Using `any` to bypass Trystero's DataPayload constraint
-    const [sendSync, onSync] = room.makeAction<any>('sync');
-    const [sendElementUpdate, onElementUpdate] = room.makeAction<any>('elUpdate');
-    const [sendElementDelete, onElementDelete] = room.makeAction<any>('elDelete');
-    const [sendCursor, onCursor] = room.makeAction<any>('cursor');
-    const [sendPing, onPing] = room.makeAction<any>('ping');
-    const [sendPlayerJoin, onPlayerJoin] = room.makeAction<any>('plyJoin');
-    const [sendPlayerLeave, onPlayerLeave] = room.makeAction<any>('plyLeave');
-    const [sendRequestSync, onRequestSync] = room.makeAction<any>('reqSync');
-    const [sendFogUpdate, onFogUpdate] = room.makeAction<any>('fogUpdate');
-    const [sendStateHash, onStateHash] = room.makeAction<any>('stateHash');
-    const [sendGridUpdate, onGridUpdate] = room.makeAction<any>('gridUpd');
-    const [sendChat, onChat] = room.makeAction<any>('chat');
-    const [sendSceneSwitch, onSceneSwitch] = room.makeAction<any>('sceneSwi');
-    const [sendSceneUpdate, onSceneUpdate] = room.makeAction<any>('sceneUpd');
-    const [sendCharacterUpdate, onCharacterUpdate] = room.makeAction<any>('charUpd');
-    const [sendCharacterDelete, onCharacterDelete] = room.makeAction<any>('charDel');
+    const [sendSync, onSync] = room.makeAction<GameState>('sync');
+    const [sendElementUpdate, onElementUpdate] = room.makeAction<CanvasElement>('elUpdate');
+    const [sendElementDelete, onElementDelete] = room.makeAction<string>('elDelete');
+    const [sendCursor, onCursor] = room.makeAction<Point>('cursor');
+    const [sendPing, onPing] = room.makeAction<{ position: Point; color: string }>('ping');
+    const [sendPlayerJoin, onPlayerJoin] = room.makeAction<Player>('plyJoin');
+    const [sendPlayerLeave, onPlayerLeave] = room.makeAction<string>('plyLeave');
+    const [sendRequestSync, onRequestSync] = room.makeAction<null>('reqSync');
+    const [sendFogUpdate, onFogUpdate] = room.makeAction<{ enabled: boolean; revealed: Point[][] }>('fogUpdate');
+    const [sendStateHash, onStateHash] = room.makeAction<string>('stateHash');
+    const [sendGridUpdate, onGridUpdate] = room.makeAction<Partial<GridSettings>>('gridUpd');
+    const [sendChat, onChat] = room.makeAction<ChatMessage>('chat');
+    const [sendSceneSwitch, onSceneSwitch] = room.makeAction<string>('sceneSwi');
+    const [sendSceneUpdate, onSceneUpdate] = room.makeAction<Scene>('sceneUpd');
+    const [sendCharacterUpdate, onCharacterUpdate] = room.makeAction<Character>('charUpd');
+    const [sendCharacterDelete, onCharacterDelete] = room.makeAction<string>('charDel');
 
     // Store senders
     actionsRef.current = {

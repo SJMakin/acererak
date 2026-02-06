@@ -63,7 +63,7 @@ export function TransclusionComponent({
             {node.content?.map((child, i) => renderNode(child, i))}
           </p>
         );
-      case 'heading':
+      case 'heading': {
         const level = (node.attrs?.level as number) || 2;
         const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements;
         return (
@@ -71,7 +71,8 @@ export function TransclusionComponent({
             {node.content?.map((child, i) => renderNode(child, i))}
           </HeadingTag>
         );
-      case 'text':
+      }
+      case 'text': {
         const text = node.text || '';
         if (node.marks) {
           return (
@@ -87,6 +88,7 @@ export function TransclusionComponent({
           );
         }
         return <span key={index}>{text}</span>;
+      }
       default:
         return null;
     }

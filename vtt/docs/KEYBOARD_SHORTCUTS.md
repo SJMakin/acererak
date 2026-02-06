@@ -20,6 +20,10 @@ The VTT now supports comprehensive keyboard shortcuts and a full undo/redo syste
 - **Space** (hold) - Temporarily activate Pan tool, releases back to previous tool when released
 - **Mouse Wheel** - Zoom in/out
 
+### Element Movement
+- **Arrow Keys** - Move selected element(s) by 1 grid cell (10px if grid snap is off)
+- **Shift+Arrow Keys** - Move selected element(s) by 1 pixel (fine positioning)
+
 ### Actions
 - **Delete** - Remove selected element
 - **Escape** - Deselect all / Cancel current action / Return to Select tool

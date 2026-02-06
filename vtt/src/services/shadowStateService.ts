@@ -125,7 +125,7 @@ export function parseStatDeclarationText(text: string): { key: string; value: st
   
   if (match) {
     result.key = match[1].trim();
-    let valueAndProjections = match[2].trim();
+    const valueAndProjections = match[2].trim();
     
     // Extract projection tags
     const projectionMatches = valueAndProjections.matchAll(/#(\w+)/g);

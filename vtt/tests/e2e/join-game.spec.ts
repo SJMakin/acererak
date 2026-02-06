@@ -415,7 +415,7 @@ test.describe('Join Game - Deployed Site Tests', () => {
 });
 
 // Helper function to wait for P2P connection with logging
-async function waitForP2PConnection(
+async function _waitForP2PConnection(
   page: Page,
   description: string,
   timeout: number = 90000

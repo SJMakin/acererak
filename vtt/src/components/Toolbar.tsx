@@ -77,15 +77,18 @@ interface ToolbarProps {
   };
 }
 
+// Icon component type used across tool definitions
+type IconComponent = React.ComponentType<{ size?: number | string }>;
+
 // Basic tools always visible
-const basicTools: { id: ToolType; icon: React.ComponentType<any>; label: string; shortcut?: string }[] = [
+const basicTools: { id: ToolType; icon: IconComponent; label: string; shortcut?: string }[] = [
   { id: 'select', icon: IconPointer, label: 'Select', shortcut: 'S' },
   { id: 'pan', icon: IconHandGrab, label: 'Pan', shortcut: 'Space' },
   { id: 'token', icon: IconUserCircle, label: 'Place Token', shortcut: 'N' },
 ];
 
 // Drawing tools in dropdown
-const drawingTools: { id: ToolType; icon: React.ComponentType<any>; label: string; shortcut?: string }[] = [
+const drawingTools: { id: ToolType; icon: IconComponent; label: string; shortcut?: string }[] = [
   { id: 'draw-freehand', icon: IconPencil, label: 'Freehand Draw', shortcut: 'D' },
   { id: 'draw-line', icon: IconLineDashed, label: 'Draw Line', shortcut: 'L' },
   { id: 'draw-rectangle', icon: IconSquare, label: 'Draw Rectangle', shortcut: 'R' },
@@ -96,20 +99,20 @@ const drawingTools: { id: ToolType; icon: React.ComponentType<any>; label: strin
 ];
 
 // Utility tools
-const utilityTools: { id: ToolType; icon: React.ComponentType<any>; label: string; shortcut?: string }[] = [
+const utilityTools: { id: ToolType; icon: IconComponent; label: string; shortcut?: string }[] = [
   { id: 'text', icon: IconTypography, label: 'Add Text', shortcut: 'T' },
   { id: 'image', icon: IconPhoto, label: 'Place Image', shortcut: 'I' },
   { id: 'measure', icon: IconRuler, label: 'Measure Distance', shortcut: 'M' },
   { id: 'ping', icon: IconMapPin, label: 'Ping Location', shortcut: 'P' },
 ];
 
-const dmTools: { id: ToolType; icon: React.ComponentType<any>; label: string }[] = [
+const dmTools: { id: ToolType; icon: IconComponent; label: string }[] = [
   { id: 'fog-reveal', icon: IconEye, label: 'Reveal Fog' },
   { id: 'fog-hide', icon: IconEyeOff, label: 'Hide Area' },
 ];
 
 // Area of Effect template tools
-const aoeTools: { id: ToolType; icon: React.ComponentType<any>; label: string; description: string }[] = [
+const aoeTools: { id: ToolType; icon: IconComponent; label: string; description: string }[] = [
   { id: 'aoe-circle', icon: IconTarget, label: 'Circle AOE', description: 'Drag to set radius' },
   { id: 'aoe-cone', icon: IconCone, label: 'Cone AOE', description: 'Fan shape with curved arc' },
   { id: 'aoe-triangle', icon: IconTriangle, label: 'Triangle AOE', description: 'Simple triangle (D&D RAW)' },

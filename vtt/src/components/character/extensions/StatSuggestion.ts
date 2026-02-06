@@ -1,25 +1,7 @@
-import { Extension, Editor } from '@tiptap/core';
+import { Extension } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
-import { SuggestionMenu, STAT_SUGGESTIONS, SuggestionItem } from './SuggestionMenu';
-
-interface CommandProps {
-  editor: Editor;
-  range: { from: number; to: number };
-  item: SuggestionItem;
-}
-
-interface SuggestionConfig {
-  char: string;
-  command: (props: CommandProps) => void;
-  items: (options: { query: string }) => SuggestionItem[];
-  render: () => {
-    onStart: (props: { editor: Editor; clientRect: () => DOMRect }) => void;
-    onUpdate: (props: { editor: Editor }) => void;
-    onKeyDown: (props: { event: KeyboardEvent }) => boolean;
-    onExit: () => void;
-  };
-}
+import { SuggestionMenu, STAT_SUGGESTIONS } from './SuggestionMenu';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -71,7 +53,6 @@ export const StatSuggestion = Extension.create({
               const { editor, clientRect } = props;
               if (!clientRect || !editor) return;
 
-              const rect = clientRect();
               popup = {
                 destroy: () => {
                   component?.destroy();

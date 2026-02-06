@@ -278,6 +278,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   }, []);
 
   // Handle pinch-zoom gesture
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- @use-gesture/react pinch state has complex internal types
   const handlePinch = useCallback((state: any) => {
     const { touches, first, memo } = state;
     
@@ -543,7 +544,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       // For line/rect/circle, just set start and end as same initially
       setCurrentLine([x, y, x, y]);
     }
-  }, [isDrawingTool, selectedTool, selectElement, room, viewportOffset, viewportScale]);
+  }, [isDrawingTool, selectedTool, selectElement, room, viewportOffset, viewportScale, addPing, finishPolygon, polygonPoints.length]);
 
   // Handle mouse/touch move for drawing
   const handleMouseMoveForDrawing = useCallback((_e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -605,7 +606,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       // Line/Rectangle/Circle: update end point only (preserves start point)
       setCurrentLine([drawStartPoint.x, drawStartPoint.y, x, y]);
     }
-  }, [isDrawingTool, selectedTool, drawStartPoint, measureWaypoints, room, viewportOffset, viewportScale]);
+  }, [isDrawingTool, selectedTool, drawStartPoint, measureWaypoints, room, viewportOffset, viewportScale, isFogTool, marqueeStart]);
 
   // Handle mouse up for drawing
   const handleMouseUp = useCallback((e?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -733,13 +734,14 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       } else {
         // Use shape creators for all drawing tools
         switch (selectedTool) {
-          case 'draw-freehand':
+          case 'draw-freehand': {
             const freehandPoints: Point[] = [];
             for (let i = 0; i < currentLine.length; i += 2) {
               freehandPoints.push({ x: currentLine[i], y: currentLine[i + 1] });
             }
             newElement = createFreehandShape(freehandPoints, style, zIndex);
             break;
+          }
           case 'draw-line':
             newElement = createLineShape(startX, startY, endX, endY, style, zIndex);
             break;
@@ -770,20 +772,21 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           case 'aoe-square':
             newElement = createAoeSquareShape(startX, startY, endX, endY, zIndex);
             break;
-          default:
+          default: {
             // Fallback to freehand
             const fallbackPoints: Point[] = [];
             for (let i = 0; i < currentLine.length; i += 2) {
               fallbackPoints.push({ x: currentLine[i], y: currentLine[i + 1] });
             }
             newElement = createFreehandShape(fallbackPoints, style, zIndex);
+          }
         }
       }
       
       // Only add shape elements (not fog operations)
       if (newElement) {
         const id = addElement(newElement);
-        room.broadcastElementUpdate({ ...newElement, id } as any);
+        room.broadcastElementUpdate({ ...newElement, id } as CanvasElement);
       }
     }
     

@@ -44,7 +44,7 @@ test.describe('Canvas Interactions', () => {
     const canvas = page.locator('canvas').first();
     
     // Get initial position
-    const initialBox = await canvas.boundingBox();
+    const _initialBox = await canvas.boundingBox();
     
     // Perform drag on canvas (simulating pan)
     await canvas.hover({ position: { x: 100, y: 100 } });

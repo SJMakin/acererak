@@ -22,6 +22,7 @@ import { useLibraryStore } from '../stores/libraryStore';
 import type {
   GameState,
   CanvasElement,
+  TokenElement,
   LibraryItem,
   CampaignNote,
   GameExport,
@@ -405,13 +406,13 @@ export default function ExportImportModal({
   };
   
   // Initialize selection based on import data
-  const initializeImportSelection = (data: any) => {
+  const initializeImportSelection = (data: EnhancedExport | EnhancedExportV2 | Record<string, unknown>) => {
     let enhancedData: EnhancedExport;
     
-    if (data.version === 1 && data.game) {
+    if ('version' in data && data.version === 1 && 'game' in data) {
       // v1 format - already converted in handleFileSelect
       return;
-    } else if (data.version === 2) {
+    } else if ('version' in data && data.version === 2) {
       // v2 format - already converted in handleFileSelect
       return;
     } else {
@@ -507,7 +508,7 @@ export default function ExportImportModal({
         if (!existing && item.type === 'token') {
           // Add to library store (using direct method)
           await libraryStore.addTokenToLibrary(
-            item.data as any,
+            item.data as TokenElement,
             item.name,
             item.description,
             item.tags

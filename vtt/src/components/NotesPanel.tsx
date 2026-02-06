@@ -311,7 +311,7 @@ export default function NotesPanel() {
                         </Text>
                       </Group>
                       <Text size="xs" c="dimmed" lineClamp={1}>
-                        {note.content.replace(/[#*_`>\[\]]/g, '').slice(0, 80)}
+                        {note.content.replace(/[#*_`>[\]]/g, '').slice(0, 80)}
                         {note.content.length > 80 ? '...' : ''}
                       </Text>
                     </Box>

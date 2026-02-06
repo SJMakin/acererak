@@ -2,6 +2,13 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { DotsWidgetComponent } from './DotsWidgetComponent';
 
+export interface DotsWidgetMarkdownToken {
+  type: 'dotsWidget';
+  raw: string;
+  current: string;
+  max: string;
+}
+
 declare module '@tiptap/core' {
   interface ReactNodeViewProps {
     shadowState?: Record<string, number | string>;
@@ -80,7 +87,7 @@ export const DotsWidget = Node.create({
   addInputRules() {
     return [
       {
-        find: /\[dots:\s*([^\/]+)\/([^\]]+)\]/g,
+        find: /\[dots:\s*([^/]+)\/([^\]]+)\]/g,
         handler: ({ state, match, range }) => {
           const current = match[1].trim();
           const max = match[2].trim();
@@ -92,5 +99,21 @@ export const DotsWidget = Node.create({
         undoable: true,
       },
     ];
+  },
+
+  parseMarkdown() {
+    return {
+      block: 'dotsWidget',
+      getAttrs: (token: DotsWidgetMarkdownToken) => ({
+        current: token.current,
+        max: token.max,
+      }),
+    };
+  },
+
+  renderMarkdown({ node }) {
+    const current = node.attrs.current || '0';
+    const max = node.attrs.max || '5';
+    return `[dots: ${current}/${max}]`;
   },
 });

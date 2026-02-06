@@ -15,7 +15,7 @@ test.describe('Combat Tracker', () => {
 
   test('should show combat tracker in sidebar', async ({ page }) => {
     // Look for tabs in sidebar
-    const tabs = page.locator('[role="tab"]');
+    const _tabs = page.locator('[role="tab"]');
     
     // There might be a combat or initiative tab
     // Or combat controls might be in GM Tools or separate section
@@ -27,7 +27,7 @@ test.describe('Combat Tracker', () => {
     // Look for "No combat active" or similar message
     
     // Try to find combat-related UI
-    const noCombatMessage = page.getByText(/No combat active|Start Combat/i);
+    const _noCombatMessage = page.getByText(/No combat active|Start Combat/i);
     
     // Message should be visible somewhere
     await page.waitForTimeout(1000);
@@ -147,7 +147,7 @@ test.describe('Combat Tracker', () => {
     const nextButton = page.getByRole('button', { name: /Next/i });
     
     if (await nextButton.count() > 0) {
-      const initialRound = page.getByText(/Round \d+/i);
+      const _initialRound = page.getByText(/Round \d+/i);
       
       // Click next
       await nextButton.first().click();
@@ -172,7 +172,7 @@ test.describe('Combat Tracker', () => {
     // After starting combat with combatants, should show whose turn it is
     
     // Look for "Current Turn" or "Active" badge
-    const currentTurnIndicator = page.getByText(/Current Turn|Active/i);
+    const _currentTurnIndicator = page.getByText(/Current Turn|Active/i);
     
     // This would be visible after combat starts
     await page.waitForTimeout(1000);
@@ -182,8 +182,8 @@ test.describe('Combat Tracker', () => {
     // This test would add a combatant and update their HP
     
     // Look for HP controls (+ and - buttons)
-    const hpDecrease = page.locator('button').filter({ hasText: /-/ });
-    const hpIncrease = page.locator('button').filter({ hasText: /\+/ });
+    const _hpDecrease = page.locator('button').filter({ hasText: /-/ });
+    const _hpIncrease = page.locator('button').filter({ hasText: /\+/ });
     
     // These controls would be near HP display
     await page.waitForTimeout(1000);
@@ -194,7 +194,7 @@ test.describe('Combat Tracker', () => {
     // HP bar should be visible in combat tracker
     
     // Look for visual HP indicator (progress bar or similar)
-    const hpDisplay = page.getByText(/HP:/i);
+    const _hpDisplay = page.getByText(/HP:/i);
     
     await page.waitForTimeout(1000);
   });
@@ -246,7 +246,7 @@ test.describe('Combat Tracker', () => {
     const removeCombatantButton = page.locator('button').filter({ hasText: /🗑|Delete|Remove/ });
     
     if (await removeCombatantButton.count() > 0) {
-      const initialCount = await removeCombatantButton.count();
+      const _initialCount = await removeCombatantButton.count();
       await removeCombatantButton.last().click();
       await page.waitForTimeout(500);
     }
@@ -308,7 +308,7 @@ test.describe('Combat Tracker', () => {
     // After adding combatant, their initiative should display as badge
     
     // Look for initiative badges (numbers in colored badges)
-    const initiativeBadges = page.locator('[class*="Badge"]').filter({ hasText: /^\d+$/ });
+    const _initiativeBadges = page.locator('[class*="Badge"]').filter({ hasText: /^\d+$/ });
     
     await page.waitForTimeout(1000);
   });
@@ -362,7 +362,7 @@ test.describe('Combat Tracker - Integration', () => {
     // As GM, all combat controls should be available
     // Start Combat button should be visible
     
-    const startButton = page.getByRole('button', { name: /Start Combat/i });
+    const _startButton = page.getByRole('button', { name: /Start Combat/i });
     
     // GM should see combat controls
     await page.waitForTimeout(1000);

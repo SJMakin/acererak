@@ -1,6 +1,6 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type Konva from 'konva';
-import type { Point, CanvasElement, ShapeElement, TokenElement, TextElement, ImageElement } from '../types';
+import type { Point, CanvasElement, Scene, ShapeElement, TokenElement, TextElement, ImageElement } from '../types';
 import {
   createFreehandShape,
   createLineShape,
@@ -42,7 +42,7 @@ interface UseDrawingHandlersProps {
   drawingFillColor: string;
   drawingFillEnabled: boolean;
   drawingStrokeWidth: number;
-  game: { scenes: any[]; activeSceneId: string } | null;
+  game: { scenes: Scene[]; activeSceneId: string } | null;
   currentLine: number[];
   setCurrentLine: Dispatch<SetStateAction<number[]>>;
   setDrawStartPoint: Dispatch<SetStateAction<Point | null>>;
@@ -479,13 +479,14 @@ export function useDrawingHandlers({
       } else {
         // Use shape creators for all drawing tools
         switch (selectedTool) {
-          case 'draw-freehand':
+          case 'draw-freehand': {
             const freehandPoints: Point[] = [];
             for (let i = 0; i < currentLine.length; i += 2) {
               freehandPoints.push({ x: currentLine[i], y: currentLine[i + 1] });
             }
             newElement = createFreehandShape(freehandPoints, style, zIndex);
             break;
+          }
           case 'draw-line':
             newElement = createLineShape(startX, startY, endX, endY, style, zIndex);
             break;
@@ -543,20 +544,21 @@ export function useDrawingHandlers({
           case 'aoe-square':
             newElement = createAoeSquareShape(startX, startY, endX, endY, zIndex);
             break;
-          default:
+          default: {
             // Fallback to freehand
             const fallbackPoints: Point[] = [];
             for (let i = 0; i < currentLine.length; i += 2) {
               fallbackPoints.push({ x: currentLine[i], y: currentLine[i + 1] });
             }
             newElement = createFreehandShape(fallbackPoints, style, zIndex);
+          }
         }
       }
 
       // Only add shape elements (not fog operations)
       if (newElement) {
         const id = addElement(newElement);
-        room.broadcastElementUpdate({ ...newElement, id } as any);
+        room.broadcastElementUpdate({ ...newElement, id } as CanvasElement);
       }
     }
 

@@ -22,7 +22,7 @@ interface MarkdownEditorProps {
 function parseMarkdown(markdown: string): string {
   if (!markdown) return '';
   
-  let html = markdown
+  const html = markdown
     // Escape HTML
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -138,5 +138,5 @@ export default function MarkdownEditor({
   );
 }
 
-// Export the markdown parser for use elsewhere
+// eslint-disable-next-line react-refresh/only-export-components -- utility function co-located with component
 export { parseMarkdown };

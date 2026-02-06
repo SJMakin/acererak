@@ -28,8 +28,6 @@ export function ExpressionComponent({
   const { formula } = node.attrs;
   const [result, setResult] = useState<string>('?');
   const [showTooltip, setShowTooltip] = useState(false);
-  const parser = new Parser();
-
   const evaluateFormula = useCallback((formulaText: string, context: ShadowState): string => {
     if (!formulaText.trim()) {
       return '?';
@@ -37,6 +35,7 @@ export function ExpressionComponent({
 
     try {
       // Sandbox: only allow safe operations
+      const parser = new Parser();
       const expr = parser.parse(formulaText);
       
       // Prepare variables from shadow state

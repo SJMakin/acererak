@@ -26,13 +26,10 @@ export function Token({
   const height = element.height * cellSize;
 
   // Get linked character data
-  const character = element.characterId 
+  const character = element.characterId
     ? useCharacterStore.getState().getCharacterById(element.characterId)
     : undefined;
-  
-  // Subscribe to character store updates for reactive updates
-  const characterStore = useCharacterStore();
-  
+
   // Determine display name: character name if linked, otherwise token name
   const displayName = character?.name || element.name;
 

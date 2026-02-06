@@ -32,6 +32,7 @@ export function BarWidgetComponent({
     } else {
       setParsedCurrent(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref, not a reactive dependency
   }, [node.attrs.current, shadowState]);
 
   // Parse max value (can be variable name or number)
@@ -73,6 +74,7 @@ export function BarWidgetComponent({
       onUpdateStat(currentKey, newValue);
     }
     setShowControls(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref
   }, [effectiveCurrent, node.attrs.current, shadowState, onUpdateStat]);
 
   const handleDecrement = useCallback(() => {
@@ -84,6 +86,7 @@ export function BarWidgetComponent({
       onUpdateStat(currentKey, newValue);
     }
     setShowControls(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref
   }, [effectiveCurrent, node.attrs.current, shadowState, onUpdateStat]);
 
   return (

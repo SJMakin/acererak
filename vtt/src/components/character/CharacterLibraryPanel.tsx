@@ -14,7 +14,7 @@ export function CharacterLibraryPanel({
   onSelectCharacter,
   onLinkToToken,
 }: CharacterLibraryPanelProps) {
-  const { characters, deleteCharacter, addCharacter, updateCharacter } = useCharacterStore();
+  const { characters, deleteCharacter, addCharacter } = useCharacterStore();
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -68,7 +68,6 @@ export function CharacterLibraryPanel({
 
   const handleDuplicate = (character: Character, e: React.MouseEvent) => {
     e.stopPropagation();
-    const now = new Date().toISOString();
     addCharacter({
       name: character.name + ' (Copy)',
       content: character.content,

@@ -32,8 +32,6 @@ interface CharacterStore {
   setP2PHandlers: (onUpdate: (character: Character) => void, onDelete: (characterId: string) => void) => void;
 }
 
-const CHARACTERS_STORAGE_KEY = 'vtt-characters';
-
 export const useCharacterStore = create<CharacterStore>((set, get) => ({
   characters: [],
   isLoading: false,

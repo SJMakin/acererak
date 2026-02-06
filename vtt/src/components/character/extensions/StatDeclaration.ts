@@ -1,9 +1,18 @@
+import React from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
-import { ReactNodeViewRenderer } from '@tiptap/react';
+import { ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { StatDeclarationComponent } from './StatDeclarationComponent';
 
 export interface StatDeclarationOptions {
   HTMLAttributes: Record<string, string>;
+}
+
+export interface StatDeclarationMarkdownToken {
+  type: 'statDeclaration';
+  raw: string;
+  key: string;
+  value: string;
+  projections: string[];
 }
 
 declare module '@tiptap/core' {
@@ -113,6 +122,51 @@ export const StatDeclaration = Node.create<StatDeclarationOptions>({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(StatDeclarationComponent);
+    const StatDeclarationWrapper = (props: ReactNodeViewProps) => {
+      return React.createElement(StatDeclarationComponent, {
+        node: props.node as unknown as { attrs: { key: string; value: string | number; projections: string[] } },
+        updateAttributes: props.updateAttributes as (attrs: { key?: string; value?: string | number; projections?: string[] }) => void,
+        selected: props.selected,
+        extension: props.extension,
+      });
+    };
+    return ReactNodeViewRenderer(StatDeclarationWrapper);
+  },
+
+  addInputRules() {
+    return [
+      {
+        find: /(\w+)::\s*([^#\n]+)(?:\s*#(\w+))*/g,
+        handler: ({ state, match, range }) => {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          const projections = match[3] ? [match[3]] : [];
+          const start = range.from;
+          const end = range.to;
+
+          state.tr.replaceWith(start, end, this.type.create({ key, value, projections }));
+        },
+        undoable: true,
+      },
+    ];
+  },
+
+  parseMarkdown() {
+    return {
+      block: 'statDeclaration',
+      getAttrs: (token: StatDeclarationMarkdownToken) => ({
+        key: token.key,
+        value: token.value,
+        projections: token.projections,
+      }),
+    };
+  },
+
+  renderMarkdown({ node }) {
+    const key = node.attrs.key || '';
+    const value = node.attrs.value || '';
+    const projections = (node.attrs.projections as string[]) || [];
+    const projectionsPart = projections.length > 0 ? projections.map((p: string) => ` #${p}`).join('') : '';
+    return `${key}:: ${value}${projectionsPart}`;
   },
 });

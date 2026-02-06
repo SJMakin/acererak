@@ -1,6 +1,6 @@
 // Character types for the Reactive Character Sheet System
 
-export interface Character {
+export type Character = {
   id: string;
   name: string;
   content: string; // TipTap JSON document
@@ -13,7 +13,7 @@ export interface Character {
   };
   createdAt: string;
   updatedAt: string;
-}
+};
 
 // P2P message types for character updates (prepared for later phases)
 export interface CharacterUpdateMessage {

@@ -1,0 +1,38 @@
+/* Transclusion Component Styles */
+
+.transclusion-wrapper {
+  position: relative;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 123, 255, 0.5);
+  border-radius: 4px;
+  background: rgba(0, 123, 255, 0.1);
+  user-select: none;
+}
+
+.transclusion-wrapper.selected {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
+}
+
+.transclusion-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.transclusion-icon {
+  opacity: 0.6;
+  font-size: 0.8em;
+}
+
+.transclusion-text {
+  font-family: 'Courier New', monospace;
+  color: #4dabf7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transclusion-wrapper .ProseMirror-selectednode {
+  outline: 2px solid #0066cc;
+}

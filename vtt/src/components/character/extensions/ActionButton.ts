@@ -1,5 +1,7 @@
+import React from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
-import { ReactNodeViewRenderer } from '@tiptap/react';
+import { ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { ActionButtonComponent } from './ActionButtonComponent';
 
 export interface ActionButtonOptions {
@@ -11,6 +13,24 @@ export interface ActionButtonAttributes {
   action: string;
   cost?: string;
 }
+
+export interface ActionButtonMarkdownToken {
+  type: 'actionButton';
+  raw: string;
+  label: string;
+  action: string;
+  cost?: string;
+}
+
+// Wrapper component to bridge ReactNodeViewProps to our custom component
+const ActionButtonWrapper = (props: ReactNodeViewProps) => {
+  return React.createElement(ActionButtonComponent, {
+    node: props.node as ProseMirrorNode & { attrs: { label: string; action: string; cost?: string } },
+    updateAttributes: props.updateAttributes as (attrs: { label?: string; action?: string; cost?: string }) => void,
+    selected: props.selected,
+    extension: props.extension,
+  });
+};
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -94,7 +114,54 @@ export const ActionButton = Node.create<ActionButtonOptions>({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(ActionButtonComponent);
+    return ReactNodeViewRenderer(ActionButtonWrapper);
+  },
+
+  addInputRules() {
+    return [
+      {
+        find: /\[([^\]]+)\]\(action:\s*([^)]+)\)/g,
+        handler: ({ state, match, range }) => {
+          const label = match[1].trim();
+          const actionPart = match[2].trim();
+          
+          // Check for cost parameter
+          const costMatch = actionPart.match(/;\s*cost:\s*(\w+)/i);
+          let action = actionPart;
+          let cost: string | undefined;
+          
+          if (costMatch) {
+            action = actionPart.replace(/;\s*cost:\s*\w+/i, '').trim();
+            cost = costMatch[1];
+          }
+          
+          const start = range.from;
+          const end = range.to;
+
+          state.tr.replaceWith(start, end, this.type.create({ label, action, cost }));
+        },
+        undoable: true,
+      },
+    ];
+  },
+
+  parseMarkdown() {
+    return {
+      block: 'actionButton',
+      getAttrs: (token: ActionButtonMarkdownToken) => ({
+        label: token.label,
+        action: token.action,
+        cost: token.cost,
+      }),
+    };
+  },
+
+  renderMarkdown({ node }) {
+    const label = node.attrs.label || 'Action';
+    const action = node.attrs.action || '';
+    const cost = node.attrs.cost;
+    const costPart = cost ? `; cost: ${cost}` : '';
+    return `[${label}](action: ${action}${costPart})`;
   },
 });
 

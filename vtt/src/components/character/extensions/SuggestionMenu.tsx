@@ -17,6 +17,7 @@ export interface SuggestionMenuRef {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant co-located with component
 export const STAT_SUGGESTIONS: SuggestionItem[] = [
   // Core Stats (D&D 5e)
   { label: 'HP', description: 'Current hit points', category: 'resource' },

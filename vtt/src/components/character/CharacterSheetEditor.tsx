@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from '@tiptap/markdown';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { StatDeclaration } from './extensions/StatDeclaration';
 import { Expression } from './extensions/Expression';
@@ -7,17 +8,13 @@ import { ActionButton } from './extensions/ActionButton';
 import { BarWidget } from './extensions/BarWidget';
 import { DotsWidget } from './extensions/DotsWidget';
 import { Transclusion } from './extensions/Transclusion';
-import { debouncedParse, parseShadowState, type ShadowState } from '../../services/shadowStateService';
-import { useGameStore } from '../../stores/gameStore';
+import { parseShadowState, type ShadowState } from '../../services/shadowStateService';
 import { useSnippetStore } from '../../stores/snippetStore';
-import type { ChatMessage } from '../../types';
 import './CharacterSheetEditor.css';
 
 interface CharacterSheetEditorProps {
   content: string;
   onChange: (content: string, shadowState?: ShadowState) => void;
-  onUpdateStat?: (key: string, newValue: string | number) => void;
-  onBroadcastRoll?: (message: ChatMessage) => void;
   readOnly?: boolean;
   showMarkdownPanel?: boolean;
   shadowState?: ShadowState;
@@ -34,8 +31,6 @@ interface CommandItem {
 export function CharacterSheetEditor({
   content,
   onChange,
-  onUpdateStat,
-  onBroadcastRoll,
   readOnly = false,
   showMarkdownPanel = false,
   shadowState: externalShadowState,
@@ -116,6 +111,7 @@ export function CharacterSheetEditor({
           levels: [1, 2, 3],
         },
       }),
+      Markdown.configure(),
       StatDeclaration.configure({
         HTMLAttributes: {
           class: 'stat-declaration',
@@ -299,123 +295,16 @@ export function CharacterSheetEditor({
     [editor]
   );
 
-  const insertTransclusion = useCallback(
-    (snippetName: string) => {
-      if (!editor) return;
-      editor.commands.insertTransclusion({ snippetName });
-    },
-    [editor]
-  );
-
   const exportMarkdown = useCallback(() => {
     if (!editor) return;
-    const json = editor.getJSON();
-    let markdown = '';
-    
-    json.content?.forEach((node) => {
-      const nodeAny = node as { type: string; text?: string; attrs?: Record<string, unknown>; content?: unknown[] };
-      switch (nodeAny.type) {
-        case 'paragraph':
-          markdown += nodeAny.text || '' + '\n\n';
-          break;
-        case 'heading':
-          const level = (nodeAny.attrs?.level as number) || 1;
-          markdown += '#'.repeat(level) + ' ' + (nodeAny.text || '') + '\n\n';
-          break;
-        case 'bulletList':
-          markdown += '- List item\n';
-          break;
-        case 'orderedList':
-          markdown += '1. List item\n';
-          break;
-        case 'blockquote':
-          markdown += '> Quote\n\n';
-          break;
-        case 'codeBlock':
-          markdown += '```\ncode\n```\n\n';
-          break;
-        case 'horizontalRule':
-          markdown += '---\n\n';
-          break;
-        case 'statDeclaration': {
-          const attrs = nodeAny.attrs || {};
-          const key = (attrs.key as string) || '';
-          const value = (attrs.value as string) || '';
-          const projections = (attrs.projections as string[]) || [];
-          markdown += `${key}:: ${value}${projections.map((p: string) => ` #${p}`).join('')}\n\n`;
-          break;
-        }
-        case 'expression': {
-          const attrs = nodeAny.attrs || {};
-          const formula = (attrs.formula as string) || '';
-          markdown += `{{ ${formula} }}\n\n`;
-          break;
-        }
-        case 'actionButton': {
-          const attrs = nodeAny.attrs || {};
-          const label = (attrs.label as string) || 'Action';
-          const action = (attrs.action as string) || '';
-          const cost = (attrs.cost as string);
-          const costPart = cost ? '; cost: ' + cost : '';
-          markdown += '[' + label + '](action: ' + action + costPart + ')\n\n';
-          break;
-        }
-        case 'barWidget': {
-          const attrs = nodeAny.attrs || {};
-          const current = (attrs.current as string) || '0';
-          const max = (attrs.max as string) || '100';
-          markdown += '[bar: ' + current + '/' + max + ']\n\n';
-          break;
-        }
-        case 'dotsWidget': {
-          const attrs = nodeAny.attrs || {};
-          const current = (attrs.current as string) || '0';
-          const max = (attrs.max as string) || '5';
-          markdown += '[dots: ' + current + '/' + max + ']\n\n';
-          break;
-        }
-        case 'transclusion': {
-          const attrs = nodeAny.attrs || {};
-          const snippetName = (attrs.snippetName as string) || '';
-          markdown += ' ![[' + snippetName + ']]\n\n';
-          break;
-        }
-      }
-    });
-    
+    const markdown = editor.getMarkdown();
     setMarkdownText(markdown);
     setShowMarkdown(true);
   }, [editor]);
 
   const importMarkdown = useCallback(() => {
     if (!editor || !markdownText) return;
-    
-    const lines = markdownText.split('\n');
-    let html = '';
-    
-    lines.forEach((line) => {
-      if (line.startsWith('# ')) {
-        html += '<h1>' + line.slice(2) + '</h1>';
-      } else if (line.startsWith('## ')) {
-        html += '<h2>' + line.slice(3) + '</h2>';
-      } else if (line.startsWith('### ')) {
-        html += '<h3>' + line.slice(4) + '</h3>';
-      } else if (line.startsWith('- ')) {
-        html += '<ul><li>' + line.slice(2) + '</li></ul>';
-      } else if (line.match(/^\d+\. /)) {
-        html += '<ol><li>' + line.slice(line.indexOf('. ') + 2) + '</li></ol>';
-      } else if (line.startsWith('> ')) {
-        html += '<blockquote>' + line.slice(2) + '</blockquote>';
-      } else if (line === '---') {
-        html += '<hr>';
-      } else if (line.match(/^(\w+)::\s*(.+)$/)) {
-        html += '<p>' + line + '</p>';
-      } else if (line.trim()) {
-        html += '<p>' + line + '</p>';
-      }
-    });
-    
-    editor.commands.setContent(html);
+    editor.commands.setContent(markdownText, { contentType: 'markdown' });
     setShowMarkdown(false);
     setMarkdownText('');
   }, [editor, markdownText]);
@@ -670,7 +559,7 @@ export function CharacterSheetEditor({
             onClick={() => insertExpression('STR + PROF')}
             title="Insert expression {{ STR + PROF }}"
           >
-            {{ }}
+            {null}
           </button>
         </div>
       )}

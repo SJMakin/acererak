@@ -37,7 +37,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     }
 
     return elementsToCopy.length;
-  }, [game, options]);
+  }, [activeScene, options]);
 
   const cutElements = useCallback((elementIds: string[]): { count: number; deletedIds: string[] } | undefined => {
     if (!activeScene || elementIds.length === 0) return;
@@ -56,7 +56,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     }
 
     return { count: elementsToCut.length, deletedIds: elementIds };
-  }, [game, deleteElements, options]);
+  }, [activeScene, deleteElements, options]);
 
   const pasteElements = useCallback((mousePosition?: Point): { count: number; pastedElements: CanvasElement[] } | undefined => {
     if (!activeScene || clipboard.current.length === 0) return;
@@ -106,9 +106,9 @@ export function useClipboard(options: UseClipboardOptions = {}) {
 
     // Create new elements with updated positions and new IDs
     const newElements = clipboard.current.map((el) => {
-      const { id, ...elementData } = el;
+      const { id: _id, ...elementData } = el;
 
-      let newElement: Omit<CanvasElement, 'id'> = {
+      const newElement: Omit<CanvasElement, 'id'> = {
         ...elementData,
         x: el.x + finalOffsetX,
         y: el.y + finalOffsetY,
@@ -117,10 +117,11 @@ export function useClipboard(options: UseClipboardOptions = {}) {
 
       // For tokens, update name to indicate it's a copy
       if (newElement.type === 'token' && 'name' in newElement) {
-        const tokenName = (newElement as any).name || 'Token';
+        const tokenEl = newElement as Omit<CanvasElement, 'id'> & { name: string };
+        const tokenName = tokenEl.name || 'Token';
         // Only add "(Copy)" if it doesn't already have it
         if (!tokenName.includes('(Copy)')) {
-          (newElement as any).name = `${tokenName} (Copy)`;
+          tokenEl.name = `${tokenName} (Copy)`;
         }
       }
 
@@ -144,7 +145,7 @@ export function useClipboard(options: UseClipboardOptions = {}) {
     }
 
     return { count: newIds.length, pastedElements };
-  }, [game, addElements, selectElements, viewportOffset, viewportScale, options]);
+  }, [activeScene, addElements, selectElements, viewportOffset, viewportScale, options]);
 
   const hasClipboard = useCallback(() => {
     return clipboard.current.length > 0;

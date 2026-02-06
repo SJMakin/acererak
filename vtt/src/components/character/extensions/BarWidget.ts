@@ -2,6 +2,13 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { BarWidgetComponent } from './BarWidgetComponent';
 
+export interface BarWidgetMarkdownToken {
+  type: 'barWidget';
+  raw: string;
+  current: string;
+  max: string;
+}
+
 // Extend ReactNodeViewProps to include our custom props
 declare module '@tiptap/core' {
   interface ReactNodeViewProps {
@@ -81,7 +88,7 @@ export const BarWidget = Node.create({
   addInputRules() {
     return [
       {
-        find: /\[bar:\s*([^\/]+)\/([^\]]+)\]/g,
+        find: /\[bar:\s*([^/]+)\/([^\]]+)\]/g,
         handler: ({ state, match, range }) => {
           const current = match[1].trim();
           const max = match[2].trim();
@@ -93,5 +100,21 @@ export const BarWidget = Node.create({
         undoable: true,
       },
     ];
+  },
+
+  parseMarkdown() {
+    return {
+      block: 'barWidget',
+      getAttrs: (token: BarWidgetMarkdownToken) => ({
+        current: token.current,
+        max: token.max,
+      }),
+    };
+  },
+
+  renderMarkdown({ node }) {
+    const current = node.attrs.current || '0';
+    const max = node.attrs.max || '100';
+    return `[bar: ${current}/${max}]`;
   },
 });

@@ -1,12 +1,13 @@
 // Core types for Lychgate VTT
 
+import type { Character } from './character';
+
 export type ElementType = 'token' | 'image' | 'shape' | 'text';
 export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
 export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer IDs
 
 // Re-export Character types
-export type { Character } from './character';
-export type { CharacterP2PMessage, CharacterUpdateMessage, CharacterDeleteMessage } from './character';
+export type { Character, CharacterP2PMessage, CharacterUpdateMessage, CharacterDeleteMessage } from './character';
 
 // Re-export Snippet types
 export type { Snippet, SnippetCategory, SnippetCreateInput, SnippetUpdateInput } from './snippet';
@@ -325,7 +326,7 @@ export interface LibraryExport {
   items: LibraryItem[];
 }
 
-// Tool types for the canvas
+// Tool types for canvas
 export type ToolType =
   | 'select'
   | 'pan'
@@ -356,7 +357,7 @@ export const DEFAULT_GRID_SETTINGS: GridSettings = {
   height: 20,
   showGrid: true,
   snapToGrid: true,
-  gridColor: 'rgba(255, 255, 255, 0.2)',
+  gridColor: 'rgba(255,255,255,0.2)',
   gridType: 'square',
 };
 
@@ -399,7 +400,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   gridSize: { width: 30, height: 30 },
   cellSize: 50,
-  gridColor: 'rgba(255, 255, 255, 0.2)',
+  gridColor: 'rgba(255,255,255,0.2)',
   backgroundColor: '#1a1a2e',
   defaultTokenSize: 1,
   defaultHP: { current: 10, max: 10 },

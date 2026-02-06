@@ -21,7 +21,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Mantine UI component library
 - [x] Konva.js canvas rendering (4 optimized layers)
 
-### P2P Networking (Phase 3 & 3.5 Complete)
+### P2P Networking (v1.6.0 / v1.7.0)
 - [x] Trystero integration (Torrent strategy with Node.js polyfills)
 - [x] WebRTC peer connections with STUN/TURN servers
 - [x] Room creation/joining via ID or QR code
@@ -122,595 +122,230 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Game menu with Share Game option (Room ID, QR code, join link)
 - [x] Dice rolls integrated into chat timeline
 
----
+### Reactive Character Sheet System (v1.9.0)
+- [x] TipTap WYSIWYG editor with rich text editing in modal
+- [x] `Key:: Value` stat declarations with editable pills and autocomplete
+- [x] Shadow state JSON auto-parsed from document (bidirectional sync)
+- [x] Projection tags: `#bar` (HP bar on token), `#badge` (AC badge on token)
+- [x] `{{ expression }}` computed fields via expr-eval (reactive to stat changes)
+- [x] `[Label](action: dice)` action buttons with dice rolling and P2P broadcast
+- [x] `[Label](action: dice; cost: Var)` actions with resource cost deduction
+- [x] `[bar: HP/MaxHP]` progress bar widget (color-coded, click to adjust)
+- [x] `[dots: N/Max]` dot tracker widget (click to fill/unfill)
+- [x] `![[Name]]` transclusion — embeds snippets inline (read-only)
+- [x] Token integration — tokens with `characterId` read HP/AC from character shadow state
+- [x] Bidirectional token↔character sync (damage click updates character, sheet edit updates token)
+- [x] Combat tracker reads HP from linked characters
+- [x] Character library panel with CRUD, templates (D&D 5e, OSR, Blank), import/export, duplicate
+- [x] Snippet library (spells, abilities, rules) with IndexedDB persistence and P2P sync
+- [x] P2P broadcast for character updates (`character-update`, `character-delete` messages)
+- [x] Keyboard shortcuts in editor (`/` slash commands, `[[` transclusion, `{{` expressions)
+- [x] Token migration service (old tokens with notes → character conversion)
+- [x] 5 default snippets (Fireball, Cure Wounds, Sneak Attack, Second Wind, Opportunity Attack)
 
-## Phase 3: Mobile Support & UX Polish
-
-**Status:** In Progress
-
-**Priority:** Medium
-
-### 3.10 Mobile Support
-
-- [ ] Ensure create/join game forms fit on mobile screen
+### 3.10 Mobile Support (partial)
 - [x] Touch gesture optimization (pinch zoom, two-finger pan)
-- [ ] Mobile-friendly toolbar layout
-- [ ] Responsive sidebar
 - [x] Touch-friendly element selection
 
-**Complexity:** Medium (responsive design, touch events)
+### 3.11 Cleanup / Deprecation (partial)
+- [x] `PropertyInspector.tsx` — "Edit Character Sheet" button, linked character stats, character selector, unlink option
+- [x] `Token.tsx` — Reads HP/AC from `character.shadowState` via projections
+- [x] `CombatTracker.tsx` — `getHpFromToken()` using characterId/shadowState, syncs HP changes back
+- [x] `libraryStore.ts` — N/A (handled by separate `characterStore.ts`)
+
+### 3.12 ESLint Setup
+- [x] ESLint 8.57 config (`.eslintrc.cjs`) — 0 errors, 0 warnings, `--max-warnings 0`
+- [x] 79 original issues resolved (40 `no-explicit-any`, 13 `no-unused-vars`, 5 `no-case-declarations`, 3 `no-useless-escape`, 1 `no-var-requires`, 15 `react-hooks/exhaustive-deps`, 2 `react-refresh/only-export-components`)
+
+### 3.13 Arrow Key Token Movement
+- [x] Arrow keys move selected element(s) by 1 grid cell (or 10px when grid snap off)
+- [x] Shift+arrow moves by 1px (fine positioning)
+- [x] Respects locked elements (skips them)
+- [x] Works with multi-select via `updateElements` batch action
+- [x] Broadcasts movement to P2P peers
+- [x] Integrates with undo/redo history (position move tracking)
+- [x] Skips when focus is in input/textarea/contenteditable
 
 ---
 
-### 3.11 Reactive Character Sheet System
+## State Sync Audit & Hardening Roadmap
 
-A system-agnostic character sheet system using TipTap WYSIWYG editor with reactive data binding between documents, shadow state, and map tokens.
+*Added 2026-02-06 — from code review of `useRoom.ts`, `gameStore.ts`, `characterStore.ts`, `shadowStateService.ts`*
 
-**Status:** ✅ COMPLETED
+### Known Issues / Concerns
 
-**Complexity:** High (4-6 weeks across 5 phases)
+#### 🔴 P1 — Delivery Reliability
+WebRTC data channels default to unreliable (UDP-like). If a delta message (`elUpdate`, `fogUpdate`, etc.) is dropped, peers silently diverge. The desync hash catches this *eventually*, but there's a window of undetected inconsistency.
 
----
+**Action:** Verify Trystero's data channel configuration. Enforce `ordered: true` + reliable delivery for all state-mutating channels. Cursor/ping channels can remain unreliable (cosmetic, high frequency).
 
-#### 3.11.1 System Overview
+#### 🔴 P1 — Desync Hash is Position-Blind
+[`hashGameState()`](../src/hooks/useRoom.ts) hashes element IDs and counts but **not** element positions, properties, or versions. Two peers can have the same tokens at different positions and produce identical hashes. Positional desyncs (the most common failure from dropped deltas) go undetected.
 
-**Core Concept:** Characters are stored as rich-text documents with embedded reactive elements. A "shadow state" JSON object syncs bidirectionally with the document, enabling fast lookups and token integration.
+**Action:** Include element version numbers (or a sorted hash of `id:version` pairs) in the state hash. This makes the hash sensitive to any element mutation, not just additions/deletions.
 
-**Key Syntax:**
+#### 🟡 P2 — Full-State Sync Payload Size
+`broadcastSync()` serializes the **entire `GameState`** as JSON. With multiple scenes, large fog polygon arrays, and 100 chat messages, this can exceed WebRTC data channel message size limits (~256KB on some browsers). Trystero may chunk, but behavior under large payloads is untested.
 
-| Syntax | Purpose | Example |
-|--------|---------|---------|
-| `Key:: Value` | Stat declaration | `Strength:: 18` |
-| `{{ expression }}` | Reactive computed field | `{{ (Strength - 10) / 2 }}` |
-| `[Label](action: dice)` | Action button | `[Attack](action: 1d20+5)` |
-| `[Label](action: dice; cost: Var)` | Action with resource cost | `[Smite](action: 2d8; cost: Slots)` |
-| `[bar: Var/Max]` | Inline bar widget | `[bar: HP/MaxHP]` |
-| `[dots: N/Max]` | Dot tracker widget | `[dots: 3/5]` |
-| `#bar` | Project stat to token bar | `HP:: 45 #bar` |
-| `#badge` | Project stat to token badge | `AC:: 18 #badge` |
-| `![[Name]]` | Transclude external content | `![[Fireball]]` |
+**Action:** Profile typical game state sizes. Consider: (a) per-scene sync, (b) stripping chat history from sync payloads, (c) chunked transfer with acknowledgment.
 
-**Data Flow:**
+#### 🟡 P2 — Character Sync Has No Conflict Resolution
+Unlike canvas elements (which have version-gated conflict resolution), character updates via `charUpd` are applied unconditionally — last-write-wins with no version check. Simultaneous character sheet edits by two users will silently lose data.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Character Document                         │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  TipTap Editor                                          │   │
-│  │  - StatDeclaration nodes                                │   │
-│  │  - Expression nodes                                     │   │
-│  │  - ActionButton nodes                                   │   │
-│  │  - Widget nodes                                         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                           │                                     │
-│                           ▼                                     │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Shadow State JSON                                      │   │
-│  │  { Strength: 18, HP: 45, MaxHP: 52, AC: 18, ... }       │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                           │                                     │
-└───────────────────────────┼─────────────────────────────────────┘
-                            │
-            ┌───────────────┼───────────────┐
-            ▼               ▼               ▼
-    ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-    │ Token #bar  │ │ Token #badge│ │ Combat      │
-    │ HP bar      │ │ AC display  │ │ Tracker     │
-    └─────────────┘ └─────────────┘ └─────────────┘
-```
+**Action:** Add `version` field to Character type. Apply the same `incomingVersion >= localVersion` gating used for canvas elements.
+
+#### 🟡 P2 — Version Counters Don't Survive Full Syncs
+When `loadGame()` replaces the store wholesale, local version counters are overwritten with the GM's values. If the GM's state is behind due to a race condition, a player's local version=5 becomes the GM's version=3, and subsequent GM updates at version=4 will overwrite the player's changes.
+
+**Action:** Document as a known limitation. Mitigate by ensuring full syncs are rare (only on join/desync recovery) and that the GM is always the most up-to-date peer.
+
+#### 🟢 P3 — No Automatic Reconnection
+If a player's WebRTC connection drops (common on mobile/WiFi), there's no automatic rejoin + resync. The player must manually refresh and rejoin. For the GM disconnecting, there's a modal but no reconnect attempt.
+
+**Action:** Implement reconnection with exponential backoff. On reconnect, automatically request a full sync.
+
+#### 🟢 P3 — No Image Asset Management
+Images are raw external URLs with no caching, deduplication, or distribution layer. If a URL goes down mid-session, the image breaks for everyone. Large image payloads (even as URLs) in game state contribute to sync bloat.
+
+**Action (future):** Explore IPFS or WebTorrent for decentralized image distribution. Peers could seed images they've already loaded, reducing dependency on external hosts.
 
 ---
 
-#### 3.11.2 Technology Stack
+### Hardening Tasks
 
-**Required Dependencies:**
-
-| Package | Version | Purpose | Size |
-|---------|---------|---------|------|
-| `@tiptap/react` | ^2.x | Core React bindings | ~15kb |
-| `@tiptap/starter-kit` | ^2.x | Basic editor extensions | ~30kb |
-| `@tiptap/extension-mention` | ^2.x | Autocomplete foundation | ~5kb |
-| `@tiptap/pm` | ^2.x | Markdown serialization | ~10kb |
-| `expr-eval` | ^2.0 | Expression evaluation | ~12kb |
-
-**Total additional bundle:** ~70kb gzipped
-
-**Installation:**
-```bash
-npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-mention @tiptap/pm expr-eval
-```
+- [ ] **P1:** Audit Trystero data channel reliability settings — enforce ordered+reliable for state channels
+- [ ] **P1:** Strengthen `hashGameState()` to include element versions/positions
+- [ ] **P1:** Build E2E sync fuzz tests (random tool usage across two browser sessions, assert hash convergence)
+- [ ] **P2:** Add version-based conflict resolution to character updates
+- [ ] **P2:** Profile game state JSON size across typical sessions; set alarms for >100KB
+- [ ] **P2:** Implement chunked/incremental sync as alternative to full-state sync
+- [ ] **P3:** Automatic reconnection with exponential backoff + resync
+- [ ] **P3:** Strip non-essential data (chat history, old pings) from sync payloads
 
 ---
 
-#### 3.11.3 What Gets Removed/Deprecated
+### E2E Sync Testing Strategy
 
-**Files to Remove:**
+The serverless architecture is actually ideal for E2E testing — no backend mocks needed. Two Playwright browser contexts can connect to the same Trystero room directly.
 
-- [ ] `src/components/MarkdownEditor.tsx` - Replace with TipTap CharacterSheetEditor
+**Proposed approach: Sync Fuzz Test**
 
-**Types to Deprecate (but keep for migration):**
+1. Spawn two browser contexts: GM and Player
+2. GM creates a room, Player joins, verify initial sync (hash match)
+3. Run N iterations of randomized actions:
+   - GM: randomly add/move/delete tokens, draw shapes, toggle fog, switch scenes
+   - Player: move tokens they control, roll dice, update character sheets
+4. After each batch, wait for hash broadcast interval, assert `gmHash === localHash` on the player side
+5. Inject artificial failures: drop connections mid-action, verify resync recovery
+6. Track metrics: time-to-convergence, number of desyncs detected, number of undetected divergences
 
-In `src/types/index.ts`, the following `TokenElement` fields become optional/deprecated:
-- `hp?: { current: number; max: number }` → Derived from shadow state
-- `ac?: number` → Derived from shadow state
-- `conditions?: string[]` → Derived from shadow state
-- `notes?: string` → Replaced by `characterId` link
-
-**Components to Modify:**
-
-- [ ] `src/components/PropertyInspector.tsx` - Remove token-specific HP/AC/conditions UI, add "Edit Character Sheet" button
-- [ ] `src/components/Token.tsx` - Read HP/AC from linked Character shadow state
-- [ ] `src/components/CombatTracker.tsx` - Read combatant HP from Character shadow state
-- [ ] `src/stores/libraryStore.ts` - Add Character library alongside token library
-
----
-
-#### 3.11.4 Implementation Phases
+**Pre-requisites:**
+- Strengthen hash function (P1 above) — current hash is too weak to detect positional drift
+- Expose hash state in the DOM or via `window.__testState` for Playwright assertions
+- Add a configurable hash broadcast interval (currently implicit — needs explicit timer)
 
 ---
 
-##### Phase 1: Foundation - TipTap Integration
+## Competitive Gap Analysis: Lychgate vs Roll20
 
-**Goal:** Basic TipTap editor working in a modal, editable rich text
+*What it would take to go from hobby VTT to a legitimate Roll20 alternative.*
 
-**Status:** ✅ COMPLETED
+### What Lychgate Already Does Better
+- **Zero infrastructure** — No server costs, no account system, no vendor lock-in
+- **Instant setup** — Share a link, start playing in seconds
+- **Privacy** — All data stays on player machines, no telemetry
+- **Character sheet engine** — The reactive `Key:: Value` / `{{ expression }}` / `![[transclusion]]` system is genuinely more powerful and flexible than Roll20's sheet system
+- **Open, extensible architecture** — Not trapped in a legacy Flash-era codebase
 
-**Tasks:**
+### Critical Gaps to Close
 
-- [x] Install TipTap dependencies
-- [x] Create `src/components/character/CharacterSheetEditor.tsx`
-  - Basic TipTap editor with StarterKit
-  - Read-only toggle
-  - Markdown import/export via `@tiptap/pm`
-- [x] Create `src/components/character/CharacterSheetModal.tsx`
-  - Modal wrapper for editor
-  - Save/cancel buttons
-  - Links to a Character by ID
-- [x] Create `src/types/character.ts`
-  ```typescript
-  export interface Character {
-    id: string;
-    name: string;
-    content: string;          // TipTap JSON document
-    shadowState: Record<string, number | string>;  // Parsed stats
-    projections: {            // What shows on token
-      bar?: string;           // Key for HP bar (e.g., "HP")
-      barMax?: string;        // Key for HP max (e.g., "MaxHP")
-      badge?: string;         // Key for badge (e.g., "AC")
-    };
-    createdAt: string;
-    updatedAt: string;
-  }
-  ```
-- [x] Add `characters: Character[]` to `GameState` in `src/types/index.ts`
-- [x] Add `characterId?: string` to `TokenElement` interface
-- [x] Create `src/stores/characterStore.ts` with Zustand
-  - `addCharacter(character: Character)`
-  - `updateCharacter(id: string, updates: Partial<Character>)`
-  - `deleteCharacter(id: string)`
-  - `getCharacterById(id: string)`
-- [x] Add IndexedDB persistence for characters (GM only)
-- [x] Integrate "Create Character" button into LibraryPanel
-- [x] Add CharacterLibraryPanel component for character management
-- [x] Add P2P message types for character updates (prepared for later phases)
+#### 1. Asset Management (HIGH — blocks mainstream adoption)
+Roll20's drag-and-drop image library, marketplace, and integrated Compendium are its killer features for casual GMs. Lychgate currently requires pasting external URLs.
 
-**Acceptance Criteria:**
-- [x] Can open modal and type rich text
-- [x] Content persists when modal closes and reopens
-- [x] Character data saved in game state
-- [x] Character store CRUD operations work correctly
-- [x] Markdown import/export functional
-- [x] IndexedDB persistence for GM
+**Roadmap items:**
+- [ ] Drag-and-drop image upload to local IndexedDB with data URL conversion
+- [ ] P2P image distribution (WebTorrent/IPFS) so images are shared without a server
+- [ ] Asset library with categories, tags, search
+- [ ] Marketplace / community asset packs (could be static JSON manifests hosted on GitHub)
+- [ ] Map builder or integration with dungeon generator tools
 
----
+#### 2. Audio/Music Integration (MEDIUM)
+Roll20 has a jukebox. Tabletop games use ambient music extensively.
 
-##### Phase 2: Custom Nodes - Stat Declarations
+**Roadmap items:**
+- [ ] External audio URL playback (Spotify/YouTube embed or direct MP3 URL)
+- [ ] GM-controlled play/pause/volume broadcast to all players
+- [ ] Ambient sound library with presets
 
-**Goal:** `Key:: Value` syntax creates editable stat pills, shadow state syncs
+#### 3. Dynamic Lighting / Line of Sight (MEDIUM-HIGH)
+Roll20's dynamic lighting is one of its most-used premium features.
 
-**Status:** ✅ COMPLETED
+**Roadmap items:**
+- [ ] Wall/door placement tool (line segments on the map)
+- [ ] Raycasting line-of-sight per token (player sees only what their token can see)
+- [ ] Light source definitions on tokens (radius, color, dim/bright)
+- [ ] Fog of War automatically computed from line-of-sight
+- [ ] Performance: This is compute-heavy — consider Web Workers or WASM
 
-**Tasks:**
+#### 4. Persistence & Session Continuity (MEDIUM)
+Games need to survive across sessions. Currently the GM's IndexedDB is the only persistence, and players lose state on page refresh.
 
-- [x] Create `src/components/character/extensions/StatDeclaration.ts`
-  - TipTap Node extension for `Key:: Value` pattern
-  - Matches pattern: "Key:: Value" or "Key:: Value #bar" or "Key:: Value #badge"
-  - Renders as: [Key: Value ▾] pill (clickable to edit)
-  - Parses projection tags: #bar, #badge
-  - Stores key, value, and projections as node attributes
-  - Commands: insertStatDeclaration, setStatDeclarationValue, addStatDeclarationProjection
-- [x] Create `src/components/character/extensions/StatDeclarationComponent.tsx`
-  - React component for rendering the node
-  - Inline editing on click (number input for numeric values)
-  - Projection tag display with icons (📊 for #bar, 🏷️ for #badge)
-  - Update node attributes on edit
-- [x] Create `src/services/shadowStateService.ts`
-  - `parseShadowState(document: JSONContent): ShadowState`
-  - Extracts all StatDeclaration nodes from TipTap document
-  - Returns: { stats: { key: value }, projections: { bar, barMax, badge } }
-  - Handles projection tags
-  - `parseStatDeclarationText()` for initial import
-  - `debouncedParse()` for debounced updates
-- [x] Wire shadow state updates
-  - On editor change → parse stats → update shadowState
-  - Debounce parsing (300ms)
-  - Pass shadowState updates to parent via callback
-  - Debug panel in development mode
-- [x] Create `src/components/character/extensions/SuggestionMenu.tsx`
-  - Autocomplete when typing `::`
-  - Suggests common stat names (HP, AC, STR, DEX, etc.)
-  - Keyboard navigation (arrow keys, Enter to select)
-  - Category icons (📊, ⚔️, ✨, 💎)
-  - STAT_SUGGESTIONS array with 50+ common D&D stats
-- [x] Create `src/components/character/extensions/StatSuggestion.ts`
-  - Extension for triggering suggestions after `::`
-- [x] Integrate extensions into CharacterSheetEditor
-  - Register StatDeclaration extension
-  - Parse shadow state on content change
-  - Update CharacterSheetModal to receive shadowState updates
-  - Export markdown includes stat declarations
+**Roadmap items:**
+- [ ] Export/import is already solid — surface it more prominently as the "save game" mechanism
+- [ ] Auto-export to file on session end (download JSON to Downloads folder)
+- [ ] Optional: encrypted cloud backup to user's own storage (Google Drive API, Dropbox, S3 presigned URLs)
+- [ ] Player-side persistence of character data (characters survive page refresh even without GM)
 
-**Acceptance Criteria:**
-- [x] Typing `Strength:: 18` creates a stat pill
-- [x] Clicking pill allows editing value
-- [x] Shadow state JSON updates automatically
-- [x] Autocomplete shows suggestions when typing `::`
-- [x] Projection tags (#bar, #badge) are parsed and stored
-- [x] Stat pills display correctly with icons for projections
-- [x] Development debug panel shows shadow state
+#### 5. Onboarding & Documentation (MEDIUM)
+Roll20 has tutorials, templates, and a large community knowledge base.
+
+**Roadmap items:**
+- [ ] In-app tutorial / guided walkthrough for first-time users
+- [ ] Pre-built game templates (D&D 5e starter, Pathfinder 2e, etc.)
+- [ ] Video demos and quick-start guide
+- [ ] Community Discord or forum
+
+#### 6. API / Extensibility (LOW initially, HIGH long-term)
+Roll20's API (macros, scripts, mods) is what keeps power users. Lychgate's architecture is better positioned for this because the entire state is client-side JavaScript.
+
+**Roadmap items:**
+- [ ] Plugin/extension API — load user JS that can hook into game events
+- [ ] Macro system for chat (e.g., `/roll 2d6+@{Strength}` referencing character stats)
+- [ ] Community extension marketplace
+
+#### 7. Polish & Edge Cases
+- [ ] Undo/redo visual feedback
+- [ ] Better error messages for failed connections
+- [ ] Accessibility (keyboard navigation, screen reader support, high contrast mode)
+- [ ] Internationalization (i18n)
+- [ ] Performance benchmarks: 100+ tokens, 10+ players, large maps
 
 ---
 
-##### Phase 3: Custom Nodes - Expressions and Actions
+## In Progress / TODO
 
-**Goal:** `{{ expression }}` shows computed values, `[Action](action: dice)` creates roll buttons
+### 3.10 Mobile Support (remaining)
 
-**Status:** ✅ COMPLETED
+**Status:** In Progress | **Complexity:** Medium
 
-**Tasks:**
-
-- [x] Create `src/components/character/extensions/Expression.ts`
-  - TipTap Node extension for `{{ expression }}` pattern
-  - Evaluates using expr-eval with shadowState as variables
-  - Renders computed result inline
-  - Commands: insertExpression, setExpressionFormula
-- [x] Create `src/components/character/extensions/ExpressionComponent.tsx`
-  - Shows computed value inline
-  - Tooltip shows formula on hover
-  - Re-evaluates when shadowState changes via useEffect
-  - Graceful error handling (shows "Error" for invalid formulas)
-  - Sandboxed evaluation using expr-eval
-- [x] Create `src/components/character/extensions/ActionButton.ts`
-  - TipTap Node extension for `[Label](action: diceFormula)` pattern
-  - Supports optional cost: `[Label](action: diceFormula; cost: Variable)`
-  - Renders as clickable button
-  - Commands: insertActionButton, setActionButtonLabel, setActionButtonAction, setActionButtonCost
-- [x] Create `src/components/character/extensions/ActionButtonComponent.tsx`
-  - Styled button with label and optional cost indicator
-  - On click: parses dice formula, resolves variables from shadowState
-  - Executes roll via existing dice service
-  - If `cost` specified: decrements variable in shadowState via callback
-  - Broadcasts roll to P2P via onBroadcastRoll callback
-- [x] Create `src/services/diceParser.ts` enhancements
-  - Added `resolveVariables(formula, shadowState)` function
-  - Replaces variable names with values: `1d20+Strength` → `1d20+18`
-  - Supports `{{ expression }}` in formulas (evaluates first)
-  - Handles missing variables gracefully
-- [x] Integrate extensions into CharacterSheetEditor
-  - Registered Expression and ActionButton extensions
-  - Pass shadowState to ExpressionComponent for reactivity
-  - Pass onRoll callback and onUpdateStat callback to ActionButtonComponent
-  - Export/import markdown support for expressions and action buttons
-- [x] Update characterStore.ts
-  - Added `updateCharacterStat()` function for action button cost deduction
-  - Updates stat values in character content JSON
-
-**Acceptance Criteria:**
-- [x] `{{ (Strength - 10) / 2 }}` shows `4` when Strength is 18
-- [x] Expression updates when stat changes (reactive via shadowState prop)
-- [x] `[Attack](action: 1d20+5)` renders as styled button
-- [x] Clicking button rolls dice and broadcasts to chat
-- [x] `[Smite](action: 2d8; cost: Slots)` decrements Slots on use
-- [x] Variable resolution works in dice formulas
-- [x] Expression errors handled gracefully (shows "Error")
+- [ ] Ensure create/join game forms fit on mobile screen
+- [ ] Mobile-friendly toolbar layout
+- [ ] Responsive sidebar
 
 ---
 
-##### Phase 4: Custom Nodes - Widgets
+### 3.11 Cleanup / Deprecation (remaining)
 
-**Goal:** `[bar: HP/MaxHP]` and `[dots: 3/5]` render visual trackers
+**Files to remove:**
+- [ ] `src/components/MarkdownEditor.tsx` — Deferred: still used for token/image notes in NotesPanel and PropertyInspector. Not a blocker.
 
-**Status:** ✅ COMPLETED
-
-**Tasks:**
-
-- [x] Create `src/components/character/extensions/BarWidget.ts`
-  - TipTap Node extension for `[bar: current/max]` pattern
-  - Matches: `[bar: Variable/MaxVariable]` or `[bar: 45/100]`
-  - Renders as horizontal progress bar
-  - Stores current and max as node attributes
-  - Commands: insertBarWidget, setBarWidgetValue
-- [x] Create `src/components/character/extensions/BarWidgetComponent.tsx`
-  - Progress bar visualization with percentage display
-  - Color changes based on percentage (>50% green, 25-50% yellow, <25% red)
-  - Click to open quick +/- buttons for value adjustment
-  - Parses variable names from shadowState for reactive updates
-  - Updates shadowState when value changes via callback
-  - Handles missing variables gracefully
-- [x] Create `src/components/character/extensions/BarWidget.css`
-  - Dark theme compatible styling
-  - Smooth transitions and animations
-  - Hover effects on bar and controls
-- [x] Create `src/components/character/extensions/DotsWidget.ts`
-  - TipTap Node extension for `[dots: current/max]` pattern
-  - Matches: `[dots: N/Max]` or `[dots: Variable/Max]`
-  - Renders as filled/empty dots (like World of Darkness games)
-  - Supports up to 10 dots
-  - Commands: insertDotsWidget, setDotsWidgetValue
-- [x] Create `src/components/character/extensions/DotsWidgetComponent.tsx`
-  - Dot visualization (●●●○○)
-  - Click dots to fill/unfill (toggle behavior)
-  - Updates shadowState when value changes via callback
-  - Handles missing variables gracefully
-  - Keyboard accessible
-- [x] Create `src/components/character/extensions/DotsWidget.css`
-  - Dark theme compatible styling
-  - Smooth pop animation on toggle
-  - Alternative color schemes (success, damage, magic, health)
-- [x] Integrate extensions into CharacterSheetEditor
-  - Register BarWidget and DotsWidget extensions
-  - Pass shadowState to components for reactivity
-  - Pass onUpdateStat callback for widget interactions
-  - Add widget toolbar buttons for quick insertion
-  - Markdown export includes widget syntax
-
-**Acceptance Criteria:**
-- [x] `[bar: HP/MaxHP]` shows progress bar with correct percentage
-- [x] Bar reflects current HP value and updates live (reactive to shadowState)
-- [x] Bar color changes based on percentage (green/yellow/red)
-- [x] Clicking bar shows +/- controls
-- [x] `[dots: 3/5]` shows 3 filled, 2 empty dots
-- [x] Clicking dots changes dot count (fills/empties)
-- [x] Widget updates sync with shadowState
-- [x] Widgets work with both variables (HP) and hardcoded numbers (45/100)
-
----
-
-##### Phase 5: Token Integration
-
-**Goal:** Tokens with `characterId` display stats from Character; bidirectional sync
-
-**Status:** ✅ COMPLETED
-
-**Tasks:**
-
-- [x] Modify `src/components/Token.tsx`
-  - [x] If `characterId` set, read HP/AC from linked Character.shadowState
-  - [x] Use `projections.bar` / `projections.barMax` / `projections.badge` keys
-  - [x] Fall back to token's own hp/ac if no character linked
-  - [x] Display character name if linked (override token name)
-  - [x] Ensure token updates when character shadowState changes
-- [x] Add "Link Character" dropdown/selector to token config modal
-  - [x] Show available Characters from characterStore
-  - [x] Option to create new Character from scratch
-  - [x] Option to unlink character
-  - [x] Display linked character info when selected
-  - [x] Save characterId to token
-- [x] Implement bidirectional sync
-  - [x] Token damage click → update Character.shadowState → update document
-  - [x] Character sheet edit → update shadowState → update token display
-  - [x] Use characterStore.updateCharacterStat() for stat updates
-- [x] Modify `src/components/CombatTracker.tsx`
-  - [x] Read HP from linked Character if available
-  - [x] Display character name if linked
-  - [x] HP changes in combat update Character shadowState
-  - [x] Use characterStore.updateCharacterStat() for updates
-  - [x] Fall back to token HP if no character linked
-- [x] Add P2P broadcast for character updates
-  - [x] New message type: `character-update`
-  - [x] New message type: `character-delete`
-  - [x] Broadcast Character changes to all peers
-  - [x] Handle incoming character updates
-- [x] Update Character Store for P2P Sync
-  - [x] Add P2P sync for character updates
-  - [x] Ensure character updates broadcast to peers
-  - [x] Handle incoming character updates from peers
-- [x] Update Property Inspector
-  - [x] Remove token-specific HP/AC/conditions UI when character linked
-  - [x] Add "Edit Character Sheet" button when character linked
-  - [x] Show character link status
-  - [x] Open CharacterSheetModal for linked character
-- [x] Update Game Types for P2P Messages
-  - [x] Add CharacterUpdateMessage interface
-  - [x] Add CharacterDeleteMessage interface
-  - [x] Ensure message types are properly typed
-
-**Acceptance Criteria:**
-- [x] Token HP bar reads from linked Character
-- [x] Token AC badge reads from linked Character
-- [x] Changing HP in Character Sheet updates token display
-- [x] Clicking token damage updates Character shadowState
-- [x] Combat tracker uses Character HP when linked
-- [x] Characters sync across P2P
-- [x] Token config modal allows linking/unlinking characters
-- [x] Property inspector shows "Edit Character Sheet" button
-
----
-
-##### Phase 6: Transclusion and Polish
-
-**Goal:** `![[SpellName]]` embeds content; templates; migration
-
-**Status:** ✅ COMPLETED
-
-**Tasks:**
-
-- [x] Create `src/components/character/extensions/Transclusion.ts`
-  - Matches: `![[Name]]`
-  - Looks up content from a global "snippets" library
-  - Renders embedded content inline (read-only)
-- [x] Create `src/components/character/extensions/TransclusionComponent.tsx`
-  - Displays embedded content from snippet
-  - Shows snippet name as header
-  - Read-only display (can't edit embedded content)
-  - Handle missing snippets gracefully
-- [x] Create `src/stores/snippetStore.ts`
-  - Store reusable text blocks (spells, abilities, rules)
-  - IndexedDB persistence (GM only)
-  - P2P sync support
-- [x] Create `src/types/snippet.ts`
-  - Snippet interface with id, name, content, category, tags
-- [x] Create character templates in `src/services/characterTemplates.ts`
-  - D&D 5e template with standard stats
-  - OSR template (simpler)
-  - Blank template
-- [x] Create migration service `src/services/tokenMigration.ts`
-  - Tokens with `notes` field → offer to convert to Character
-  - Keep `hp`/`ac`/`conditions` working for unlinked tokens
-- [x] Keyboard shortcuts in editor
-  - `/` for slash commands (command palette)
-  - `[[` for transclusion autocomplete
-  - `{{` for expression autocomplete
-  - `Ctrl/Cmd + B` for Bold
-  - `Ctrl/Cmd + I` for Italic
-  - `Ctrl/Cmd + K` for Link
-- [x] Create `src/components/character/SnippetLibraryPanel.tsx`
-  - List saved snippets
-  - Create/edit/delete snippets
-  - Categorize snippets (spells, abilities, rules, custom)
-  - Search functionality
-  - Insert snippet into character sheet
-- [x] Integrate Transclusion into CharacterSheetEditor
-  - Register Transclusion extension
-  - Add transclusion autocomplete for `[[`
-  - Pass snippet store to TransclusionComponent
-- [x] Update CharacterLibraryPanel
-  - Add template picker when creating new Character
-  - Add import/export characters
-  - Add duplicate character functionality
-- [x] Update database for snippets
-  - Add snippets table to IndexedDB
-  - Add storage functions for snippets
-  - Ensure GM-only persistence
-
-**Acceptance Criteria:**
-- [x] `![[Fireball]]` embeds spell text from snippet
-- [x] Template picker shows when creating new Character
-- [x] Existing games still work (backward compatible)
-- [x] Slash commands work for inserting elements
-- [x] Snippet library allows creating/editing snippets
-- [x] Transclusion autocomplete works with `[[`
-- [x] Migration option available for old tokens
-- [x] Keyboard shortcuts work in editor
-- [x] Default snippets included (Fireball, Cure Wounds, Sneak Attack, Second Wind, Opportunity Attack)
-
----
-
-#### 3.11.5 File Structure
-
-```
-src/
-├── components/
-│   └── character/
-│       ├── CharacterSheetEditor.tsx      # Main TipTap editor
-│       ├── CharacterSheetModal.tsx       # Modal wrapper
-│       ├── CharacterLibraryPanel.tsx     # Library UI
-│       └── extensions/
-│           ├── StatDeclaration.ts        # Key:: Value node
-│           ├── StatDeclarationComponent.tsx
-│           ├── Expression.ts             # {{ }} node
-│           ├── ExpressionComponent.tsx
-│           ├── ActionButton.ts           # [](action:) node
-│           ├── ActionButtonComponent.tsx
-│           ├── BarWidget.ts              # [bar:] node
-│           ├── BarWidgetComponent.tsx
-│           ├── DotsWidget.ts             # [dots:] node
-│           ├── DotsWidgetComponent.tsx
-│           ├── Transclusion.ts           # ![[]] node
-│           ├── TransclusionComponent.tsx
-│           └── SuggestionMenu.tsx        # Autocomplete UI
-├── services/
-│   └── shadowStateService.ts             # Parse document → JSON
-├── stores/
-│   ├── characterStore.ts                 # Character CRUD
-│   └── snippetStore.ts                   # Transclusion content
-└── types/
-    └── character.ts                      # Character interfaces
-```
-
----
-
-#### 3.11.6 P2P Message Types
-
-Add to `src/types/index.ts`:
-
-```typescript
-export interface CharacterUpdateMessage {
-  type: 'character-update';
-  character: Character;
-}
-
-export interface CharacterDeleteMessage {
-  type: 'character-delete';
-  characterId: string;
-}
-```
-
----
-
-#### 3.11.7 Testing Requirements
-
+**Testing:**
 - [ ] Unit tests for shadowStateService (parse document → JSON)
 - [ ] Unit tests for expression evaluation with variables
 - [ ] Unit tests for dice formula variable resolution
 - [ ] E2E test: create character, add stats, link to token, verify display
 - [ ] E2E test: edit character sheet, verify token updates
 - [ ] E2E test: P2P sync of character changes
-
----
-
-#### 3.11.8 Risks and Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| TipTap bundle size | +70kb to bundle | Lazy load editor modal |
-| Expression injection | Security issue | Sandbox expr-eval, no eval() |
-| Complex parsing bugs | Bad UX | Forgiving parser, clear error messages |
-| Mobile keyboard issues | Poor mobile UX | Test extensively, add tap-to-edit shortcuts |
-| Migration breaks old games | Data loss | Keep backward compat, offer explicit migration |
-
----
-
-### 3.12 Character Library System ✅ MERGED INTO 3.11
-
-*This feature has been merged into section 3.11 (Reactive Character Sheet System):*
-
-- **Phase 5:** CharacterLibraryPanel, token-character linking
-- **Phase 6:** Templates, transclusion snippets, import/export
-
-See [3.11.4 Phase 5](#phase-5-token-integration) and [3.11.4 Phase 6](#phase-6-transclusion-and-polish) for implementation details.
-
----
-
-### 3.13 Arrow Key Token Movement
-
-Add keyboard controls for moving selected tokens with arrow keys.
-
-**Requirements:**
-- Arrow keys move selected token(s) by 1 grid cell
-- Shift+arrow moves by 1 pixel (fine positioning)
-- Respects grid snapping settings
-- Works with multi-select
-- Broadcasts movement to P2P
-- Integrates with undo/redo history
-
-**Files to modify:**
-- `src/hooks/useCanvasKeyboardShortcuts.ts` - Add arrow key handlers
-- `src/stores/gameStore.ts` - Ensure moveElement action supports keyboard input
-
-**Status:** Ready for implementation (straightforward feature)
-
-**Complexity:** Low (extends existing keyboard shortcut system)
 
 ---
 
@@ -722,45 +357,10 @@ Add keyboard controls for moving selected tokens with arrow keys.
 - Add player token ownership/assignment
 - **Status:** Deferred to Phase 4+ (requires design thinking)
 
-
----
-
-## ~~Phase 3: P2P Reliability & State Sync~~ ✅ COMPLETED (v1.6.0)
-
-**Summary:** Implemented robust P2P state synchronization with GM authority model.
-
-**Key Deliverables:**
-- Connection state machine (connected/syncing/disconnected/error)
-- GM disconnect detection with player notification
-- State hash comparison for desync detection + recovery
-- Element versioning for conflict resolution
-- GM-only action enforcement
-- Grid settings broadcast
-- In-game chat with whispers
-
-*Moved to "P2P Networking" in Completed Features.*
-
----
-
-## ~~Phase 3.5: P2P Polish & Bug Fixes~~ ✅ COMPLETED (v1.7.0)
-
-**Summary:** Fixed P2P broadcast gaps and improved cursor performance.
-
-**Key Deliverables:**
-- Undo/redo state synchronization
-- Copy/cut/paste operations broadcast
-- Cursor throttling (10Hz max, 5px min delta)
-- Client-side cursor interpolation
-
-*Moved to "P2P Networking" in Completed Features.*
-
 ---
 
 ## Phase 4: Canvas & Tools Enhancements (ON HOLD)
 
-*Lower priority than P2P reliability*
-
-### Future Enhancements
 - [ ] Layer dropdown in Property Inspector (manually move elements between layers)
 - [ ] Token rotation control
 - [ ] Aura/radius indicator option
@@ -817,6 +417,62 @@ Add keyboard controls for moving selected tokens with arrow keys.
 - [ ] Share character data between apps
 - [ ] Deploy as integrated module
 - [ ] Unified visual theme
+
+---
+
+## Reference
+
+### Character Sheet Syntax
+
+| Syntax | Purpose | Example |
+|--------|---------|---------|
+| `Key:: Value` | Stat declaration | `Strength:: 18` |
+| `{{ expression }}` | Reactive computed field | `{{ (Strength - 10) / 2 }}` |
+| `[Label](action: dice)` | Action button | `[Attack](action: 1d20+5)` |
+| `[Label](action: dice; cost: Var)` | Action with resource cost | `[Smite](action: 2d8; cost: Slots)` |
+| `[bar: Var/Max]` | Inline bar widget | `[bar: HP/MaxHP]` |
+| `[dots: N/Max]` | Dot tracker widget | `[dots: 3/5]` |
+| `#bar` | Project stat to token bar | `HP:: 45 #bar` |
+| `#badge` | Project stat to token badge | `AC:: 18 #badge` |
+| `![[Name]]` | Transclude external content | `![[Fireball]]` |
+
+### Character Sheet File Structure
+
+```
+src/
+├── components/
+│   └── character/
+│       ├── CharacterSheetEditor.tsx      # Main TipTap editor
+│       ├── CharacterSheetModal.tsx       # Modal wrapper
+│       ├── CharacterLibraryPanel.tsx     # Library UI
+│       ├── SnippetLibraryPanel.tsx       # Snippet library UI
+│       └── extensions/
+│           ├── StatDeclaration.ts        # Key:: Value node
+│           ├── StatDeclarationComponent.tsx
+│           ├── Expression.ts             # {{ }} node
+│           ├── ExpressionComponent.tsx
+│           ├── ActionButton.ts           # [](action:) node
+│           ├── ActionButtonComponent.tsx
+│           ├── BarWidget.ts              # [bar:] node
+│           ├── BarWidgetComponent.tsx
+│           ├── DotsWidget.ts             # [dots:] node
+│           ├── DotsWidgetComponent.tsx
+│           ├── Transclusion.ts           # ![[]] node
+│           ├── TransclusionComponent.tsx
+│           ├── StatSuggestion.ts         # Autocomplete trigger
+│           └── SuggestionMenu.tsx        # Autocomplete UI
+├── services/
+│   ├── shadowStateService.ts             # Parse document → JSON
+│   ├── diceParser.ts                     # Dice formula + variable resolution
+│   ├── characterTemplates.ts             # D&D 5e, OSR, Blank templates
+│   └── tokenMigration.ts                # Old token → character migration
+├── stores/
+│   ├── characterStore.ts                 # Character CRUD + P2P sync
+│   └── snippetStore.ts                   # Transclusion content
+└── types/
+    ├── character.ts                      # Character interfaces
+    └── snippet.ts                        # Snippet interfaces
+```
 
 ---
 
