@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { AppShell, Box } from '@mantine/core';
+import { AppShell, Box, Drawer, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useGameStore } from './stores/gameStore';
 import { useRoom } from './hooks/useRoom';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -14,6 +15,15 @@ function App() {
   const { game, performUndo, performRedo, selectElement, selectedElementId } = useGameStore();
   const room = useRoom();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
+  useEffect(() => {
+    if (!isMobile && mobileSidebarOpen) {
+      setMobileSidebarOpen(false);
+    }
+  }, [isMobile, mobileSidebarOpen]);
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts({
@@ -69,20 +79,32 @@ function App() {
     return <Lobby room={room} />;
   }
 
+  const handleToggleSidebar = () => {
+    if (isMobile) {
+      setMobileSidebarOpen((open) => !open);
+    } else {
+      setSidebarOpen((open) => !open);
+    }
+  };
+
   return (
     <AppShell
       header={{ height: 50 }}
-      aside={{ 
-        width: sidebarOpen ? 300 : 0, 
-        breakpoint: 'sm',
-        collapsed: { mobile: !sidebarOpen, desktop: !sidebarOpen }
-      }}
+      aside={
+        isMobile
+          ? undefined
+          : {
+              width: sidebarOpen ? 300 : 0,
+              breakpoint: 'sm',
+              collapsed: { mobile: !sidebarOpen, desktop: !sidebarOpen },
+            }
+      }
       padding={0}
     >
       <AppShell.Header>
         <Toolbar 
-          sidebarOpen={sidebarOpen} 
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          sidebarOpen={isMobile ? mobileSidebarOpen : sidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
           room={room}
         />
       </AppShell.Header>
@@ -93,9 +115,24 @@ function App() {
         </Box>
       </AppShell.Main>
 
-      <AppShell.Aside p="md">
-        <Sidebar room={room} />
-      </AppShell.Aside>
+      {!isMobile && (
+        <AppShell.Aside p="md">
+          <Sidebar room={room} />
+        </AppShell.Aside>
+      )}
+
+      {isMobile && (
+        <Drawer
+          opened={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
+          position="right"
+          size={300}
+          padding="md"
+          title="Sidebar"
+        >
+          <Sidebar room={room} />
+        </Drawer>
+      )}
 
       {/* GM Disconnect Modal - only show for non-GM players */}
       <GMDisconnectModal

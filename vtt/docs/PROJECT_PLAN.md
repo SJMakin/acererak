@@ -330,7 +330,7 @@ Roll20's API (macros, scripts, mods) is what keeps power users. Lychgate's archi
 
 - [x] Ensure create/join game forms fit on mobile screen
 - [ ] Mobile-friendly toolbar layout
-- [ ] Responsive sidebar
+- [x] Responsive sidebar
 
 ---
 
@@ -400,7 +400,7 @@ Roll20's API (macros, scripts, mods) is what keeps power users. Lychgate's archi
 ### Mobile Support
 - [ ] Touch gesture optimization (pinch zoom, two-finger pan)
 - [ ] Mobile-friendly toolbar layout
-- [ ] Responsive sidebar
+- [x] Responsive sidebar
 - [ ] Touch-friendly element selection
 
 ### Testing
