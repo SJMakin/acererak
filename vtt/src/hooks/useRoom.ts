@@ -27,12 +27,25 @@ function hashGameState(game: GameState): string {
   // Get active scene for per-scene data
   const activeScene = getActiveScene(game);
 
+  const elementSignatures = activeScene
+    ? activeScene.elements
+        .map((element) => ({
+          id: element.id,
+          version: element.version ?? 0,
+          x: element.x,
+          y: element.y,
+        }))
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    : [];
+  const elementIds = elementSignatures.map((element) => element.id);
+
   // Hash important game state fields for desync detection
   const stateStr = JSON.stringify({
     activeSceneId: game.activeSceneId,
     sceneCount: game.scenes.length,
-    elementCount: activeScene?.elements.length || 0,
-    elementIds: activeScene?.elements.map(e => e.id).sort() || [],
+    elementCount: elementSignatures.length,
+    elementIds,
+    elementSignatures,
     fogEnabled: activeScene?.fogOfWar.enabled || false,
     fogRevealedCount: activeScene?.fogOfWar.revealed.length || 0,
     combatRound: game.combat?.round,
