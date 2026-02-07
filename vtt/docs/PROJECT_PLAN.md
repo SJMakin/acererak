@@ -329,7 +329,7 @@ Roll20's API (macros, scripts, mods) is what keeps power users. Lychgate's archi
 **Status:** In Progress | **Complexity:** Medium
 
 - [x] Ensure create/join game forms fit on mobile screen
-- [ ] Mobile-friendly toolbar layout
+- [x] Mobile-friendly toolbar layout
 - [x] Responsive sidebar
 
 ---

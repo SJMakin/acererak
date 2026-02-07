@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import {
   Group,
   ActionIcon,
@@ -16,8 +16,10 @@ import {
   Modal,
   Button,
   TextInput,
+  useMantineTheme,
   ActionIcon as MantineActionIcon,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   IconPointer,
   IconHandGrab,
@@ -47,6 +49,10 @@ import {
   IconEdit,
   IconShare,
   IconDatabase,
+  IconMenu2,
+  IconDots,
+  IconPalette,
+  IconRefresh,
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
@@ -78,7 +84,7 @@ interface ToolbarProps {
 }
 
 // Icon component type used across tool definitions
-type IconComponent = React.ComponentType<{ size?: number | string }>;
+type IconComponent = ComponentType<{ size?: number | string }>;
 
 // Basic tools always visible
 const basicTools: { id: ToolType; icon: IconComponent; label: string; shortcut?: string }[] = [
@@ -142,6 +148,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     setDrawingFillEnabled,
     setDrawingStrokeWidth,
   } = useGameStore();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const { canUndo, canRedo } = useHistoryStore();
   const [settingsOpened, setSettingsOpened] = useState(false);
   const [exportImportOpened, setExportImportOpened] = useState(false);
@@ -162,6 +170,16 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   // Check if current tool is a drawing tool or AOE tool
   const isDrawingTool = selectedTool.startsWith('draw-');
   const isAoeTool = selectedTool.startsWith('aoe-');
+  const connectionConfig = {
+    disconnected: { color: 'gray', label: 'Disconnected' },
+    connecting: { color: 'yellow', label: 'Connecting...' },
+    connected: { color: 'green', label: 'Connected' },
+    syncing: { color: 'blue', label: 'Syncing...' },
+    error: { color: 'red', label: 'Error' },
+  };
+  const connectionInfo = connectionConfig[room.connectionState];
+  const playerCount = room.peers.length + 1;
+  const isRoomConnected = room.connectionState === 'connected';
 
   // Handle SceneModal submission
   const handleSceneSubmit = (data: {
@@ -221,6 +239,501 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     }
     setEditingSceneName('');
   };
+
+  if (isMobile) {
+    const actionSize = 'xl';
+    const compactActionSize = 'lg';
+    const toolIconSize = 20;
+    const menuIconSize = 18;
+
+    return (
+      <Stack h="100%" px="xs" gap={4} w="100%">
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            <Tooltip label={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'} position="bottom">
+              <ActionIcon variant="subtle" size={compactActionSize} onClick={onToggleSidebar}>
+                <IconMenu2 size={menuIconSize} />
+              </ActionIcon>
+            </Tooltip>
+
+            <Text fw={600} size="sm" lineClamp={1} style={{ maxWidth: 160 }}>
+              🎲 {game?.name || 'Lychgate VTT'}
+            </Text>
+
+            {isGM && game && (() => {
+              const activeScene = game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0];
+              return (
+                <Menu shadow="md" width={220}>
+                  <Menu.Target>
+                    <Tooltip label="Switch Scene" position="bottom">
+                      <Button variant="subtle" color="gray" size="compact-sm" px="xs">
+                        <Group gap={6} wrap="nowrap">
+                          <IconMap size={16} />
+                          <Text size="xs" fw={500} lineClamp={1} style={{ maxWidth: 120 }}>
+                            {activeScene?.name || 'Scene'}
+                          </Text>
+                          <IconChevronDown size={12} />
+                        </Group>
+                      </Button>
+                    </Tooltip>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Scenes</Menu.Label>
+                    {game.scenes.map((scene) => (
+                      <Menu.Item
+                        key={scene.id}
+                        leftSection={<IconMap size={16} />}
+                        onClick={() => {
+                          useGameStore.getState().switchScene(scene.id);
+                          room.broadcastSceneSwitch(scene.id);
+                        }}
+                        color={scene.id === game.activeSceneId ? 'violet' : undefined}
+                        bg={scene.id === game.activeSceneId ? 'var(--mantine-color-violet-light)' : undefined}
+                      >
+                        <Group justify="space-between" gap="xs">
+                          <Text size="sm">{scene.name}</Text>
+                          {scene.id === game.activeSceneId && (
+                            <Badge size="xs" variant="light" color="violet">
+                              Active
+                            </Badge>
+                          )}
+                        </Group>
+                      </Menu.Item>
+                    ))}
+
+                    <Menu.Divider />
+
+                    <Menu.Item
+                      leftSection={<IconPlus size={16} />}
+                      onClick={() => {
+                        setEditingScene(undefined);
+                        setSceneModalOpened(true);
+                      }}
+                    >
+                      New Scene
+                    </Menu.Item>
+
+                    <Menu.Item
+                      leftSection={<IconCopy size={16} />}
+                      onClick={() => {
+                        if (activeScene) {
+                          const newSceneId = useGameStore.getState().duplicateScene(activeScene.id);
+                          const newScene = game.scenes.find(s => s.id === newSceneId);
+                          if (newScene) {
+                            room.broadcastSceneUpdate(newScene);
+                          }
+                        }
+                      }}
+                    >
+                      Duplicate Current Scene
+                    </Menu.Item>
+
+                    <Menu.Item
+                      leftSection={<IconEdit size={16} />}
+                      onClick={() => {
+                        setEditingScene(activeScene);
+                        setSceneModalOpened(true);
+                      }}
+                    >
+                      Edit Current Scene
+                    </Menu.Item>
+
+                    <Menu.Item
+                      leftSection={<IconSettings size={16} />}
+                      onClick={() => {
+                        setSceneManagerOpened(true);
+                      }}
+                    >
+                      Manage Scenes
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              );
+            })()}
+
+            {isGM && previewAsPlayer && (
+              <Badge
+                color="violet"
+                variant="filled"
+                size="xs"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setPreviewAsPlayer(false)}
+              >
+                👁️ Preview
+              </Badge>
+            )}
+          </Group>
+
+          <Group gap="xs" wrap="nowrap">
+            <Tooltip label="Undo (Ctrl+Z)" position="bottom">
+              <ActionIcon
+                variant="subtle"
+                size={compactActionSize}
+                onClick={() => {
+                  performUndo();
+                  room.broadcastSync();
+                }}
+                disabled={!canUndo()}
+              >
+                ↶
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Redo (Ctrl+Y)" position="bottom">
+              <ActionIcon
+                variant="subtle"
+                size={compactActionSize}
+                onClick={() => {
+                  performRedo();
+                  room.broadcastSync();
+                }}
+                disabled={!canRedo()}
+              >
+                ↷
+              </ActionIcon>
+            </Tooltip>
+
+            <Tooltip label="Settings" position="bottom">
+              <ActionIcon variant="subtle" size={compactActionSize} onClick={() => setSettingsOpened(true)}>
+                ⚙️
+              </ActionIcon>
+            </Tooltip>
+
+            <Menu shadow="md" width={240}>
+              <Menu.Target>
+                <ActionIcon variant="subtle" size={compactActionSize}>
+                  <IconDots size={menuIconSize} />
+                </ActionIcon>
+              </Menu.Target>
+
+              <Menu.Dropdown>
+                {room.roomId && (
+                  <>
+                    <Menu.Label>Connection</Menu.Label>
+                    <Menu.Item disabled>
+                      <Text size="xs" c="dimmed">Status: {connectionInfo.label}</Text>
+                    </Menu.Item>
+                    <Menu.Item disabled>
+                      <Text size="xs" c="dimmed">{playerCount} player{playerCount !== 1 ? 's' : ''}</Text>
+                    </Menu.Item>
+                    {!room.isHost && isRoomConnected && (
+                      <Menu.Item leftSection={<IconRefresh size={16} />} onClick={room.requestFullSync}>
+                        Request Sync
+                      </Menu.Item>
+                    )}
+                    <Menu.Divider />
+                  </>
+                )}
+
+                <Menu.Label>Game</Menu.Label>
+
+                {room.roomId && (
+                  <>
+                    <Menu.Label>Share</Menu.Label>
+                    <Menu.Item
+                      leftSection={<IconCopy size={16} />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(room.roomId!);
+                      }}
+                    >
+                      Copy Room ID
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconShare size={16} />}
+                      onClick={() => setShareGameOpened(true)}
+                    >
+                      Show QR Code
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconCopy size={16} />}
+                      onClick={() => {
+                        const joinLink = `${window.location.origin}${window.location.pathname}?room=${room.roomId}`;
+                        navigator.clipboard.writeText(joinLink);
+                      }}
+                    >
+                      Copy Join Link
+                    </Menu.Item>
+                    <Menu.Divider />
+                  </>
+                )}
+
+                <Menu.Item
+                  leftSection={<IconDatabase size={16} />}
+                  onClick={() => {
+                    setExportImportMode('export');
+                    setExportImportOpened(true);
+                  }}
+                >
+                  Save/Load...
+                </Menu.Item>
+
+                <Menu.Item
+                  leftSection={<IconSettings size={16} />}
+                  onClick={() => setSettingsOpened(true)}
+                >
+                  Settings...
+                </Menu.Item>
+
+                {room.roomId && (
+                  <>
+                    <Menu.Divider />
+                    <Menu.Item
+                      color="red"
+                      onClick={room.leaveRoom}
+                    >
+                      🚪 Leave Game
+                    </Menu.Item>
+                  </>
+                )}
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+        </Group>
+
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap">
+            {basicTools.map((tool) => (
+              <Tooltip
+                key={tool.id}
+                label={`${tool.label}${tool.shortcut ? ` (${tool.shortcut})` : ''}`}
+                position="bottom"
+              >
+                <ActionIcon
+                  variant={selectedTool === tool.id ? 'filled' : 'subtle'}
+                  color={selectedTool === tool.id ? 'violet' : 'gray'}
+                  size={actionSize}
+                  onClick={() => setTool(tool.id)}
+                >
+                  <tool.icon size={toolIconSize} />
+                </ActionIcon>
+              </Tooltip>
+            ))}
+
+            <Menu shadow="md" width={200}>
+              <Menu.Target>
+                <Tooltip label="Drawing Tools" position="bottom">
+                  <ActionIcon
+                    variant={isDrawingTool ? 'filled' : 'subtle'}
+                    color={isDrawingTool ? 'violet' : 'gray'}
+                    size={actionSize}
+                  >
+                    <Group gap={2} wrap="nowrap">
+                      {(() => {
+                        const currentDrawingTool = drawingTools.find(t => t.id === selectedTool);
+                        const Icon = currentDrawingTool?.icon || IconPencil;
+                        return <Icon size={toolIconSize} />;
+                      })()}
+                      <IconChevronDown size={12} />
+                    </Group>
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Drawing Tools</Menu.Label>
+                {drawingTools.map((tool) => (
+                  <Menu.Item
+                    key={tool.id}
+                    leftSection={<tool.icon size={16} />}
+                    onClick={() => setTool(tool.id)}
+                    color={selectedTool === tool.id ? 'violet' : undefined}
+                    bg={selectedTool === tool.id ? 'var(--mantine-color-violet-light)' : undefined}
+                  >
+                    <Group justify="space-between" gap="xs">
+                      <Text size="sm">{tool.label}</Text>
+                      {tool.shortcut && (
+                        <Badge size="xs" variant="light" color="gray">
+                          {tool.shortcut}
+                        </Badge>
+                      )}
+                    </Group>
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+
+          <Group gap="xs" wrap="nowrap">
+            <Menu shadow="md" width={240}>
+              <Menu.Target>
+                <Tooltip label="More Tools" position="bottom">
+                  <ActionIcon variant="subtle" size={actionSize}>
+                    <IconPalette size={toolIconSize} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Utility Tools</Menu.Label>
+                {utilityTools.map((tool) => (
+                  <Menu.Item
+                    key={tool.id}
+                    leftSection={<tool.icon size={16} />}
+                    onClick={() => setTool(tool.id)}
+                    color={selectedTool === tool.id ? 'violet' : undefined}
+                    bg={selectedTool === tool.id ? 'var(--mantine-color-violet-light)' : undefined}
+                  >
+                    <Group justify="space-between" gap="xs">
+                      <Text size="sm">{tool.label}</Text>
+                      {tool.shortcut && (
+                        <Badge size="xs" variant="light" color="gray">
+                          {tool.shortcut}
+                        </Badge>
+                      )}
+                    </Group>
+                  </Menu.Item>
+                ))}
+
+                <Menu.Divider />
+
+                <Menu.Label>Area Templates</Menu.Label>
+                {aoeTools.map((tool) => (
+                  <Menu.Item
+                    key={tool.id}
+                    leftSection={<tool.icon size={16} />}
+                    onClick={() => setTool(tool.id)}
+                    color={selectedTool === tool.id ? 'orange' : undefined}
+                    bg={selectedTool === tool.id ? 'var(--mantine-color-orange-light)' : undefined}
+                  >
+                    <Stack gap={0}>
+                      <Text size="sm">{tool.label}</Text>
+                      <Text size="xs" c="dimmed">{tool.description}</Text>
+                    </Stack>
+                  </Menu.Item>
+                ))}
+
+                {isGM && (
+                  <>
+                    <Menu.Divider />
+                    <Menu.Label>GM Tools</Menu.Label>
+                    {dmTools.map((tool) => (
+                      <Menu.Item
+                        key={tool.id}
+                        leftSection={<tool.icon size={16} />}
+                        onClick={() => setTool(tool.id)}
+                        color={selectedTool === tool.id ? 'violet' : undefined}
+                        bg={selectedTool === tool.id ? 'var(--mantine-color-violet-light)' : undefined}
+                      >
+                        <Text size="sm">{tool.label}</Text>
+                      </Menu.Item>
+                    ))}
+                  </>
+                )}
+
+                <Menu.Divider />
+                <Menu.Label>View</Menu.Label>
+                <Menu.Item onClick={() => handleZoom(0.8)}>Zoom Out</Menu.Item>
+                <Menu.Item onClick={() => handleZoom(1.25)}>Zoom In</Menu.Item>
+                <Menu.Item onClick={() => setViewport({ x: 0, y: 0 }, 1)}>Reset Zoom</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+        </Group>
+
+        {isDrawingTool && (
+          <Group gap="xs" wrap="nowrap">
+            <Popover position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <Tooltip label="Stroke Color" position="bottom">
+                  <ActionIcon
+                    variant="subtle"
+                    size={compactActionSize}
+                    style={{
+                      backgroundColor: drawingStrokeColor,
+                      border: '2px solid #fff',
+                    }}
+                  >
+                    <Box w={18} h={18} />
+                  </ActionIcon>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <Stack gap="xs">
+                  <Text size="xs" fw={600}>Stroke Color</Text>
+                  <ColorInput
+                    value={drawingStrokeColor}
+                    onChange={setDrawingStrokeColor}
+                    format="hex"
+                    swatches={['#ffffff', '#000000', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']}
+                  />
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+
+            <Popover position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <Tooltip label="Fill Color" position="bottom">
+                  <ActionIcon
+                    variant="subtle"
+                    size={compactActionSize}
+                    style={{
+                      backgroundColor: drawingFillEnabled ? drawingFillColor : 'transparent',
+                      border: `2px solid ${drawingFillEnabled ? '#fff' : '#666'}`,
+                      opacity: drawingFillEnabled ? 1 : 0.5,
+                    }}
+                  >
+                    <Box w={18} h={18} />
+                  </ActionIcon>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <Stack gap="xs">
+                  <Group justify="space-between">
+                    <Text size="xs" fw={600}>Fill Color</Text>
+                    <Switch
+                      size="xs"
+                      checked={drawingFillEnabled}
+                      onChange={(e) => setDrawingFillEnabled(e.currentTarget.checked)}
+                      label="Fill"
+                    />
+                  </Group>
+                  <ColorInput
+                    value={drawingFillColor}
+                    onChange={setDrawingFillColor}
+                    format="hex"
+                    disabled={!drawingFillEnabled}
+                    swatches={['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']}
+                  />
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+
+            <Popover position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <Tooltip label={`Stroke Width: ${drawingStrokeWidth}px`} position="bottom">
+                  <ActionIcon variant="subtle" size={compactActionSize}>
+                    <Text size="sm" fw={600}>{drawingStrokeWidth}</Text>
+                  </ActionIcon>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <Stack gap="xs">
+                  <Text size="xs" fw={600}>Stroke Width</Text>
+                  <NumberInput
+                    value={drawingStrokeWidth}
+                    onChange={(val) => setDrawingStrokeWidth(Number(val) || 3)}
+                    min={1}
+                    max={10}
+                    step={1}
+                    w={100}
+                  />
+                  <Group gap={4}>
+                    {[1, 2, 3, 5, 8, 10].map((width) => (
+                      <ActionIcon
+                        key={width}
+                        size="sm"
+                        variant={drawingStrokeWidth === width ? 'filled' : 'subtle'}
+                        onClick={() => setDrawingStrokeWidth(width)}
+                      >
+                        {width}
+                      </ActionIcon>
+                    ))}
+                  </Group>
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+          </Group>
+        )}
+      </Stack>
+    );
+  }
 
   return (
     <Group h="100%" px="md" justify="space-between">

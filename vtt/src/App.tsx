@@ -12,12 +12,14 @@ import Sidebar from './components/Sidebar';
 import GMDisconnectModal from './components/GMDisconnectModal';
 
 function App() {
-  const { game, performUndo, performRedo, selectElement, selectedElementId } = useGameStore();
+  const { game, performUndo, performRedo, selectElement, selectedElementId, selectedTool } = useGameStore();
   const room = useRoom();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const isDrawingTool = selectedTool?.startsWith('draw-') ?? false;
+  const headerHeight = isMobile ? (isDrawingTool ? 140 : 96) : 50;
 
   useEffect(() => {
     if (!isMobile && mobileSidebarOpen) {
@@ -89,7 +91,7 @@ function App() {
 
   return (
     <AppShell
-      header={{ height: 50 }}
+      header={{ height: headerHeight }}
       aside={
         isMobile
           ? undefined
@@ -110,7 +112,7 @@ function App() {
       </AppShell.Header>
 
       <AppShell.Main>
-        <Box style={{ width: '100%', height: 'calc(100vh - 50px)' }}>
+        <Box style={{ width: '100%', height: `calc(100vh - ${headerHeight}px)` }}>
           <GameCanvas room={room} />
         </Box>
       </AppShell.Main>
