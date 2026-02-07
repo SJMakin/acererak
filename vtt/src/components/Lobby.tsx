@@ -20,6 +20,7 @@ import {
   Alert,
   Loader,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { QRCodeSVG } from 'qrcode.react';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
@@ -39,6 +40,8 @@ interface LobbyProps {
 export default function Lobby({ room }: LobbyProps) {
   const { createGame, loadGame } = useGameStore();
   const [activeTab, setActiveTab] = useState<string | null>('recent');
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const formSpacing = isMobile ? 'sm' : 'md';
   
   // Create game form
   const [gameName, setGameName] = useState('');
@@ -130,243 +133,270 @@ export default function Lobby({ room }: LobbyProps) {
   };
 
   return (
-    <Container size="sm" py="xl">
-      <Paper shadow="md" p="xl" radius="md" withBorder>
-        <Title order={1} ta="center" mb="md">
-          🎲 Lychgate VTT
-        </Title>
-        <Text c="dimmed" ta="center" mb="xl">
-          Decentralized Virtual Tabletop for TTRPG
-        </Text>
+    <Box className="lobby-root">
+      <Container size="sm" py={isMobile ? 'md' : 'xl'} px={isMobile ? 'md' : undefined} fluid={isMobile}>
+        <Paper
+          shadow={isMobile ? 'sm' : 'md'}
+          p={isMobile ? 'md' : 'xl'}
+          radius="md"
+          withBorder
+          style={isMobile ? { width: '100%' } : undefined}
+        >
+          <Title order={isMobile ? 2 : 1} ta="center" mb={isMobile ? 'xs' : 'md'}>
+            🎲 Lychgate VTT
+          </Title>
+          <Text c="dimmed" ta="center" mb={isMobile ? 'md' : 'xl'} size={isMobile ? 'sm' : 'md'}>
+            Decentralized Virtual Tabletop for TTRPG
+          </Text>
 
-        <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List grow mb="lg">
-            <Tabs.Tab value="recent">Recent Games</Tabs.Tab>
-            <Tabs.Tab value="create">Create Game</Tabs.Tab>
-            <Tabs.Tab value="join">Join Game</Tabs.Tab>
-          </Tabs.List>
+          <Tabs value={activeTab} onChange={setActiveTab}>
+            <Tabs.List
+              grow={!isMobile}
+              mb={isMobile ? 'md' : 'lg'}
+              style={{ flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : undefined }}
+            >
+              <Tabs.Tab value="recent">Recent Games</Tabs.Tab>
+              <Tabs.Tab value="create">Create Game</Tabs.Tab>
+              <Tabs.Tab value="join">Join Game</Tabs.Tab>
+            </Tabs.List>
 
-          <Tabs.Panel value="recent">
-            <Stack>
-              {recentGames.length === 0 ? (
-                <Text c="dimmed" ta="center" py="xl">
-                  No saved games yet. Create a new game to get started!
-                </Text>
-              ) : (
-                recentGames.map((game) => (
-                  <Card key={game.id} shadow="sm" padding="md" radius="md" withBorder>
-                    <Group justify="space-between" mb="xs">
-                      <Text fw={500}>{game.name}</Text>
-                      <Group gap="xs">
-                        {game.isGM && (
-                          <Badge color="violet" variant="light" size="sm">
-                            GM
+            <Tabs.Panel value="recent">
+              <Stack gap={formSpacing}>
+                {recentGames.length === 0 ? (
+                  <Text c="dimmed" ta="center" py={isMobile ? 'md' : 'xl'}>
+                    No saved games yet. Create a new game to get started!
+                  </Text>
+                ) : (
+                  recentGames.map((game) => (
+                    <Card key={game.id} shadow="sm" padding="md" radius="md" withBorder>
+                      <Group
+                        justify="space-between"
+                        mb="xs"
+                        style={isMobile ? { flexWrap: 'wrap', gap: 8 } : undefined}
+                      >
+                        <Text fw={500}>{game.name}</Text>
+                        <Group gap="xs">
+                          {game.isGM && (
+                            <Badge color="violet" variant="light" size="sm">
+                              GM
+                            </Badge>
+                          )}
+                          <Badge color="gray" variant="light" size="sm">
+                            {game.playerCount} {game.playerCount === 1 ? 'player' : 'players'}
                           </Badge>
-                        )}
-                        <Badge color="gray" variant="light" size="sm">
-                          {game.playerCount} {game.playerCount === 1 ? 'player' : 'players'}
-                        </Badge>
+                        </Group>
                       </Group>
-                    </Group>
-                    
-                    <Text size="sm" c="dimmed" mb="md">
-                      Last played: {formatDate(game.lastUpdated)}
-                    </Text>
+                      
+                      <Text size="sm" c="dimmed" mb="md">
+                        Last played: {formatDate(game.lastUpdated)}
+                      </Text>
 
-                    <Group justify="flex-end">
+                      <Group justify="flex-end" style={isMobile ? { flexWrap: 'wrap', gap: 8 } : undefined}>
+                        <Button
+                          variant="subtle"
+                          color="red"
+                          size={isMobile ? 'sm' : 'xs'}
+                          onClick={() => handleDeleteGame(game.id)}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          variant="filled"
+                          size={isMobile ? 'sm' : 'xs'}
+                          onClick={() => handleLoadGame(game)}
+                        >
+                          Load Game
+                        </Button>
+                      </Group>
+                    </Card>
+                  ))
+                )}
+              </Stack>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="create">
+              {!createdRoomId ? (
+                <Stack gap={formSpacing}>
+                  {room.error && (
+                    <Alert color="red" title="Connection Error">
+                      {room.error}
+                    </Alert>
+                  )}
+                  <TextInput
+                    label="Game Name"
+                    placeholder="My Epic Campaign"
+                    value={gameName}
+                    onChange={(e) => setGameName(e.currentTarget.value)}
+                    required
+                  />
+                  <TextInput
+                    label="Your Name (GM)"
+                    placeholder="Game Master"
+                    value={gmName}
+                    onChange={(e) => setGmName(e.currentTarget.value)}
+                    required
+                  />
+                  <Button
+                    fullWidth
+                    mt="md"
+                    size={isMobile ? 'md' : 'sm'}
+                    onClick={handleCreateGame}
+                    disabled={!gameName.trim() || !gmName.trim() || room.connectionState === 'connecting'}
+                    leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
+                  >
+                    {room.connectionState === 'connecting' ? 'Creating...' : 'Create Game'}
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack align="center" gap={isMobile ? 'sm' : 'xs'}>
+                  {room.error && (
+                    <Alert color="red" title="Connection Error" style={{ width: '100%' }} py="xs">
+                      {room.error}
+                    </Alert>
+                  )}
+                  <Group gap="xs" justify="center" style={isMobile ? { flexWrap: 'wrap' } : undefined}>
+                    {room.connectionState === 'connecting' && (
+                      <Group gap="xs">
+                        <Loader size="xs" />
+                        <Text c="dimmed" size="xs">Connecting...</Text>
+                      </Group>
+                    )}
+                    {room.connectionState === 'connected' && (
+                      <Badge color="green" size="sm" variant="light">
+                        Connected
+                      </Badge>
+                    )}
+                    <Text fw={500}>Game Created!</Text>
+                  </Group>
+                  <Text c="dimmed" size="xs">
+                    Share this QR code or link with your players
+                  </Text>
+
+                  <Box
+                    p="xs"
+                    bg="white"
+                    style={{ borderRadius: 6 }}
+                  >
+                    <QRCodeSVG
+                      value={getShareUrl()}
+                      size={isMobile ? 120 : 140}
+                      level="M"
+                    />
+                  </Box>
+
+                  <Group gap="xs" align="center" w="100%">
+                    <Code
+                      block
+                      style={{
+                        flex: 1,
+                        fontSize: isMobile ? '0.7rem' : '0.75rem',
+                        wordBreak: 'break-all',
+                      }}
+                      data-testid="room-code"
+                    >
+                      {createdRoomId}
+                    </Code>
+                    <CopyButton value={createdRoomId}>
+                      {({ copied, copy }) => (
+                        <Tooltip label={copied ? 'Copied!' : 'Copy Room ID'}>
+                          <ActionIcon
+                            color={copied ? 'teal' : 'gray'}
+                            variant="subtle"
+                            size={isMobile ? 'md' : 'sm'}
+                            onClick={copy}
+                          >
+                            {copied ? '✓' : '📋'}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </CopyButton>
+                  </Group>
+
+                  <CopyButton value={getShareUrl()}>
+                    {({ copied, copy }) => (
                       <Button
-                        variant="subtle"
-                        color="red"
-                        size="xs"
-                        onClick={() => handleDeleteGame(game.id)}
+                        variant="light"
+                        color={copied ? 'teal' : 'blue'}
+                        onClick={copy}
+                        fullWidth
+                        size={isMobile ? 'sm' : 'xs'}
                       >
-                        Delete
+                        {copied ? 'Link Copied!' : 'Copy Invite Link'}
                       </Button>
-                      <Button
-                        variant="filled"
-                        size="xs"
-                        onClick={() => handleLoadGame(game)}
-                      >
-                        Load Game
-                      </Button>
-                    </Group>
-                  </Card>
-                ))
+                    )}
+                  </CopyButton>
+
+                  <Text size="xs" c="dimmed">
+                    Waiting for players... ({room.peers.length} connected)
+                  </Text>
+
+                  <Button
+                    fullWidth
+                    size={isMobile ? 'md' : 'sm'}
+                    onClick={handleStartGame}
+                  >
+                    Start Game →
+                  </Button>
+                </Stack>
               )}
-            </Stack>
-          </Tabs.Panel>
+            </Tabs.Panel>
 
-          <Tabs.Panel value="create">
-            {!createdRoomId ? (
-              <Stack>
+            <Tabs.Panel value="join">
+              <Stack gap={formSpacing}>
                 {room.error && (
                   <Alert color="red" title="Connection Error">
                     {room.error}
                   </Alert>
                 )}
+                {room.connectionState === 'connecting' && (
+                  <Alert color="blue" title="Connecting">
+                    <Group gap="xs">
+                      <Loader size="sm" />
+                      <Text size="sm">Establishing P2P connection... This may take up to 30 seconds.</Text>
+                    </Group>
+                  </Alert>
+                )}
                 <TextInput
-                  label="Game Name"
-                  placeholder="My Epic Campaign"
-                  value={gameName}
-                  onChange={(e) => setGameName(e.currentTarget.value)}
+                  label="Room ID"
+                  placeholder="Enter room ID or scan QR"
+                  value={joinRoomId}
+                  onChange={(e) => setJoinRoomId(e.currentTarget.value)}
                   required
+                  disabled={room.connectionState === 'connecting'}
                 />
                 <TextInput
-                  label="Your Name (GM)"
-                  placeholder="Game Master"
-                  value={gmName}
-                  onChange={(e) => setGmName(e.currentTarget.value)}
+                  label="Your Name"
+                  placeholder="Player Name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.currentTarget.value)}
                   required
+                  disabled={room.connectionState === 'connecting'}
+                />
+                <ColorInput
+                  label="Your Color"
+                  value={playerColor}
+                  onChange={setPlayerColor}
+                  swatches={[
+                    '#3b82f6', '#ef4444', '#22c55e', '#f59e0b',
+                    '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'
+                  ]}
+                  disabled={room.connectionState === 'connecting'}
                 />
                 <Button
                   fullWidth
                   mt="md"
-                  onClick={handleCreateGame}
-                  disabled={!gameName.trim() || !gmName.trim() || room.connectionState === 'connecting'}
+                  size={isMobile ? 'md' : 'sm'}
+                  onClick={handleJoinGame}
+                  disabled={!joinRoomId.trim() || !playerName.trim() || room.connectionState === 'connecting'}
                   leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
                 >
-                  {room.connectionState === 'connecting' ? 'Creating...' : 'Create Game'}
+                  {room.connectionState === 'connecting' ? 'Joining...' : 'Join Game'}
                 </Button>
               </Stack>
-            ) : (
-              <Stack align="center" gap="xs">
-                {room.error && (
-                  <Alert color="red" title="Connection Error" style={{ width: '100%' }} py="xs">
-                    {room.error}
-                  </Alert>
-                )}
-                <Group gap="xs" justify="center">
-                  {room.connectionState === 'connecting' && (
-                    <Group gap="xs">
-                      <Loader size="xs" />
-                      <Text c="dimmed" size="xs">Connecting...</Text>
-                    </Group>
-                  )}
-                  {room.connectionState === 'connected' && (
-                    <Badge color="green" size="sm" variant="light">
-                      Connected
-                    </Badge>
-                  )}
-                  <Text fw={500}>Game Created!</Text>
-                </Group>
-                <Text c="dimmed" size="xs">
-                  Share this QR code or link with your players
-                </Text>
-
-                <Box
-                  p="xs"
-                  bg="white"
-                  style={{ borderRadius: 6 }}
-                >
-                  <QRCodeSVG
-                    value={getShareUrl()}
-                    size={140}
-                    level="M"
-                  />
-                </Box>
-
-                <Group gap="xs" align="center" w="100%">
-                  <Code block style={{ flex: 1, fontSize: '0.75rem' }} data-testid="room-code">
-                    {createdRoomId}
-                  </Code>
-                  <CopyButton value={createdRoomId}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? 'Copied!' : 'Copy Room ID'}>
-                        <ActionIcon
-                          color={copied ? 'teal' : 'gray'}
-                          variant="subtle"
-                          size="sm"
-                          onClick={copy}
-                        >
-                          {copied ? '✓' : '📋'}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-
-                <CopyButton value={getShareUrl()}>
-                  {({ copied, copy }) => (
-                    <Button
-                      variant="light"
-                      color={copied ? 'teal' : 'blue'}
-                      onClick={copy}
-                      fullWidth
-                      size="xs"
-                    >
-                      {copied ? 'Link Copied!' : 'Copy Invite Link'}
-                    </Button>
-                  )}
-                </CopyButton>
-
-                <Text size="xs" c="dimmed">
-                  Waiting for players... ({room.peers.length} connected)
-                </Text>
-
-                <Button
-                  fullWidth
-                  onClick={handleStartGame}
-                >
-                  Start Game →
-                </Button>
-              </Stack>
-            )}
-          </Tabs.Panel>
-
-          <Tabs.Panel value="join">
-            <Stack>
-              {room.error && (
-                <Alert color="red" title="Connection Error">
-                  {room.error}
-                </Alert>
-              )}
-              {room.connectionState === 'connecting' && (
-                <Alert color="blue" title="Connecting">
-                  <Group gap="xs">
-                    <Loader size="sm" />
-                    <Text size="sm">Establishing P2P connection... This may take up to 30 seconds.</Text>
-                  </Group>
-                </Alert>
-              )}
-              <TextInput
-                label="Room ID"
-                placeholder="Enter room ID or scan QR"
-                value={joinRoomId}
-                onChange={(e) => setJoinRoomId(e.currentTarget.value)}
-                required
-                disabled={room.connectionState === 'connecting'}
-              />
-              <TextInput
-                label="Your Name"
-                placeholder="Player Name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.currentTarget.value)}
-                required
-                disabled={room.connectionState === 'connecting'}
-              />
-              <ColorInput
-                label="Your Color"
-                value={playerColor}
-                onChange={setPlayerColor}
-                swatches={[
-                  '#3b82f6', '#ef4444', '#22c55e', '#f59e0b',
-                  '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'
-                ]}
-                disabled={room.connectionState === 'connecting'}
-              />
-              <Button
-                fullWidth
-                mt="md"
-                onClick={handleJoinGame}
-                disabled={!joinRoomId.trim() || !playerName.trim() || room.connectionState === 'connecting'}
-                leftSection={room.connectionState === 'connecting' ? <Loader size="xs" /> : undefined}
-              >
-                {room.connectionState === 'connecting' ? 'Joining...' : 'Join Game'}
-              </Button>
-            </Stack>
-          </Tabs.Panel>
-        </Tabs>
-      </Paper>
-    </Container>
+            </Tabs.Panel>
+          </Tabs>
+        </Paper>
+      </Container>
+    </Box>
   );
 }

@@ -16,6 +16,16 @@ body {
   color: #C1C2C5;
 }
 
+/* Lobby layout (allows internal scrolling while keeping app shell locked) */
+.lobby-root {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Canvas container */
 .canvas-container {
   width: 100%;
