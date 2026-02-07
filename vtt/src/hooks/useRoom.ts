@@ -365,7 +365,11 @@ export function useRoom() {
       const currentGame = useGameStore.getState().game;
       if (isHost && currentGame) {
         console.log('Sending game sync to new peer:', peerId);
-        sendSync(currentGame, [peerId]);
+        const syncPayload = {
+          ...currentGame,
+          characters: useCharacterStore.getState().characters,
+        };
+        sendSync(syncPayload, [peerId]);
       }
     });
 
@@ -399,6 +403,9 @@ export function useRoom() {
     onSync((gameState: GameState, peerId: string) => {
       console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
+      if (gameState.characters) {
+        useCharacterStore.getState().setCharacters(gameState.characters);
+      }
       // Track sync time and GM peer ID
       setRoomState(prev => ({
         ...prev,
@@ -457,7 +464,11 @@ export function useRoom() {
       const currentGame = useGameStore.getState().game;
       if (isHost && currentGame) {
         console.log('Sending game sync on request to peer:', peerId);
-        sendSync(currentGame, [peerId]);
+        const syncPayload = {
+          ...currentGame,
+          characters: useCharacterStore.getState().characters,
+        };
+        sendSync(syncPayload, [peerId]);
       }
     });
 
@@ -667,7 +678,10 @@ export function useRoom() {
 
   const broadcastSync = useCallback(() => {
     if (actionsRef.current.sendSync && game) {
-      actionsRef.current.sendSync(game);
+      actionsRef.current.sendSync({
+        ...game,
+        characters: useCharacterStore.getState().characters,
+      });
     }
   }, [game]);
 

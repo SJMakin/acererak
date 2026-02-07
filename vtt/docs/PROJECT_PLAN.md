@@ -216,7 +216,7 @@ Images are raw external URLs with no caching, deduplication, or distribution lay
 - [ ] **P1:** Audit Trystero data channel reliability settings — enforce ordered+reliable for state channels
 - [x] **P1:** Strengthen `hashGameState()` to include element versions/positions
 - [ ] **P1:** Build E2E sync fuzz tests (random tool usage across two browser sessions, assert hash convergence)
-- [ ] **P2:** Add version-based conflict resolution to character updates
+- [x] **P2:** Add version-based conflict resolution to character updates
 - [ ] **P2:** Profile game state JSON size across typical sessions; set alarms for >100KB
 - [ ] **P2:** Implement chunked/incremental sync as alternative to full-state sync
 - [ ] **P3:** Automatic reconnection with exponential backoff + resync

@@ -2,6 +2,7 @@
 
 export type Character = {
   id: string;
+  version?: number; // Incremented on each update for conflict resolution
   name: string;
   content: string; // TipTap JSON document
   shadowState: Record<string, number | string>; // Parsed stats

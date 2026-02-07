@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { Character } from '../types';
 import { saveCharacters, loadCharacters } from '../db/database';
+import { parseShadowState } from '../services/shadowStateService';
 
 interface CharacterStore {
   characters: Character[];
@@ -21,7 +22,7 @@ interface CharacterStore {
   // Queries
   getCharacterById: (id: string) => Character | undefined;
 
-  // Bulk operations
+  // Bulk operations (hydration only; does not persist or broadcast)
   setCharacters: (characters: Character[]) => void;
   loadFromDB: () => Promise<void>;
 
@@ -43,6 +44,7 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     const character: Character = {
       ...characterData,
       id,
+      version: 1,
       createdAt: now,
       updatedAt: now,
     };
@@ -70,8 +72,19 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
   updateCharacter: (id, updates) => {
     set((state) => {
       const now = new Date().toISOString();
+      const existing = state.characters.find((char) => char.id === id);
+      if (!existing) return state;
+      const newVersion = (existing.version || 0) + 1;
+      const { id: _id, createdAt: _createdAt, version: _version, updatedAt: _updatedAt, ...safeUpdates } = updates;
       const updatedCharacters = state.characters.map((char) =>
-        char.id === id ? { ...char, ...updates, updatedAt: now } : char
+        char.id === id
+          ? {
+              ...char,
+              ...safeUpdates,
+              version: newVersion,
+              updatedAt: now,
+            }
+          : char
       );
 
       // Persist to IndexedDB if GM
@@ -150,9 +163,18 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
         }
 
         const now = new Date().toISOString();
+        const newVersion = (character.version || 0) + 1;
+        const parsedShadow = parseShadowState(content);
         const updatedCharacters = state.characters.map((char) =>
           char.id === characterId
-            ? { ...char, content: JSON.stringify(content), updatedAt: now }
+            ? {
+                ...char,
+                content: JSON.stringify(content),
+                shadowState: parsedShadow.stats,
+                projections: parsedShadow.projections,
+                version: newVersion,
+                updatedAt: now,
+              }
             : char
         );
 
@@ -211,18 +233,42 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
 export function handleIncomingCharacterUpdate(character: Character) {
   const store = useCharacterStore.getState();
   const existing = store.getCharacterById(character.id);
+
+  const applyCharacters = (characters: Character[]) => {
+    useCharacterStore.setState({ characters });
+    if (store.isGM) {
+      saveCharacters(characters).catch((err) => {
+        console.error('Failed to save characters:', err);
+      });
+    }
+  };
   
   if (existing) {
+    // Version-based conflict resolution: ignore stale updates; equal version uses LWW semantics
+    const incomingVersion = character.version || 0;
+    const localVersion = existing.version || 0;
+
+    if (incomingVersion < localVersion) {
+      return;
+    }
+
     // Update existing character
-    store.updateCharacter(character.id, character);
+    const updatedCharacters = store.characters.map((char) =>
+      char.id === character.id ? { ...char, ...character } : char
+    );
+    applyCharacters(updatedCharacters);
   } else {
     // Add new character
-    store.addCharacter({
-      name: character.name,
-      content: character.content,
-      shadowState: character.shadowState,
-      projections: character.projections,
-    });
+    const now = new Date().toISOString();
+    applyCharacters([
+      ...store.characters,
+      {
+        ...character,
+        version: character.version || 1,
+        createdAt: character.createdAt || now,
+        updatedAt: character.updatedAt || now,
+      },
+    ]);
   }
 }
 
@@ -232,7 +278,13 @@ export function handleIncomingCharacterDelete(characterId: string) {
   const existing = store.getCharacterById(characterId);
   
   if (existing) {
-    store.deleteCharacter(characterId);
+    const remaining = store.characters.filter((char) => char.id !== characterId);
+    useCharacterStore.setState({ characters: remaining });
+    if (store.isGM) {
+      saveCharacters(remaining).catch((err) => {
+        console.error('Failed to save characters:', err);
+      });
+    }
   }
 }
 
