@@ -213,7 +213,7 @@ Images are raw external URLs with no caching, deduplication, or distribution lay
 
 ### Hardening Tasks
 
-- [ ] **P1:** Audit Trystero data channel reliability settings — enforce ordered+reliable for state channels
+- [x] **P1:** Audit Trystero data channel reliability settings — enforce ordered+reliable for state channels
 - [x] **P1:** Strengthen `hashGameState()` to include element versions/positions
 - [ ] **P1:** Build E2E sync fuzz tests (random tool usage across two browser sessions, assert hash convergence)
 - [x] **P2:** Add version-based conflict resolution to character updates

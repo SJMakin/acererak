@@ -62,7 +62,7 @@ function hashGameState(game: GameState): string {
 
 // ICE server configuration for WebRTC
 // Includes STUN servers for NAT traversal and free TURN servers for relay fallback
-const rtcConfig: RTCConfiguration = {
+const rtcBaseConfig: RTCConfiguration = {
   iceServers: [
     // Google STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
@@ -86,10 +86,28 @@ const rtcConfig: RTCConfiguration = {
   ],
 };
 
+// Trystero forwards rtcConfig into simple-peer; channelConfig controls data channel reliability.
+type TrysteroRtcConfig = {
+  config?: RTCConfiguration;
+  channelConfig?: RTCDataChannelInit;
+};
+
+const reliableRtcConfig: TrysteroRtcConfig = {
+  config: rtcBaseConfig,
+  channelConfig: { ordered: true },
+};
+
+const unreliableRtcConfig: TrysteroRtcConfig = {
+  config: rtcBaseConfig,
+  channelConfig: { ordered: false, maxRetransmits: 0 },
+};
+
+const PRESENCE_ROOM_SUFFIX = ':presence';
+
 // Trystero room configuration
 interface RoomConfig {
   appId: string;
-  rtcConfig?: RTCConfiguration;
+  rtcConfig?: TrysteroRtcConfig;
 }
 
 // Define Room type manually to match trystero
@@ -131,6 +149,7 @@ type ActionSender<T> = (data: T, targetPeers?: string[]) => void;
 
 export function useRoom() {
   const roomRef = useRef<Room | null>(null);
+  const presenceRoomRef = useRef<Room | null>(null);
   const [roomState, setRoomState] = useState<RoomState>({
     roomId: null,
     peers: [],
@@ -150,8 +169,6 @@ export function useRoom() {
     sendSync?: ActionSender<GameState>;
     sendElementUpdate?: ActionSender<CanvasElement>;
     sendElementDelete?: ActionSender<string>;
-    sendCursor?: ActionSender<Point>;
-    sendPing?: ActionSender<{ position: Point; color: string }>;
     sendPlayerJoin?: ActionSender<Player>;
     sendPlayerLeave?: ActionSender<string>;
     sendRequestSync?: ActionSender<null>;
@@ -164,6 +181,11 @@ export function useRoom() {
     sendSceneUpdate?: ActionSender<Scene>;
     sendCharacterUpdate?: ActionSender<Character>;
     sendCharacterDelete?: ActionSender<string>;
+  }>({});
+
+  const presenceActionsRef = useRef<{
+    sendCursor?: ActionSender<Point>;
+    sendPing?: ActionSender<{ position: Point; color: string }>;
   }>({});
 
   const {
@@ -205,12 +227,20 @@ export function useRoom() {
         if (roomRef.current) {
           roomRef.current.leave();
         }
+        if (presenceRoomRef.current) {
+          presenceRoomRef.current.leave();
+        }
+        presenceActionsRef.current = {};
 
         const trystero = await loadTrystero();
-        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig }, roomId);
+        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig: reliableRtcConfig }, roomId);
+        const presenceRoomId = `${roomId}${PRESENCE_ROOM_SUFFIX}`;
+        const presenceRoom = trystero.joinRoom({ appId: APP_ID, rtcConfig: unreliableRtcConfig }, presenceRoomId);
         roomRef.current = room;
+        presenceRoomRef.current = presenceRoom;
 
         setupRoomHandlers(room, true);
+        setupPresenceHandlers(presenceRoom);
 
         setRoomState(prev => ({
           ...prev,
@@ -229,7 +259,7 @@ export function useRoom() {
     })();
 
     return roomId;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- setupRoomHandlers is defined after this callback; called inside async closure so ref is stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setupRoomHandlers/setupPresenceHandlers are defined after this callback; called inside async closure so ref is stable
   }, [myPeerId, setConnected]);
 
   // Join an existing room (as player)
@@ -251,12 +281,20 @@ export function useRoom() {
         if (roomRef.current) {
           roomRef.current.leave();
         }
+        if (presenceRoomRef.current) {
+          presenceRoomRef.current.leave();
+        }
+        presenceActionsRef.current = {};
 
         const trystero = await loadTrystero();
-        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig }, roomId);
+        const room = trystero.joinRoom({ appId: APP_ID, rtcConfig: reliableRtcConfig }, roomId);
+        const presenceRoomId = `${roomId}${PRESENCE_ROOM_SUFFIX}`;
+        const presenceRoom = trystero.joinRoom({ appId: APP_ID, rtcConfig: unreliableRtcConfig }, presenceRoomId);
         roomRef.current = room;
+        presenceRoomRef.current = presenceRoom;
 
         setupRoomHandlers(room, false);
+        setupPresenceHandlers(presenceRoom);
 
         // Wait for connection then send join message
         room.onPeerJoin((peerId: string) => {
@@ -295,7 +333,7 @@ export function useRoom() {
         }));
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setupRoomHandlers/setupPresenceHandlers are defined after this callback; called inside async closure so ref is stable
   }, [setConnected]);
 
   // Setup room event handlers
@@ -304,8 +342,6 @@ export function useRoom() {
     const [sendSync, onSync] = room.makeAction<GameState>('sync');
     const [sendElementUpdate, onElementUpdate] = room.makeAction<CanvasElement>('elUpdate');
     const [sendElementDelete, onElementDelete] = room.makeAction<string>('elDelete');
-    const [sendCursor, onCursor] = room.makeAction<Point>('cursor');
-    const [sendPing, onPing] = room.makeAction<{ position: Point; color: string }>('ping');
     const [sendPlayerJoin, onPlayerJoin] = room.makeAction<Player>('plyJoin');
     const [sendPlayerLeave, onPlayerLeave] = room.makeAction<string>('plyLeave');
     const [sendRequestSync, onRequestSync] = room.makeAction<null>('reqSync');
@@ -323,8 +359,6 @@ export function useRoom() {
       sendSync,
       sendElementUpdate,
       sendElementDelete,
-      sendCursor,
-      sendPing,
       sendPlayerJoin,
       sendPlayerLeave,
       sendRequestSync,
@@ -423,16 +457,6 @@ export function useRoom() {
 
     onElementDelete((elementId: string, _peerId: string) => {
       deleteElement(elementId);
-    });
-
-    onCursor((position: Point, peerId: string) => {
-      updatePlayer(peerId, { cursor: position });
-    });
-
-    onPing((data: { position: Point; color: string }, peerId: string) => {
-      // Add received ping to game store for visualization
-      console.log('Ping from', peerId, 'at', data.position);
-      addPing(data.position.x, data.position.y, data.color);
     });
 
     onPlayerJoin((player: Player, _peerId: string) => {
@@ -649,7 +673,27 @@ export function useRoom() {
       console.log('Received character delete:', characterId);
       handleIncomingCharacterDelete(characterId);
     });
-  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, updatePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene, addPing]);
+  }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene]);
+
+  const setupPresenceHandlers = useCallback((room: Room) => {
+    const [sendCursor, onCursor] = room.makeAction<Point>('cursor');
+    const [sendPing, onPing] = room.makeAction<{ position: Point; color: string }>('ping');
+
+    presenceActionsRef.current = {
+      sendCursor,
+      sendPing,
+    };
+
+    onCursor((position: Point, peerId: string) => {
+      updatePlayer(peerId, { cursor: position });
+    });
+
+    onPing((data: { position: Point; color: string }, peerId: string) => {
+      // Add received ping to game store for visualization
+      console.log('Ping from', peerId, 'at', data.position);
+      addPing(data.position.x, data.position.y, data.color);
+    });
+  }, [updatePlayer, addPing]);
 
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
@@ -665,14 +709,14 @@ export function useRoom() {
   }, []);
 
   const broadcastCursor = useCallback((position: Point) => {
-    if (actionsRef.current.sendCursor) {
-      actionsRef.current.sendCursor(position);
+    if (presenceActionsRef.current.sendCursor) {
+      presenceActionsRef.current.sendCursor(position);
     }
   }, []);
 
   const broadcastPing = useCallback((position: Point, color: string) => {
-    if (actionsRef.current.sendPing) {
-      actionsRef.current.sendPing({ position, color });
+    if (presenceActionsRef.current.sendPing) {
+      presenceActionsRef.current.sendPing({ position, color });
     }
   }, []);
 
@@ -770,6 +814,11 @@ export function useRoom() {
       roomRef.current.leave();
       roomRef.current = null;
     }
+    if (presenceRoomRef.current) {
+      presenceRoomRef.current.leave();
+      presenceRoomRef.current = null;
+    }
+    presenceActionsRef.current = {};
     setRoomState({
       roomId: null,
       peers: [],
@@ -791,6 +840,9 @@ export function useRoom() {
     return () => {
       if (roomRef.current) {
         roomRef.current.leave();
+      }
+      if (presenceRoomRef.current) {
+        presenceRoomRef.current.leave();
       }
     };
   }, []);
