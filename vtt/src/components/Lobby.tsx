@@ -57,6 +57,9 @@ export default function Lobby({ room }: LobbyProps) {
   // Recent games
   const [recentGames, setRecentGames] = useState<SavedGame[]>([]);
 
+  // Pending loaded game for "Continue" flow
+  const [pendingLoadGame, setPendingLoadGame] = useState<SavedGame | null>(null);
+
   const handleCreateGame = () => {
     if (!gameName.trim() || !gmName.trim()) return;
 
@@ -71,8 +74,11 @@ export default function Lobby({ room }: LobbyProps) {
   };
 
   const handleStartGame = () => {
-    // Now actually create the game, which will trigger the app to show the canvas
-    if (pendingGameData) {
+    if (pendingLoadGame) {
+      // Continue flow: load existing game state
+      loadGame(pendingLoadGame.gameState);
+    } else if (pendingGameData) {
+      // Create flow: create new game
       createGame(pendingGameData.name, pendingGameData.gmName);
     }
   };
@@ -109,7 +115,12 @@ export default function Lobby({ room }: LobbyProps) {
   };
 
   const handleLoadGame = (game: SavedGame) => {
-    loadGame(game.gameState);
+    // Use the saved roomId if available, otherwise generate one
+    const roomId = game.gameState.roomId || nanoid(8);
+    room.createRoom(roomId);
+    setCreatedRoomId(roomId);
+    setPendingLoadGame(game);
+    setActiveTab('create');
   };
 
   const handleDeleteGame = async (gameId: string) => {
@@ -205,7 +216,7 @@ export default function Lobby({ room }: LobbyProps) {
                           size={isMobile ? 'sm' : 'xs'}
                           onClick={() => handleLoadGame(game)}
                         >
-                          Load Game
+                          Continue
                         </Button>
                       </Group>
                     </Card>
@@ -266,7 +277,7 @@ export default function Lobby({ room }: LobbyProps) {
                         Connected
                       </Badge>
                     )}
-                    <Text fw={500}>Game Created!</Text>
+                    <Text fw={500}>{pendingLoadGame ? 'Resuming Game' : 'Game Created!'}</Text>
                   </Group>
                   <Text c="dimmed" size="xs">
                     Share this QR code or link with your players
@@ -335,7 +346,7 @@ export default function Lobby({ room }: LobbyProps) {
                     size={isMobile ? 'md' : 'sm'}
                     onClick={handleStartGame}
                   >
-                    Start Game →
+                    {pendingLoadGame ? 'Continue Game →' : 'Start Game →'}
                   </Button>
                 </Stack>
               )}

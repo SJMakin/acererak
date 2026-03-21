@@ -2,6 +2,11 @@ import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { GameState, LibraryItem, LibraryItemType, Character } from '../types';
 import type { Snippet } from '../types/snippet';
+import type { AIImage } from '../types/ai';
+
+export interface SavedAIImage extends AIImage {
+  // Additional DB-specific fields if needed
+}
 
 export interface SavedGame {
   id: string;
@@ -30,6 +35,7 @@ const db = new Dexie('LychgateVTTDatabase') as Dexie & {
   library: Table<SavedLibraryItem, string>;
   characters: Table<SavedCharacter, string>;
   snippets: Table<SavedSnippet, string>;
+  aiImages: Table<SavedAIImage, string>;
 };
 
 db.version(1).stores({
@@ -55,6 +61,15 @@ db.version(4).stores({
   library: 'id, type, name, *tags, createdAt, updatedAt',
   characters: 'id, name, createdAt, updatedAt',
   snippets: 'id, name, category, *tags, createdAt, updatedAt',
+});
+
+// Version 5: Add AI images table
+db.version(5).stores({
+  games: 'id, name, lastUpdated, isGM',
+  library: 'id, type, name, *tags, createdAt, updatedAt',
+  characters: 'id, name, createdAt, updatedAt',
+  snippets: 'id, name, category, *tags, createdAt, updatedAt',
+  aiImages: 'id, modelId, createdAt',
 });
 
 export { db };
@@ -192,4 +207,35 @@ export async function searchSnippets(query: string): Promise<Snippet[]> {
     }
   });
   return results;
+}
+
+// AI Image operations
+export async function saveAIImage(image: SavedAIImage): Promise<void> {
+  await db.aiImages.put(image);
+}
+
+export async function getAIImage(id: string): Promise<SavedAIImage | undefined> {
+  return db.aiImages.get(id);
+}
+
+export async function deleteAIImage(id: string): Promise<void> {
+  await db.aiImages.delete(id);
+}
+
+export async function getRecentAIImages(limit = 20): Promise<SavedAIImage[]> {
+  return db.aiImages
+    .orderBy('createdAt')
+    .reverse()
+    .limit(limit)
+    .toArray();
+}
+
+export async function deleteOldAIImages(olderThan: string): Promise<number> {
+  const old = await db.aiImages
+    .where('createdAt')
+    .below(olderThan)
+    .toArray();
+  const ids = old.map(img => img.id);
+  await db.aiImages.bulkDelete(ids);
+  return ids.length;
 }

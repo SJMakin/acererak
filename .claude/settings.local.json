@@ -11,7 +11,17 @@
       "Bash(grep:*)",
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -40 \"\"{}\"\"')",
       "Bash($env:TEST_URL=\"https://lychgate.sammak.in\")",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(npx vite:*)",
+      "Bash(cd C:/Users/Sam/Documents/node/acererak/vtt && npx tsc --noEmit 2>&1 | head -20)",
+      "Bash(sleep 5 && curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/)",
+      "Bash(find /c/Users/Sam/Documents/node/acererak/vtt -name \"playwright.config.*\" -o -name \"playwright.config.*\" 2>/dev/null | head -5)",
+      "Bash(HEADED=1 SLOW_MO=400 npx playwright test tests/e2e/peer-dedup.spec.ts --project=chromium 2>&1)",
+      "Bash(HEADED=1 SLOW_MO=400 npx playwright test tests/e2e/multiplayer-session.spec.ts --project=chromium 2>&1)",
+      "Bash(find /c/Users/Sam/Documents/node/acererak/vtt -type f \\\\\\( -name \"*.png\" -o -name \"*.jpg\" -o -name \"*.jpeg\" -o -name \"*.gif\" -o -name \"*.svg\" \\\\\\) 2>/dev/null | grep -v node_modules)",
+      "Bash(cd C:/Users/Sam/Documents/node/acererak/vtt && bash deploy.sh)",
+      "Bash(find /c/Users/Sam/Documents/node/acererak/vtt/tests -type f -name \"*.spec.ts\" -o -name \"*.test.ts\" 2>/dev/null | head -10)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/ 2>&1)"
     ]
   }
 }

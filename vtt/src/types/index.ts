@@ -12,6 +12,9 @@ export type { Character, CharacterP2PMessage, CharacterUpdateMessage, CharacterD
 // Re-export Snippet types
 export type { Snippet, SnippetCategory, SnippetCreateInput, SnippetUpdateInput } from './snippet';
 
+// Re-export AI types
+export type { AIModelInfo, AISettings, AIRequest, AIResponse, AICapabilities, AIImage } from './ai';
+
 export interface Point {
   x: number;
   y: number;
@@ -142,6 +145,7 @@ export interface CampaignNote {
 export interface GameState {
   id: string;
   name: string;
+  roomId: string;            // Stable P2P room ID for reconnecting
   createdAt: string;
   updatedAt: string;
 

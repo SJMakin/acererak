@@ -25,7 +25,6 @@ function formatLastSynced(timestamp: number | null): string {
 
 export default function ConnectionStatus({
   roomId,
-  peers,
   connectionState,
   lastSyncedAt,
   gmDisconnected,
@@ -33,7 +32,7 @@ export default function ConnectionStatus({
   isDesynced,
   onRequestSync,
 }: ConnectionStatusProps) {
-  const { isGM } = useGameStore();
+  const { isGM, game } = useGameStore();
 
   if (!roomId) return null;
 
@@ -46,7 +45,7 @@ export default function ConnectionStatus({
   };
 
   const config = statusConfig[connectionState];
-  const playerCount = peers.length + 1;
+  const playerCount = game ? Object.keys(game.players).length : 1;
 
   return (
     <Group gap="xs">

@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useLibraryStore } from '../stores/libraryStore';
-import type { TokenElement, CanvasElement, Visibility, ChatMessage } from '../types';
+import type { TokenElement, CanvasElement, Visibility, ChatMessage, Point } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
 import LibraryPanel from './LibraryPanel';
@@ -33,6 +33,7 @@ interface SidebarProps {
     broadcastCombat?: () => void;
     broadcastDiceRoll?: (message: ChatMessage) => void;
     broadcastChat?: (message: ChatMessage) => void;
+    broadcastFogUpdate?: (fogOfWar: { enabled: boolean; revealed: Point[][] }) => void;
   };
 }
 
@@ -100,11 +101,14 @@ export default function Sidebar({ room }: SidebarProps) {
   };
 
   const handleUpdateVisibility = (elementId: string, visibility: Visibility) => {
-    const element = activeScene?.elements.find(e => e.id === elementId);
-    if (!element) return;
-
     updateElement(elementId, { visibleTo: visibility });
-    room.broadcastElementUpdate({ ...element, visibleTo: visibility });
+    const freshScene = useGameStore.getState().game?.scenes.find(
+      s => s.id === useGameStore.getState().game?.activeSceneId
+    );
+    const freshElement = freshScene?.elements.find(e => e.id === elementId);
+    if (freshElement) {
+      room.broadcastElementUpdate(freshElement);
+    }
   };
 
   // Get tokens and other elements
@@ -320,10 +324,13 @@ export default function Sidebar({ room }: SidebarProps) {
                         checked={selectedElement.locked}
                         onChange={(e) => {
                           updateElement(selectedElement.id, { locked: e.currentTarget.checked });
-                          room.broadcastElementUpdate({
-                            ...selectedElement,
-                            locked: e.currentTarget.checked
-                          });
+                          const freshScene = useGameStore.getState().game?.scenes.find(
+                            s => s.id === useGameStore.getState().game?.activeSceneId
+                          );
+                          const freshEl = freshScene?.elements.find(el => el.id === selectedElement.id);
+                          if (freshEl) {
+                            room.broadcastElementUpdate(freshEl);
+                          }
                         }}
                       />
                       <Button
@@ -400,6 +407,12 @@ export default function Sidebar({ room }: SidebarProps) {
                       checked={activeScene?.fogOfWar.enabled}
                       onChange={(e) => {
                         useGameStore.getState().toggleFog(e.currentTarget.checked);
+                        const freshScene = useGameStore.getState().game?.scenes.find(
+                          s => s.id === useGameStore.getState().game?.activeSceneId
+                        );
+                        if (freshScene?.fogOfWar && room.broadcastFogUpdate) {
+                          room.broadcastFogUpdate(freshScene.fogOfWar);
+                        }
                       }}
                     />
                     <Text size="xs" c="dimmed">

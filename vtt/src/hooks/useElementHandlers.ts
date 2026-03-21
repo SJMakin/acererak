@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react';
 import type { CanvasElement, Point } from '../types';
+import { useGameStore } from '../stores/gameStore';
 
 interface UseElementHandlersParams {
   game: {
@@ -106,22 +107,33 @@ export function useElementHandlers({
           }
         });
 
-        // Batch update all elements
+        // Batch update all elements, then broadcast with fresh versions
         updateElements(updates);
 
-        // Broadcast all updates
-        updatedElements.forEach(el => {
-          room.broadcastElementUpdate(el);
-        });
+        const freshGame = useGameStore.getState().game;
+        const freshScene = freshGame?.scenes.find(s => s.id === freshGame.activeSceneId) || freshGame?.scenes[0];
+        if (freshScene) {
+          selectedElementIds.forEach(id => {
+            const freshEl = freshScene.elements.find(e => e.id === id);
+            if (freshEl) {
+              room.broadcastElementUpdate(freshEl);
+            }
+          });
+        }
       }
 
       // Reset multi-drag state
       isDraggingMultiple.current = false;
       dragStartPositions.current = {};
     } else {
-      // Single element move
+      // Single element move — update store first, then broadcast with fresh version
       updateElement(elementId, { x: finalX, y: finalY });
-      room.broadcastElementUpdate({ ...element, x: finalX, y: finalY });
+      const freshGame = useGameStore.getState().game;
+      const freshScene = freshGame?.scenes.find(s => s.id === freshGame.activeSceneId) || freshGame?.scenes[0];
+      const freshElement = freshScene?.elements.find(e => e.id === elementId);
+      if (freshElement) {
+        room.broadcastElementUpdate(freshElement);
+      }
     }
   }, [game, updateElement, updateElements, room, selectedElementIds]);
 

@@ -4,6 +4,10 @@ import { defineConfig, devices } from '@playwright/test';
 // Usage: TEST_URL=https://lychgate.sammak.in npx playwright test
 const baseURL = process.env.TEST_URL || 'http://localhost:5174';
 
+// HEADED=1 npx playwright test  → visible browsers with slowMo
+const headed = !!process.env.HEADED;
+const slowMo = headed ? Number(process.env.SLOW_MO || 400) : 0;
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 120000, // Increased timeout for P2P connections (2 minutes)
@@ -17,6 +21,8 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    headless: !headed,
+    launchOptions: { slowMo },
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',

@@ -40,10 +40,12 @@
     "react-konva": "^18.2.10",
     "readable-stream": "^4.7.0",
     "trystero": "^0.20.0",
+    "xsai": "^0.4.4",
     "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@types/node": "^25.5.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.13.1",

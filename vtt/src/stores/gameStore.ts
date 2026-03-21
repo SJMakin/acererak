@@ -208,6 +208,7 @@ interface GameStore {
 
   // Actions - Chat
   addChatMessage: (message: ChatMessage) => void;
+  hasChatMessage: (messageId: string) => boolean;
   clearChatMessages: () => void;
 
   // Actions - Campaign Notes
@@ -280,6 +281,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const game: GameState = {
       id: nanoid(12),
       name,
+      roomId: nanoid(8),
       createdAt: now,
       updatedAt: now,
       // Multi-scene architecture
@@ -302,6 +304,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   loadGame: (game) => {
+    // Migrate legacy saves without a roomId
+    if (!game.roomId) {
+      game = { ...game, roomId: nanoid(8) };
+    }
+
     // Migrate legacy diceRolls to roll-type chat messages
     if (game.diceRolls && game.diceRolls.length > 0) {
       const rollMessages: ChatMessage[] = game.diceRolls.map(roll => ({
@@ -1121,6 +1128,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set((state) => {
       if (!state.game) return state;
       const chatMessages = state.game.chatMessages || [];
+      if (chatMessages.some((existingMessage) => existingMessage.id === message.id)) {
+        return state;
+      }
       // Keep only last 100 messages
       const updatedMessages = [...chatMessages, message].slice(-100);
       return {
@@ -1130,6 +1140,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
       };
     });
+  },
+
+  hasChatMessage: (messageId) => {
+    const chatMessages = get().game?.chatMessages || [];
+    return chatMessages.some((message) => message.id === messageId);
   },
 
   clearChatMessages: () => {

@@ -80,6 +80,7 @@ interface ToolbarProps {
     broadcastGridSettings: (settings: Partial<import('../types').GridSettings>) => void;
     broadcastSceneSwitch: (sceneId: string) => void;
     broadcastSceneUpdate: (scene: Scene) => void;
+    broadcastAICapabilities: (capabilities: import('../types').AICapabilities) => void;
   };
 }
 
@@ -178,7 +179,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
     error: { color: 'red', label: 'Error' },
   };
   const connectionInfo = connectionConfig[room.connectionState];
-  const playerCount = room.peers.length + 1;
+  const playerCount = game ? Object.keys(game.players).length : 1;
   const isRoomConnected = room.connectionState === 'connected';
 
   // Handle SceneModal submission
@@ -1279,6 +1280,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
         opened={settingsOpened}
         onClose={() => setSettingsOpened(false)}
         onBroadcastGridSettings={room.broadcastGridSettings}
+        onBroadcastAICapabilities={room.broadcastAICapabilities}
       />
       
       {/* Export/Import Modal */}

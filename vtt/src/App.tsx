@@ -60,6 +60,14 @@ function App() {
     });
   }, []);
 
+  // Expose test hooks in dev mode for e2e tests
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).__testGameStore = useGameStore;
+      (window as any).__testGetRoomState = () => room;
+    }
+  });
+
   // Periodically broadcast state hash for desync detection (GM only)
   useEffect(() => {
     if (!room.isHost || room.peers.length === 0) return;

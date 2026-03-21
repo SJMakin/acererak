@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { Point, TokenElement, TextElement, CanvasElement, GameState } from '../types';
+import { useGameStore } from '../stores/gameStore';
 import type { TokenConfig } from '../components/TokenConfigModal';
 
 interface UseModalHandlersProps {
@@ -91,11 +92,13 @@ export function useModalHandlers({
 
     if (editingTextId) {
       // Update existing text
-      const element = activeScene.elements.find(e => e.id === editingTextId);
-      if (element && element.type === 'text') {
-        updateElement(editingTextId, { content: text });
-        const updatedElement: TextElement = { ...element, content: text };
-        room.broadcastElementUpdate(updatedElement);
+      updateElement(editingTextId, { content: text });
+      const freshScene = useGameStore.getState().game?.scenes.find(
+        s => s.id === useGameStore.getState().game?.activeSceneId
+      );
+      const freshElement = freshScene?.elements.find(e => e.id === editingTextId);
+      if (freshElement) {
+        room.broadcastElementUpdate(freshElement);
       }
     } else if (textEditPosition) {
       // Create new text element

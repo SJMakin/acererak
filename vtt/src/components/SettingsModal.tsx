@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   Tabs,
@@ -11,19 +11,44 @@ import {
   Text,
   Divider,
   Select,
+  PasswordInput,
+  Badge,
+  Loader,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import type { Settings, GridType, GridSettings } from '../types';
+import { useAIStore } from '../stores/aiStore';
+import type { Settings, GridType, GridSettings, AIModelInfo, AICapabilities } from '../types';
 
 interface SettingsModalProps {
   opened: boolean;
   onClose: () => void;
   onBroadcastGridSettings?: (settings: Partial<GridSettings>) => void;
+  onBroadcastAICapabilities?: (capabilities: AICapabilities) => void;
 }
 
-export default function SettingsModal({ opened, onClose, onBroadcastGridSettings }: SettingsModalProps) {
-  const { settings, updateSettings, resetSettings, game, updateGridSettings } = useGameStore();
+export default function SettingsModal({ opened, onClose, onBroadcastGridSettings, onBroadcastAICapabilities }: SettingsModalProps) {
+  const { settings, updateSettings, resetSettings, game, updateGridSettings, myPeerId } = useGameStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
+
+  // AI store
+  const {
+    apiKey,
+    isConnected: aiConnected,
+    isLoadingModels,
+    models,
+    textModel,
+    imageModel,
+    setApiKey,
+    clearApiKey,
+    setTextModel,
+    setImageModel,
+  } = useAIStore();
+
+  // Local API key input (only committed on save)
+  const [localApiKey, setLocalApiKey] = useState(apiKey);
+
+  // Determine if current user is GM
+  const isGM = game?.gmPeerId === myPeerId;
 
   // Get active scene
   const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
@@ -32,8 +57,17 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
   useEffect(() => {
     if (opened) {
       setLocalSettings(settings);
+      setLocalApiKey(apiKey);
     }
-  }, [opened, settings]);
+  }, [opened, settings, apiKey]);
+
+  // Broadcast AI capabilities when they change
+  const broadcastCaps = useCallback(() => {
+    if (onBroadcastAICapabilities) {
+      const caps = useAIStore.getState().getCapabilities();
+      onBroadcastAICapabilities(caps);
+    }
+  }, [onBroadcastAICapabilities]);
 
   const handleSave = () => {
     updateSettings(localSettings);
@@ -49,6 +83,64 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
     setLocalSettings(prev => ({ ...prev, ...updates }));
   };
 
+  // AI handlers
+  const handleSaveApiKey = async () => {
+    await setApiKey(localApiKey);
+    broadcastCaps();
+  };
+
+  const handleClearApiKey = () => {
+    clearApiKey();
+    setLocalApiKey('');
+    broadcastCaps();
+  };
+
+  const handleTextModelChange = (modelId: string | null) => {
+    if (!modelId) {
+      setTextModel(null);
+    } else {
+      const model = models.find(m => m.id === modelId) || null;
+      setTextModel(model);
+    }
+    broadcastCaps();
+  };
+
+  const handleImageModelChange = (modelId: string | null) => {
+    if (!modelId) {
+      setImageModel(null);
+    } else {
+      const model = models.find(m => m.id === modelId) || null;
+      setImageModel(model);
+    }
+    broadcastCaps();
+  };
+
+  // Build model select data
+  const textModels = models.filter(m => m.modelType === 'text');
+  const imageModels = models.filter(m => m.modelType === 'image');
+
+  const makeModelOptions = (modelList: AIModelInfo[]) => {
+    // Group by provider
+    const grouped = new Map<string, AIModelInfo[]>();
+    for (const m of modelList) {
+      const list = grouped.get(m.provider) || [];
+      list.push(m);
+      grouped.set(m.provider, list);
+    }
+
+    const options: { group: string; items: { value: string; label: string }[] }[] = [];
+    for (const [provider, providerModels] of grouped) {
+      options.push({
+        group: provider,
+        items: providerModels.map(m => ({
+          value: m.id,
+          label: `${m.name}${m.isFree ? ' [free]' : ''}`,
+        })),
+      });
+    }
+    return options;
+  };
+
   return (
     <Modal
       opened={opened}
@@ -61,6 +153,7 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
           <Tabs.Tab value="grid">Grid</Tabs.Tab>
           <Tabs.Tab value="tokens">Token Defaults</Tabs.Tab>
           <Tabs.Tab value="ui">UI Preferences</Tabs.Tab>
+          {isGM && <Tabs.Tab value="ai">AI</Tabs.Tab>}
         </Tabs.List>
 
         {/* Grid Settings Tab */}
@@ -268,6 +361,105 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
             />
           </Stack>
         </Tabs.Panel>
+
+        {/* AI Settings Tab (GM only) */}
+        {isGM && (
+          <Tabs.Panel value="ai" pt="md">
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
+                Configure AI integration via OpenRouter. Your API key stays local and is never shared with players.
+              </Text>
+
+              {/* API Key */}
+              <Group align="end">
+                <PasswordInput
+                  label="OpenRouter API Key"
+                  description="Get your key at openrouter.ai/keys"
+                  placeholder="sk-or-..."
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
+                <Button onClick={handleSaveApiKey} disabled={!localApiKey || localApiKey === apiKey}>
+                  Save Key
+                </Button>
+                {apiKey && (
+                  <Button variant="subtle" color="red" onClick={handleClearApiKey}>
+                    Clear
+                  </Button>
+                )}
+              </Group>
+
+              {/* Connection Status */}
+              <Group>
+                <Text size="sm" fw={500}>Status:</Text>
+                {isLoadingModels ? (
+                  <Group gap="xs">
+                    <Loader size="xs" />
+                    <Text size="sm" c="dimmed">Loading models...</Text>
+                  </Group>
+                ) : aiConnected ? (
+                  <Badge color="green" variant="light">
+                    Connected ({models.length} models)
+                  </Badge>
+                ) : apiKey ? (
+                  <Badge color="red" variant="light">
+                    Invalid key
+                  </Badge>
+                ) : (
+                  <Badge color="gray" variant="light">
+                    No key set
+                  </Badge>
+                )}
+              </Group>
+
+              {aiConnected && (
+                <>
+                  <Divider label="Model Selection" />
+
+                  {/* Text Model */}
+                  <Select
+                    label="Text Model"
+                    description="Used for NPC dialogue, descriptions, encounter generation"
+                    placeholder="Select a text model"
+                    searchable
+                    clearable
+                    value={textModel?.id || null}
+                    onChange={handleTextModelChange}
+                    data={makeModelOptions(textModels)}
+                    nothingFoundMessage="No models found"
+                  />
+
+                  {/* Image Model */}
+                  <Select
+                    label="Image Model"
+                    description="Used for generating NPC portraits, maps, scene art"
+                    placeholder="Select an image model"
+                    searchable
+                    clearable
+                    value={imageModel?.id || null}
+                    onChange={handleImageModelChange}
+                    data={makeModelOptions(imageModels)}
+                    nothingFoundMessage="No image models found"
+                  />
+
+                  {/* Selected models summary */}
+                  <Divider label="Active Configuration" />
+                  <Stack gap="xs">
+                    <Group gap="xs">
+                      <Text size="sm" fw={500}>Text:</Text>
+                      <Text size="sm" c="dimmed">{textModel?.name || 'None selected'}</Text>
+                    </Group>
+                    <Group gap="xs">
+                      <Text size="sm" fw={500}>Image:</Text>
+                      <Text size="sm" c="dimmed">{imageModel?.name || 'None selected'}</Text>
+                    </Group>
+                  </Stack>
+                </>
+              )}
+            </Stack>
+          </Tabs.Panel>
+        )}
       </Tabs>
 
       {/* Action Buttons */}

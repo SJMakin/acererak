@@ -891,6 +891,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           layerVisibility={layerVisibility}
           gridSettings={gridSettings}
           isGM={effectiveIsDM}
+          isDrawingTool={isDrawingTool}
           showTokenMetadata={settings.showTokenMetadata}
           onSelect={selectElement}
           onShiftSelect={toggleElementSelection}

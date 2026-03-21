@@ -19,6 +19,7 @@ interface InteractiveElementsLayerProps {
   };
   gridSettings: GridSettings;
   isGM: boolean;
+  isDrawingTool: boolean;
   showTokenMetadata: boolean;
   onSelect: (id: string) => void;
   onShiftSelect: (id: string) => void;
@@ -34,6 +35,7 @@ export function InteractiveElementsLayer({
   layerVisibility,
   gridSettings,
   isGM,
+  isDrawingTool,
   showTokenMetadata,
   onSelect,
   onShiftSelect,
@@ -42,7 +44,7 @@ export function InteractiveElementsLayer({
   onTextDoubleClick,
 }: InteractiveElementsLayerProps) {
   return (
-    <Layer listening={true}>
+    <Layer listening={!isDrawingTool}>
       {/* Unlocked shapes */}
       {layerVisibility.drawings && elements
         .filter((el): el is ShapeElement => el.type === 'shape' && !el.locked)

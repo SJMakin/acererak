@@ -1,6 +1,7 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import type Konva from 'konva';
 import type { Point, CanvasElement, Scene, ShapeElement, TokenElement, TextElement, ImageElement } from '../types';
+import { useGameStore } from '../stores/gameStore';
 import {
   createFreehandShape,
   createLineShape,
@@ -472,9 +473,14 @@ export function useDrawingHandlers({
           hideFog(points);
         }
 
-        // Broadcast fog update
-        if (room.broadcastFogUpdate && activeScene?.fogOfWar) {
-          room.broadcastFogUpdate(activeScene.fogOfWar);
+        // Broadcast fog update with fresh state (not stale closure)
+        if (room.broadcastFogUpdate) {
+          const freshScene = useGameStore.getState().game?.scenes.find(
+            s => s.id === useGameStore.getState().game?.activeSceneId
+          );
+          if (freshScene?.fogOfWar) {
+            room.broadcastFogUpdate(freshScene.fogOfWar);
+          }
         }
       } else {
         // Use shape creators for all drawing tools

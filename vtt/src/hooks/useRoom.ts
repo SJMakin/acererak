@@ -3,6 +3,7 @@ import { notifications } from '@mantine/notifications';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import { useCharacterStore, handleIncomingCharacterUpdate, handleIncomingCharacterDelete } from '../stores/characterStore';
+import { useAIStore } from '../stores/aiStore';
 import type {
   GameState,
   CanvasElement,
@@ -13,6 +14,9 @@ import type {
   ChatMessage,
   Scene,
   Character,
+  AIRequest,
+  AIResponse,
+  AICapabilities,
 } from '../types';
 
 const APP_ID = 'lychgate-vtt-v1';
@@ -29,22 +33,19 @@ function hashGameState(game: GameState): string {
 
   const elementSignatures = activeScene
     ? activeScene.elements
-        .map((element) => ({
-          id: element.id,
-          version: element.version ?? 0,
-          x: element.x,
-          y: element.y,
+        .map((el) => ({
+          id: el.id,
+          version: el.version ?? 0,
+          x: Math.round(el.x),
+          y: Math.round(el.y),
         }))
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     : [];
-  const elementIds = elementSignatures.map((element) => element.id);
 
-  // Hash important game state fields for desync detection
   const stateStr = JSON.stringify({
     activeSceneId: game.activeSceneId,
     sceneCount: game.scenes.length,
     elementCount: elementSignatures.length,
-    elementIds,
     elementSignatures,
     fogEnabled: activeScene?.fogOfWar.enabled || false,
     fogRevealedCount: activeScene?.fogOfWar.revealed.length || 0,
@@ -181,7 +182,13 @@ export function useRoom() {
     sendSceneUpdate?: ActionSender<Scene>;
     sendCharacterUpdate?: ActionSender<Character>;
     sendCharacterDelete?: ActionSender<string>;
+    sendAIReq?: ActionSender<AIRequest>;
+    sendAIRes?: ActionSender<AIResponse>;
+    sendAICap?: ActionSender<AICapabilities>;
   }>({});
+
+  // Pending AI request promises (player side)
+  const pendingAIRequestsRef = useRef<Map<string, { resolve: (res: AIResponse) => void; reject: (err: Error) => void }>>(new Map());
 
   const presenceActionsRef = useRef<{
     sendCursor?: ActionSender<Point>;
@@ -297,7 +304,14 @@ export function useRoom() {
         setupPresenceHandlers(presenceRoom);
 
         // Wait for connection then send join message
-        room.onPeerJoin((peerId: string) => {
+        // Guard against duplicate onPeerJoin from trystero renegotiation
+        const joinedPeers = new Set<string>();
+        const playerPeerJoinHandler = (peerId: string) => {
+          if (joinedPeers.has(peerId)) {
+            console.log('Ignoring duplicate onPeerJoin (player side) for:', peerId);
+            return;
+          }
+          joinedPeers.add(peerId);
           console.log('Connected to peer:', peerId);
 
           setRoomState(prev => ({
@@ -321,7 +335,13 @@ export function useRoom() {
               controlledTokens: [],
             });
           }
-        });
+        };
+        room.onPeerJoin(playerPeerJoinHandler);
+
+        // Expose test hook in dev mode so e2e tests can simulate player-side duplicate onPeerJoin
+        if (import.meta.env.DEV) {
+          (window as unknown as Record<string, unknown>).__testTriggerPlayerPeerJoin = playerPeerJoinHandler;
+        }
 
         setConnected(true, newPeerId);
       } catch (error) {
@@ -353,6 +373,9 @@ export function useRoom() {
     const [sendSceneUpdate, onSceneUpdate] = room.makeAction<Scene>('sceneUpd');
     const [sendCharacterUpdate, onCharacterUpdate] = room.makeAction<Character>('charUpd');
     const [sendCharacterDelete, onCharacterDelete] = room.makeAction<string>('charDel');
+    const [sendAIReq, onAIReq] = room.makeAction<AIRequest>('aiReq');
+    const [sendAIRes, onAIRes] = room.makeAction<AIResponse>('aiRes');
+    const [sendAICap, onAICap] = room.makeAction<AICapabilities>('aiCaps');
 
     // Store senders
     actionsRef.current = {
@@ -370,6 +393,9 @@ export function useRoom() {
       sendSceneUpdate,
       sendCharacterUpdate,
       sendCharacterDelete,
+      sendAIReq,
+      sendAIRes,
+      sendAICap,
     };
 
     // Setup character store P2P handlers
@@ -386,12 +412,20 @@ export function useRoom() {
       }
     );
 
+    // Track peers we've already synced to avoid duplicate onPeerJoin from trystero renegotiation
+    const syncedPeers = new Set<string>();
+
     // Handle peer events
-    room.onPeerJoin((peerId: string) => {
+    const peerJoinHandler = (peerId: string) => {
+      if (syncedPeers.has(peerId)) {
+        console.log('Ignoring duplicate onPeerJoin for:', peerId);
+        return;
+      }
+      syncedPeers.add(peerId);
       console.log('Peer joined:', peerId);
       setRoomState((prev) => ({
         ...prev,
-        peers: [...prev.peers, peerId],
+        peers: prev.peers.includes(peerId) ? prev.peers : [...prev.peers, peerId],
       }));
 
       // If we're host, send current game state to new peer
@@ -404,11 +438,24 @@ export function useRoom() {
           characters: useCharacterStore.getState().characters,
         };
         sendSync(syncPayload, [peerId]);
+
+        // Broadcast AI capabilities to new peer
+        const aiCaps = useAIStore.getState().getCapabilities();
+        if (aiCaps.hasAI) {
+          sendAICap(aiCaps, [peerId]);
+        }
       }
-    });
+    };
+    room.onPeerJoin(peerJoinHandler);
+
+    // Expose test hook in dev mode so e2e tests can simulate duplicate onPeerJoin
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__testTriggerPeerJoin = peerJoinHandler;
+    }
 
     room.onPeerLeave((peerId: string) => {
       console.log('Peer left:', peerId);
+      syncedPeers.delete(peerId);
 
       // Check if the GM disconnected
       const game = useGameStore.getState().game;
@@ -499,15 +546,8 @@ export function useRoom() {
     onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, peerId: string) => {
       console.log('Received fog update from:', peerId);
 
-      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
-
-      const gmPeerId = currentGame.gmPeerId;
-      if (gmPeerId && peerId !== gmPeerId && !isHost) {
-        console.warn('Ignoring fog update from non-GM peer:', peerId);
-        return;
-      }
 
       // Get active scene
       const activeScene = getActiveScene(currentGame);
@@ -566,16 +606,33 @@ export function useRoom() {
         });
       }
 
+      const hasMessage = useGameStore.getState().hasChatMessage(chatMessage.id);
+      if (hasMessage) {
+        return;
+      }
+
       addChatMessage(chatMessage);
     });
 
     // Handle state hash for desync detection (GM broadcasts, players compare)
+    // Require consecutive mismatches to avoid false positives from network lag
+    let consecutiveMismatches = 0;
     onStateHash((gmHash: string, _peerId: string) => {
       const currentGame = useGameStore.getState().game;
       if (!currentGame || isHost) return; // GM doesn't need to check against itself
 
       const localHash = hashGameState(currentGame);
-      const isDesynced = localHash !== gmHash;
+      const hashesMatch = localHash === gmHash;
+
+      if (hashesMatch) {
+        consecutiveMismatches = 0;
+      } else {
+        consecutiveMismatches++;
+        console.warn('State hash mismatch', consecutiveMismatches, '- Local:', localHash, 'GM:', gmHash);
+      }
+
+      // Only flag desync after 2 consecutive mismatches (20s of sustained mismatch)
+      const isDesynced = consecutiveMismatches >= 2;
 
       setRoomState(prev => ({
         ...prev,
@@ -583,25 +640,14 @@ export function useRoom() {
         gmHash,
         isDesynced,
       }));
-
-      if (isDesynced) {
-        console.warn('State desync detected! Local:', localHash, 'GM:', gmHash);
-      }
     });
 
     // Handle grid settings update (GM only can broadcast)
     onGridUpdate((gridSettings: Partial<GridSettings>, peerId: string) => {
       console.log('Received grid update from:', peerId);
 
-      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
-
-      const gmPeerId = currentGame.gmPeerId;
-      if (gmPeerId && peerId !== gmPeerId && !isHost) {
-        console.warn('Ignoring grid update from non-GM peer:', peerId);
-        return;
-      }
 
       // Apply grid settings update
       updateGridSettings(gridSettings);
@@ -611,15 +657,8 @@ export function useRoom() {
     onSceneSwitch((sceneId: string, peerId: string) => {
       console.log('Received scene switch from:', peerId, 'to scene:', sceneId);
 
-      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
-
-      const gmPeerId = currentGame.gmPeerId;
-      if (gmPeerId && peerId !== gmPeerId && !isHost) {
-        console.warn('Ignoring scene switch from non-GM peer:', peerId);
-        return;
-      }
 
       // Switch to the specified scene
       switchScene(sceneId);
@@ -636,15 +675,8 @@ export function useRoom() {
     onSceneUpdate((scene: Scene, peerId: string) => {
       console.log('Received scene update from:', peerId, 'scene:', scene.name);
 
-      // Verify the update is from the GM (host) - enforce GM-only action
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
-
-      const gmPeerId = currentGame.gmPeerId;
-      if (gmPeerId && peerId !== gmPeerId && !isHost) {
-        console.warn('Ignoring scene update from non-GM peer:', peerId);
-        return;
-      }
 
       // Check if scene exists (update) or is new (add)
       const existingScene = currentGame.scenes.find(s => s.id === scene.id);
@@ -672,6 +704,34 @@ export function useRoom() {
     onCharacterDelete((characterId: string, _peerId: string) => {
       console.log('Received character delete:', characterId);
       handleIncomingCharacterDelete(characterId);
+    });
+
+    // Handle AI request (player → GM)
+    onAIReq((request: AIRequest, _peerId: string) => {
+      if (!isHost) return; // Only GM handles AI requests
+      console.log('Received AI request:', request.type, 'from:', request.fromPeerId);
+      // Future: dispatch to AI service based on request.type
+      // For now, respond with "not implemented"
+      sendAIRes({
+        requestId: request.requestId,
+        ok: false,
+        error: 'AI features not yet implemented',
+      }, [request.fromPeerId]);
+    });
+
+    // Handle AI response (GM → player)
+    onAIRes((response: AIResponse, _peerId: string) => {
+      const pending = pendingAIRequestsRef.current.get(response.requestId);
+      if (pending) {
+        pending.resolve(response);
+        pendingAIRequestsRef.current.delete(response.requestId);
+      }
+    });
+
+    // Handle AI capabilities broadcast (GM → all)
+    onAICap((capabilities: AICapabilities, _peerId: string) => {
+      console.log('Received AI capabilities:', capabilities);
+      useAIStore.setState({ capabilities });
     });
   }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene]);
 
@@ -805,6 +865,41 @@ export function useRoom() {
     }
   }, []);
 
+  // Broadcast AI capabilities (GM only)
+  const broadcastAICapabilities = useCallback((capabilities: AICapabilities) => {
+    if (actionsRef.current.sendAICap && roomState.isHost) {
+      actionsRef.current.sendAICap(capabilities);
+    }
+  }, [roomState.isHost]);
+
+  // Request AI from GM (player only) — returns a promise
+  const requestAI = useCallback((type: string, payload: Record<string, unknown>): Promise<AIResponse> => {
+    const myPeer = useGameStore.getState().myPeerId;
+    if (!myPeer) return Promise.reject(new Error('Not connected'));
+
+    const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const request: AIRequest = { requestId, type, payload, fromPeerId: myPeer };
+
+    return new Promise((resolve, reject) => {
+      pendingAIRequestsRef.current.set(requestId, { resolve, reject });
+
+      // Timeout after 60 seconds
+      setTimeout(() => {
+        if (pendingAIRequestsRef.current.has(requestId)) {
+          pendingAIRequestsRef.current.delete(requestId);
+          reject(new Error('AI request timed out'));
+        }
+      }, 60000);
+
+      if (actionsRef.current.sendAIReq) {
+        actionsRef.current.sendAIReq(request);
+      } else {
+        pendingAIRequestsRef.current.delete(requestId);
+        reject(new Error('AI request channel not available'));
+      }
+    });
+  }, []);
+
   // Leave room
   const leaveRoom = useCallback(() => {
     if (roomRef.current) {
@@ -867,5 +962,7 @@ export function useRoom() {
     broadcastSceneUpdate,
     broadcastCharacterUpdate,
     broadcastCharacterDelete,
+    broadcastAICapabilities,
+    requestAI,
   };
 }

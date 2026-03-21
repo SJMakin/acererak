@@ -70,7 +70,13 @@ export default function PropertyInspector({ room, onOpenCharacterSheet }: Proper
   // Helper functions for updating and broadcasting
   const handleUpdate = (updates: Partial<CanvasElement>) => {
     updateElement(selectedElement.id, updates);
-    room.broadcastElementUpdate({ ...selectedElement, ...updates } as CanvasElement);
+    const freshScene = useGameStore.getState().game?.scenes.find(
+      s => s.id === useGameStore.getState().game?.activeSceneId
+    );
+    const freshElement = freshScene?.elements.find(e => e.id === selectedElement.id);
+    if (freshElement) {
+      room.broadcastElementUpdate(freshElement);
+    }
   };
 
   const handleDelete = () => {
