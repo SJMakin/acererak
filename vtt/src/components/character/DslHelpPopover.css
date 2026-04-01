@@ -1,0 +1,111 @@
+.dsl-help-popover__anchor {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 10;
+}
+
+.dsl-help-popover__trigger {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+
+.dsl-help-popover__trigger:hover {
+  opacity: 1;
+}
+
+.dsl-help-popover__dropdown {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(124, 58, 237, 0.3) !important;
+  padding: 16px !important;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.dsl-help-popover__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8f0;
+  margin-bottom: 6px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+}
+
+.dsl-help-popover__intro {
+  font-size: 12px;
+  color: #8b8ba0;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+}
+
+.dsl-help-popover__intro kbd {
+  background: rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(124, 58, 237, 0.4);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: #c4b5fd;
+  font-family: inherit;
+}
+
+.dsl-help-popover__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dsl-help-popover__section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b6b80;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+  margin-top: 4px;
+}
+
+.dsl-help-popover__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dsl-help-popover__syntax {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: #c4a35a;
+  background: rgba(196, 163, 90, 0.08);
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+  width: fit-content;
+}
+
+.dsl-help-popover__syntax--tag {
+  font-size: 11px;
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.1);
+  padding: 1px 5px;
+  display: inline;
+}
+
+.dsl-help-popover__desc {
+  font-size: 11.5px;
+  color: #9090a8;
+  line-height: 1.45;
+}
+
+.dsl-help-popover__desc code {
+  font-size: inherit;
+}
+
+.dsl-help-popover__tip {
+  font-size: 11px;
+  color: #6b6b80;
+  font-style: italic;
+  padding-top: 8px;
+  border-top: 1px solid rgba(124, 58, 237, 0.1);
+}

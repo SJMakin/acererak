@@ -1,0 +1,33 @@
+.bubble-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(20, 20, 35, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.bubble-toolbar .mantine-ActionIcon-root {
+  color: #c4c4d4;
+  transition: all 0.15s ease;
+}
+
+.bubble-toolbar .mantine-ActionIcon-root:hover {
+  color: #fff;
+  background: rgba(124, 58, 237, 0.25);
+}
+
+.bubble-toolbar .mantine-ActionIcon-root[data-variant="filled"] {
+  background: rgba(124, 58, 237, 0.5);
+  color: #fff;
+}
+
+.bubble-toolbar__separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+}

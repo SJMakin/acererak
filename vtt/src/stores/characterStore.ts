@@ -4,12 +4,30 @@ import type { Character } from '../types';
 import { saveCharacters, loadCharacters } from '../db/database';
 import { parseShadowState } from '../services/shadowStateService';
 
+interface SheetFloatingBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+type SheetDisplayMode = 'modal' | 'floating' | 'window';
+
 interface CharacterStore {
   characters: Character[];
   isLoading: boolean;
   isGM: boolean;
   onP2PUpdate?: (character: Character) => void;
   onP2PDelete?: (characterId: string) => void;
+
+  // Sheet UI state
+  sheetCharacterId: string | null; // null = closed; 'new' = create new
+  sheetDisplayMode: SheetDisplayMode;
+  sheetFloatingBounds: SheetFloatingBounds | null;
+  openCharacterSheet: (characterId: string | null, tokenId?: string) => void;
+  closeCharacterSheet: () => void;
+  setSheetDisplayMode: (mode: SheetDisplayMode) => void;
+  setSheetFloatingBounds: (bounds: SheetFloatingBounds) => void;
 
   // CRUD operations
   addCharacter: (character: Omit<Character, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -33,10 +51,45 @@ interface CharacterStore {
   setP2PHandlers: (onUpdate: (character: Character) => void, onDelete: (characterId: string) => void) => void;
 }
 
+const FLOATING_BOUNDS_KEY = 'characterSheet.panelBounds';
+
+function loadFloatingBounds(): SheetFloatingBounds | null {
+  try {
+    const raw = localStorage.getItem(FLOATING_BOUNDS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const useCharacterStore = create<CharacterStore>((set, get) => ({
   characters: [],
   isLoading: false,
   isGM: false,
+
+  // Sheet UI state
+  sheetCharacterId: null,
+  sheetDisplayMode: 'modal',
+  sheetFloatingBounds: loadFloatingBounds(),
+
+  openCharacterSheet: (characterId) => {
+    set({ sheetCharacterId: characterId ?? 'new', sheetDisplayMode: 'modal' });
+  },
+
+  closeCharacterSheet: () => {
+    set({ sheetCharacterId: null, sheetDisplayMode: 'modal' });
+  },
+
+  setSheetDisplayMode: (mode) => {
+    set({ sheetDisplayMode: mode });
+  },
+
+  setSheetFloatingBounds: (bounds) => {
+    set({ sheetFloatingBounds: bounds });
+    try {
+      localStorage.setItem(FLOATING_BOUNDS_KEY, JSON.stringify(bounds));
+    } catch { /* ignore quota errors */ }
+  },
 
   addCharacter: (characterData) => {
     const id = nanoid(10);

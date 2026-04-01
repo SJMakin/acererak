@@ -39,12 +39,12 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
   ],
-  // Only start webServer if testing locally and not CI
-  ...(!process.env.TEST_URL && process.env.CI && {
+  // Auto-start dev server unless testing against a deployed URL
+  ...(!process.env.TEST_URL && {
     webServer: {
       command: 'npm run dev',
       url: 'http://localhost:5174',
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },
   }),

@@ -39,7 +39,7 @@ interface LobbyProps {
 
 export default function Lobby({ room }: LobbyProps) {
   const { createGame, loadGame } = useGameStore();
-  const [activeTab, setActiveTab] = useState<string | null>('recent');
+  const [activeTab, setActiveTab] = useState<string | null>('create');
   const isMobile = useMediaQuery('(max-width: 768px)');
   const formSpacing = isMobile ? 'sm' : 'md';
   

@@ -14,9 +14,13 @@ import {
   PasswordInput,
   Badge,
   Loader,
+  Image,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useAIStore } from '../stores/aiStore';
+import { useImageStore } from '../stores/imageStore';
+import { getHistory, clearHistory } from '../services/aiImageService';
+import type { AIImage } from '../types/ai';
 import type { Settings, GridType, GridSettings, AIModelInfo, AICapabilities } from '../types';
 
 interface SettingsModalProps {
@@ -32,7 +36,7 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
 
   // AI store
   const {
-    apiKey,
+    hasApiKey,
     isConnected: aiConnected,
     isLoadingModels,
     models,
@@ -42,10 +46,15 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
     clearApiKey,
     setTextModel,
     setImageModel,
+    getKeyForDisplay,
   } = useAIStore();
 
   // Local API key input (only committed on save)
-  const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [localApiKey, setLocalApiKey] = useState('');
+
+  // AI history & storage
+  const [aiHistory, setAiHistory] = useState<(AIImage & { url: string | null })[]>([]);
+  const [storageStats, setStorageStats] = useState<{ count: number; totalBytes: number } | null>(null);
 
   // Determine if current user is GM
   const isGM = game?.gmPeerId === myPeerId;
@@ -57,9 +66,14 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
   useEffect(() => {
     if (opened) {
       setLocalSettings(settings);
-      setLocalApiKey(apiKey);
+      setLocalApiKey(getKeyForDisplay());
+      // Load AI history and storage stats
+      if (isGM) {
+        getHistory(10).then(setAiHistory).catch(() => {});
+        useImageStore.getState().getStorageUsage().then(setStorageStats).catch(() => {});
+      }
     }
-  }, [opened, settings, apiKey]);
+  }, [opened, settings, hasApiKey, isGM, getKeyForDisplay]);
 
   // Broadcast AI capabilities when they change
   const broadcastCaps = useCallback(() => {
@@ -380,10 +394,10 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
                   onChange={(e) => setLocalApiKey(e.currentTarget.value)}
                   style={{ flex: 1 }}
                 />
-                <Button onClick={handleSaveApiKey} disabled={!localApiKey || localApiKey === apiKey}>
+                <Button onClick={handleSaveApiKey} disabled={!localApiKey || localApiKey === getKeyForDisplay()}>
                   Save Key
                 </Button>
-                {apiKey && (
+                {hasApiKey && (
                   <Button variant="subtle" color="red" onClick={handleClearApiKey}>
                     Clear
                   </Button>
@@ -402,7 +416,7 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
                   <Badge color="green" variant="light">
                     Connected ({models.length} models)
                   </Badge>
-                ) : apiKey ? (
+                ) : hasApiKey ? (
                   <Badge color="red" variant="light">
                     Invalid key
                   </Badge>
@@ -455,6 +469,54 @@ export default function SettingsModal({ opened, onClose, onBroadcastGridSettings
                       <Text size="sm" c="dimmed">{imageModel?.name || 'None selected'}</Text>
                     </Group>
                   </Stack>
+
+                  {/* AI Image History */}
+                  <Divider label="Recent Generations" />
+                  {aiHistory.length > 0 ? (
+                    <Stack gap="xs">
+                      {aiHistory.map((item) => (
+                        <Group key={item.id} gap="sm" wrap="nowrap">
+                          {item.url && (
+                            <Image
+                              src={item.url}
+                              alt={item.prompt}
+                              w={48}
+                              h={48}
+                              fit="cover"
+                              radius="sm"
+                            />
+                          )}
+                          <Text size="xs" c="dimmed" lineClamp={2} style={{ flex: 1 }}>
+                            {item.prompt}
+                          </Text>
+                        </Group>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Text size="sm" c="dimmed">No AI-generated images yet</Text>
+                  )}
+
+                  {/* Storage Stats */}
+                  <Divider label="Storage" />
+                  {storageStats && (
+                    <Text size="sm" c="dimmed">
+                      Embedded images: {storageStats.count} images, {(storageStats.totalBytes / (1024 * 1024)).toFixed(1)} MB
+                    </Text>
+                  )}
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="compact-sm"
+                    onClick={async () => {
+                      await clearHistory();
+                      setAiHistory([]);
+                      // Refresh storage stats
+                      useImageStore.getState().getStorageUsage().then(setStorageStats).catch(() => {});
+                    }}
+                    disabled={aiHistory.length === 0}
+                  >
+                    Clear AI Image History
+                  </Button>
                 </>
               )}
             </Stack>

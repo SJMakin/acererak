@@ -1,19 +1,19 @@
 import { create } from 'zustand';
 import type { AIModelInfo, AICapabilities } from '../types/ai';
 import { fetchModels, validateApiKey } from '../services/openRouterService';
+import { generateAndStore, type GenerateResult } from '../services/aiImageService';
+import {
+  setKey as vaultSetKey,
+  clearKey as vaultClearKey,
+  hasKey as vaultHasKey,
+  withKey,
+  restoreKey,
+  getKeyForDisplay,
+} from '../services/keyVault';
 
-// localStorage keys
-const API_KEY_KEY = 'vtt-ai-apiKey';
+// localStorage keys for model selections (not sensitive)
 const TEXT_MODEL_KEY = 'vtt-ai-textModel';
 const IMAGE_MODEL_KEY = 'vtt-ai-imageModel';
-
-function loadStoredKey(): string {
-  try {
-    return localStorage.getItem(API_KEY_KEY) || '';
-  } catch {
-    return '';
-  }
-}
 
 function loadStoredModelId(key: string): string {
   try {
@@ -23,15 +23,24 @@ function loadStoredModelId(key: string): string {
   }
 }
 
+/** Function to request AI generation via P2P (player → GM). Set by useRoom. */
+let requestAIFn: ((type: string, payload: Record<string, unknown>) => Promise<{ ok: boolean; data?: unknown; error?: string }>) | null = null;
+
+export function setRequestAIFn(fn: typeof requestAIFn) {
+  requestAIFn = fn;
+}
+
 interface AIStore {
-  // State
-  apiKey: string;
+  // State — note: raw apiKey is NOT stored here, only a boolean flag
+  hasApiKey: boolean;
   textModel: AIModelInfo | null;
   imageModel: AIModelInfo | null;
   models: AIModelInfo[];
   isLoadingModels: boolean;
   isConnected: boolean;
   capabilities: AICapabilities;
+  isGenerating: boolean;
+  generationError: string | null;
 
   // Actions
   setApiKey: (key: string) => Promise<void>;
@@ -40,26 +49,29 @@ interface AIStore {
   setTextModel: (model: AIModelInfo | null) => void;
   setImageModel: (model: AIModelInfo | null) => void;
   getCapabilities: () => AICapabilities;
-  /** Restore persisted model selections after models have been fetched */
   restoreModelSelections: () => void;
+  generateImage: (prompt: string) => Promise<GenerateResult | null>;
+  /** Get the raw key for display in Settings password field */
+  getKeyForDisplay: () => string;
+  /** Initialize vault from localStorage (call once at startup) */
+  initVault: () => Promise<void>;
 }
 
 export const useAIStore = create<AIStore>((set, get) => ({
   // Initial state
-  apiKey: loadStoredKey(),
+  hasApiKey: false,
   textModel: null,
   imageModel: null,
   models: [],
   isLoadingModels: false,
   isConnected: false,
   capabilities: { hasAI: false, features: [] },
+  isGenerating: false,
+  generationError: null,
 
   setApiKey: async (key: string) => {
-    try {
-      localStorage.setItem(API_KEY_KEY, key);
-    } catch { /* ignore */ }
-
-    set({ apiKey: key, isConnected: false });
+    await vaultSetKey(key);
+    set({ hasApiKey: vaultHasKey(), isConnected: false });
 
     if (!key) {
       set({ models: [], textModel: null, imageModel: null, capabilities: { hasAI: false, features: [] } });
@@ -67,7 +79,7 @@ export const useAIStore = create<AIStore>((set, get) => ({
     }
 
     // Validate then fetch models
-    const valid = await validateApiKey(key);
+    const valid = await withKey(validateApiKey);
     if (!valid) {
       set({ isConnected: false, capabilities: { hasAI: false, features: [] } });
       return;
@@ -78,14 +90,14 @@ export const useAIStore = create<AIStore>((set, get) => ({
   },
 
   clearApiKey: () => {
+    vaultClearKey();
     try {
-      localStorage.removeItem(API_KEY_KEY);
       localStorage.removeItem(TEXT_MODEL_KEY);
       localStorage.removeItem(IMAGE_MODEL_KEY);
     } catch { /* ignore */ }
 
     set({
-      apiKey: '',
+      hasApiKey: false,
       isConnected: false,
       models: [],
       textModel: null,
@@ -95,15 +107,12 @@ export const useAIStore = create<AIStore>((set, get) => ({
   },
 
   loadModels: async () => {
-    const { apiKey } = get();
-    if (!apiKey) return;
+    if (!vaultHasKey()) return;
 
     set({ isLoadingModels: true });
     try {
-      const models = await fetchModels(apiKey);
+      const models = await withKey(fetchModels);
       set({ models, isLoadingModels: false });
-
-      // Restore persisted selections or auto-select defaults
       get().restoreModelSelections();
     } catch (err) {
       console.error('Failed to load AI models:', err);
@@ -116,15 +125,12 @@ export const useAIStore = create<AIStore>((set, get) => ({
     const textModels = models.filter(m => m.modelType === 'text');
     const imageModels = models.filter(m => m.modelType === 'image');
 
-    // Restore text model
     const storedTextId = loadStoredModelId(TEXT_MODEL_KEY);
     let textModel = storedTextId ? textModels.find(m => m.id === storedTextId) || null : null;
     if (!textModel && textModels.length > 0) {
-      // Auto-select first free model, or first available
       textModel = textModels.find(m => m.isFree) || textModels[0];
     }
 
-    // Restore image model
     const storedImageId = loadStoredModelId(IMAGE_MODEL_KEY);
     let imageModel = storedImageId ? imageModels.find(m => m.id === storedImageId) || null : null;
     if (!imageModel && imageModels.length > 0) {
@@ -146,11 +152,8 @@ export const useAIStore = create<AIStore>((set, get) => ({
 
   setTextModel: (model: AIModelInfo | null) => {
     try {
-      if (model) {
-        localStorage.setItem(TEXT_MODEL_KEY, model.id);
-      } else {
-        localStorage.removeItem(TEXT_MODEL_KEY);
-      }
+      if (model) localStorage.setItem(TEXT_MODEL_KEY, model.id);
+      else localStorage.removeItem(TEXT_MODEL_KEY);
     } catch { /* ignore */ }
 
     const { imageModel } = get();
@@ -169,11 +172,8 @@ export const useAIStore = create<AIStore>((set, get) => ({
 
   setImageModel: (model: AIModelInfo | null) => {
     try {
-      if (model) {
-        localStorage.setItem(IMAGE_MODEL_KEY, model.id);
-      } else {
-        localStorage.removeItem(IMAGE_MODEL_KEY);
-      }
+      if (model) localStorage.setItem(IMAGE_MODEL_KEY, model.id);
+      else localStorage.removeItem(IMAGE_MODEL_KEY);
     } catch { /* ignore */ }
 
     const { textModel } = get();
@@ -190,16 +190,60 @@ export const useAIStore = create<AIStore>((set, get) => ({
     set({ imageModel: model, capabilities });
   },
 
-  getCapabilities: () => {
-    return get().capabilities;
+  getCapabilities: () => get().capabilities,
+
+  generateImage: async (prompt: string) => {
+    const { imageModel, capabilities } = get();
+    set({ isGenerating: true, generationError: null });
+
+    try {
+      // GM path: has API key and image model configured locally
+      if (vaultHasKey() && imageModel) {
+        const result = await withKey((apiKey) => generateAndStore(apiKey, imageModel.id, prompt));
+        set({ isGenerating: false });
+        return result;
+      }
+
+      // Player path: relay via P2P to GM
+      if (capabilities.imageModel && requestAIFn) {
+        const response = await requestAIFn('generate-image', { prompt });
+        if (!response.ok) {
+          throw new Error(response.error || 'AI generation failed');
+        }
+        const data = response.data as GenerateResult;
+        set({ isGenerating: false });
+        return data;
+      }
+
+      throw new Error('No image model available');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({ isGenerating: false, generationError: message });
+      return null;
+    }
+  },
+
+  getKeyForDisplay,
+
+  initVault: async () => {
+    const restored = await restoreKey();
+    if (restored) {
+      set({ hasApiKey: true });
+      // Validate and load models
+      try {
+        const valid = await withKey(validateApiKey);
+        if (valid) {
+          set({ isConnected: true });
+          await get().loadModels();
+        }
+      } catch {
+        // key was restored but validation failed — still keep the key
+      }
+    }
   },
 }));
 
-// Auto-initialize if a key was persisted from a previous session
-const storedKey = loadStoredKey();
-if (storedKey) {
-  // Defer to avoid blocking module load
-  setTimeout(() => {
-    useAIStore.getState().setApiKey(storedKey);
-  }, 0);
-}
+// Auto-initialize vault from localStorage
+setTimeout(() => {
+  useAIStore.getState().initVault();
+}, 0);

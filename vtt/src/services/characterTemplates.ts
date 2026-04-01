@@ -1,6 +1,6 @@
 // Character templates for the Reactive Character Sheet System
 
-export type TemplateId = 'dnd5e' | 'osr' | 'blank';
+export type TemplateId = 'dnd5e' | 'pf2e' | 'osr' | 'blank';
 
 export interface CharacterTemplate {
   id: TemplateId;
@@ -158,6 +158,173 @@ export const characterTemplates: CharacterTemplate[] = [
       INT: 10,
       WIS: 10,
       CHA: 10,
+    },
+  },
+  {
+    id: 'pf2e',
+    name: 'Pathfinder 2e',
+    description: 'Pathfinder Second Edition character sheet',
+    content: JSON.stringify({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: '{Character Name}' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Level {Level} ' },
+            { type: 'text', marks: [{ type: 'italic' }], text: '{Ancestry} {Class}' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Defenses & Health' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'HP:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{HP}' },
+            { type: 'text', text: ' / MaxHP:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{MaxHP}' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'AC:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{AC}' },
+            { type: 'text', text: ' | Fortitude:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '+{Fort}' },
+            { type: 'text', text: ' | Reflex:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '+{Ref}' },
+            { type: 'text', text: ' | Will:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '+{Will}' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Perception:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '+{Perception}' },
+            { type: 'text', text: ' | Speed:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{Speed}' },
+            { type: 'text', text: ' ft' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Ability Scores' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'STR:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{STR}' },
+            { type: 'text', text: ' | DEX:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{DEX}' },
+            { type: 'text', text: ' | CON:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{CON}' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'INT:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{INT}' },
+            { type: 'text', text: ' | WIS:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{WIS}' },
+            { type: 'text', text: ' | CHA:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{CHA}' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Class DC & Proficiency' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'ClassDC:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{ClassDC}' },
+            { type: 'text', text: ' | PROF:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '+{PROF}' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Resources' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'HeroPoints:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{HeroPoints}' },
+            { type: 'text', text: ' | FocusPoints:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{FocusPoints}' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Actions & Feats' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Add strikes, spells, and class feats here.' }],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Skills' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Acrobatics, Arcana, Athletics, Crafting, Deception, Diplomacy, Intimidation, Lore, Medicine, Nature, Occultism, Performance, Religion, Society, Stealth, Survival, Thievery' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Equipment & Notes' }],
+        },
+      ],
+    }),
+    defaultStats: {
+      HP: 20,
+      MaxHP: 20,
+      AC: 15,
+      Fort: 5,
+      Ref: 5,
+      Will: 5,
+      Perception: 5,
+      Speed: 25,
+      STR: 10,
+      DEX: 10,
+      CON: 10,
+      INT: 10,
+      WIS: 10,
+      CHA: 10,
+      ClassDC: 15,
+      PROF: 2,
+      Level: 1,
+      HeroPoints: 1,
+      FocusPoints: 0,
     },
   },
   {

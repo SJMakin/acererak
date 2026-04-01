@@ -1,0 +1,33 @@
+.floating-insert-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(20, 20, 35, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.floating-insert-menu:hover {
+  opacity: 1;
+}
+
+.floating-insert-menu .mantine-ActionIcon-root {
+  color: rgba(200, 200, 220, 0.6);
+  transition: all 0.15s ease;
+}
+
+.floating-insert-menu .mantine-ActionIcon-root:hover {
+  color: #fff;
+  background: rgba(124, 58, 237, 0.2);
+}
+
+.floating-insert-menu__separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2px 4px;
+}

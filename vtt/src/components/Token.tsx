@@ -21,7 +21,7 @@ export function Token({
   showMetadata?: boolean;
   onDamage?: (amount: number) => void; // For character sync damage
 }) {
-  const [image] = useImage(element.imageUrl);
+  const [image] = useImage(element.imageUrl, element.imageId);
   const width = element.width * cellSize;
   const height = element.height * cellSize;
 

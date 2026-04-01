@@ -10,6 +10,7 @@ import GameCanvas from './components/GameCanvas';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import GMDisconnectModal from './components/GMDisconnectModal';
+import { CharacterSheetModal } from './components/character/CharacterSheetModal';
 
 function App() {
   const { game, performUndo, performRedo, selectElement, selectedElementId, selectedTool } = useGameStore();
@@ -149,6 +150,9 @@ function App() {
         opened={room.gmDisconnected && !room.isHost}
         onLeaveGame={room.leaveRoom}
       />
+
+      {/* Character Sheet — single instance, driven by store */}
+      <CharacterSheetModal />
     </AppShell>
   );
 }

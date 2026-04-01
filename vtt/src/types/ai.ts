@@ -41,13 +41,11 @@ export interface AICapabilities {
   features: string[];
 }
 
-/** Image blob record for IndexedDB */
+/** AI-generated image record for IndexedDB (references content-addressed images table) */
 export interface AIImage {
   id: string;
   prompt: string;
-  blob: Blob;
+  imageId: string;     // reference to images table (content-addressed)
   modelId: string;
   createdAt: string;
-  width?: number;
-  height?: number;
 }

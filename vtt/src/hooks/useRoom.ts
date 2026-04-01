@@ -3,7 +3,12 @@ import { notifications } from '@mantine/notifications';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import { useCharacterStore, handleIncomingCharacterUpdate, handleIncomingCharacterDelete } from '../stores/characterStore';
-import { useAIStore } from '../stores/aiStore';
+import { useAIStore, setRequestAIFn } from '../stores/aiStore';
+import { useImageStore, setImageMissingCallback } from '../stores/imageStore';
+import { generateAndStore } from '../services/aiImageService';
+import { hasKey as vaultHasKey, withKey as vaultWithKey } from '../services/keyVault';
+import { computeHash } from '../services/imageService';
+import type { EmbeddedImage } from '../services/imageService';
 import type {
   GameState,
   CanvasElement,
@@ -24,6 +29,20 @@ const APP_ID = 'lychgate-vtt-v1';
 // Helper to get active scene from game state
 function getActiveScene(game: GameState) {
   return game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0] || null;
+}
+
+// Collect all imageId references from a game state
+function collectImageIds(game: GameState): Set<string> {
+  const ids = new Set<string>();
+  for (const scene of game.scenes) {
+    if (scene.backgroundImageId) ids.add(scene.backgroundImageId);
+    for (const el of scene.elements) {
+      if ('imageId' in el && (el as { imageId?: string }).imageId) {
+        ids.add((el as { imageId: string }).imageId);
+      }
+    }
+  }
+  return ids;
 }
 
 // Simple hash function for state comparison
@@ -185,6 +204,9 @@ export function useRoom() {
     sendAIReq?: ActionSender<AIRequest>;
     sendAIRes?: ActionSender<AIResponse>;
     sendAICap?: ActionSender<AICapabilities>;
+    sendImgReq?: ActionSender<string>;
+    sendImgMeta?: ActionSender<{id: string; mime: string; width: number; height: number; size: number}>;
+    sendImgData?: ActionSender<ArrayBuffer>;
   }>({});
 
   // Pending AI request promises (player side)
@@ -376,6 +398,9 @@ export function useRoom() {
     const [sendAIReq, onAIReq] = room.makeAction<AIRequest>('aiReq');
     const [sendAIRes, onAIRes] = room.makeAction<AIResponse>('aiRes');
     const [sendAICap, onAICap] = room.makeAction<AICapabilities>('aiCaps');
+    const [sendImgReq, onImgReq] = room.makeAction<string>('imgReq');
+    const [sendImgMeta, onImgMeta] = room.makeAction<{id: string; mime: string; width: number; height: number; size: number}>('imgMeta');
+    const [sendImgData, onImgData] = room.makeAction<ArrayBuffer>('imgData');
 
     // Store senders
     actionsRef.current = {
@@ -396,7 +421,18 @@ export function useRoom() {
       sendAIReq,
       sendAIRes,
       sendAICap,
+      sendImgReq,
+      sendImgMeta,
+      sendImgData,
     };
+
+    // Register P2P image request callback so useImage can auto-request missing images
+    setImageMissingCallback((imageId: string) => {
+      if (actionsRef.current.sendImgReq) {
+        console.log('Auto-requesting missing image:', imageId);
+        actionsRef.current.sendImgReq(imageId);
+      }
+    });
 
     // Setup character store P2P handlers
     useCharacterStore.getState().setP2PHandlers(
@@ -444,6 +480,27 @@ export function useRoom() {
         if (aiCaps.hasAI) {
           sendAICap(aiCaps, [peerId]);
         }
+
+        // Proactively push all embedded images to new peer
+        (async () => {
+          const imageIds = collectImageIds(currentGame);
+          const imgStore = useImageStore.getState();
+          for (const imageId of imageIds) {
+            const image = await imgStore.getImage(imageId);
+            if (image) {
+              sendImgMeta({
+                id: image.id,
+                mime: image.mimeType,
+                width: image.width,
+                height: image.height,
+                size: image.sizeBytes,
+              }, [peerId]);
+              const buffer = await image.blob.arrayBuffer();
+              sendImgData(buffer, [peerId]);
+            }
+          }
+        })();
+
       }
     };
     room.onPeerJoin(peerJoinHandler);
@@ -707,16 +764,78 @@ export function useRoom() {
     });
 
     // Handle AI request (player → GM)
-    onAIReq((request: AIRequest, _peerId: string) => {
+    // Rate limiting: track per-peer request timestamps
+    const AI_MAX_PROMPT_LENGTH = 2000;
+    const AI_COOLDOWN_MS = 30_000; // 30s cooldown per peer
+    const aiRequestTimestamps = new Map<string, number>();
+
+    onAIReq(async (request: AIRequest, peerId: string) => {
       if (!isHost) return; // Only GM handles AI requests
-      console.log('Received AI request:', request.type, 'from:', request.fromPeerId);
-      // Future: dispatch to AI service based on request.type
-      // For now, respond with "not implemented"
-      sendAIRes({
-        requestId: request.requestId,
-        ok: false,
-        error: 'AI features not yet implemented',
-      }, [request.fromPeerId]);
+      // Use transport-level peerId for routing (not self-reported fromPeerId)
+      console.log('Received AI request:', request.type, 'from peer:', peerId);
+
+      const sendErr = (msg: string) => sendAIRes({
+        requestId: request.requestId, ok: false, error: msg,
+      }, [peerId]);
+
+      // Rate limiting: one request per peer per cooldown period
+      const lastReq = aiRequestTimestamps.get(peerId) || 0;
+      if (Date.now() - lastReq < AI_COOLDOWN_MS) {
+        sendErr('Rate limited — please wait before generating another image');
+        return;
+      }
+
+      if (request.type === 'generate-image') {
+        // Validate payload
+        const prompt = typeof request.payload?.prompt === 'string'
+          ? request.payload.prompt.trim()
+          : '';
+        if (!prompt) {
+          sendErr('Prompt is required');
+          return;
+        }
+        if (prompt.length > AI_MAX_PROMPT_LENGTH) {
+          sendErr(`Prompt too long (max ${AI_MAX_PROMPT_LENGTH} characters)`);
+          return;
+        }
+
+        const aiState = useAIStore.getState();
+        if (!vaultHasKey() || !aiState.imageModel) {
+          sendErr('No image model configured');
+          return;
+        }
+
+        // Record timestamp for rate limiting
+        aiRequestTimestamps.set(peerId, Date.now());
+
+        try {
+          const result = await vaultWithKey((apiKey) => generateAndStore(apiKey, aiState.imageModel!.id, prompt));
+          sendAIRes({
+            requestId: request.requestId,
+            ok: true,
+            data: result,
+          }, [peerId]);
+          // Push the image blob to requesting peer so they can render it
+          const imgStore = useImageStore.getState();
+          const image = await imgStore.getImage(result.imageId);
+          if (image && actionsRef.current.sendImgMeta && actionsRef.current.sendImgData) {
+            actionsRef.current.sendImgMeta({
+              id: image.id,
+              mime: image.mimeType,
+              width: image.width,
+              height: image.height,
+              size: image.sizeBytes,
+            }, [peerId]);
+            const buffer = await image.blob.arrayBuffer();
+            actionsRef.current.sendImgData(buffer, [peerId]);
+          }
+        } catch {
+          // Sanitize error — never forward raw API errors (may leak key info)
+          sendErr('Image generation failed');
+        }
+      } else {
+        sendErr('Unknown AI request type');
+      }
     });
 
     // Handle AI response (GM → player)
@@ -728,10 +847,114 @@ export function useRoom() {
       }
     });
 
-    // Handle AI capabilities broadcast (GM → all)
-    onAICap((capabilities: AICapabilities, _peerId: string) => {
+    // Handle AI capabilities broadcast (GM → all, players only accept from known GM)
+    onAICap((capabilities: AICapabilities, peerId: string) => {
+      // Only accept capabilities from the GM peer (prevent spoofing by other players)
+      const currentGame = useGameStore.getState().game;
+      const gmPeerId = currentGame?.gmPeerId;
+      if (gmPeerId && peerId !== gmPeerId) {
+        console.warn('Ignoring AI capabilities from non-GM peer:', peerId);
+        return;
+      }
       console.log('Received AI capabilities:', capabilities);
       useAIStore.setState({ capabilities });
+    });
+
+    // Handle image request (player → GM): player asks for an image by ID
+    onImgReq(async (imageId: string, peerId: string) => {
+      if (!isHost) return;
+      console.log('Received image request for:', imageId, 'from:', peerId);
+      const imgStore = useImageStore.getState();
+      const image = await imgStore.getImage(imageId);
+      if (image) {
+        sendImgMeta({
+          id: image.id,
+          mime: image.mimeType,
+          width: image.width,
+          height: image.height,
+          size: image.sizeBytes,
+        }, [peerId]);
+        const buffer = await image.blob.arrayBuffer();
+        sendImgData(buffer, [peerId]);
+      } else {
+        // Send empty metadata to signal "image not found" so player doesn't wait forever
+        sendImgMeta({ id: imageId, mime: '', width: 0, height: 0, size: -1 }, [peerId]);
+      }
+    });
+
+    // FIFO queue for image metadata — ordered channel guarantees meta arrives before its data
+    const imgMetaQueue: Array<{id: string; mime: string; width: number; height: number; size: number; receivedAt: number}> = [];
+
+    const IMG_META_TIMEOUT = 60_000;
+    const IMG_META_MAX_QUEUE = 100;
+
+    // Handle image metadata (GM → player)
+    onImgMeta((meta: {id: string; mime: string; width: number; height: number; size: number}, _peerId: string) => {
+      // Clean stale entries
+      const now = Date.now();
+      while (imgMetaQueue.length > 0 && now - imgMetaQueue[0].receivedAt > IMG_META_TIMEOUT) {
+        const stale = imgMetaQueue.shift()!;
+        console.warn('Dropping stale image metadata:', stale.id);
+      }
+      // Cap queue length to prevent memory exhaustion
+      while (imgMetaQueue.length >= IMG_META_MAX_QUEUE) {
+        const dropped = imgMetaQueue.shift()!;
+        console.warn('Dropping oldest image metadata (queue full):', dropped.id);
+      }
+      // size === -1 means "image not found on GM" — skip it
+      if (meta.size < 0) {
+        console.warn('GM does not have image:', meta.id);
+        return;
+      }
+      imgMetaQueue.push({ ...meta, receivedAt: now });
+    });
+
+    // Handle image binary data (GM → player) — matches FIFO with metadata queue
+    const P2P_IMAGE_MAX_SIZE = 20 * 1024 * 1024; // 20MB
+
+    onImgData(async (buffer: ArrayBuffer, _peerId: string) => {
+      const meta = imgMetaQueue.shift();
+      if (!meta) {
+        console.warn('Received image data with no pending metadata');
+        return;
+      }
+
+      // Reject oversized payloads
+      if (buffer.byteLength > P2P_IMAGE_MAX_SIZE) {
+        console.warn('Rejecting P2P image: too large', buffer.byteLength, 'bytes for', meta.id);
+        return;
+      }
+
+      // Verify size matches metadata
+      if (buffer.byteLength !== meta.size) {
+        console.warn('P2P image size mismatch for', meta.id, '— expected', meta.size, 'got', buffer.byteLength);
+        return;
+      }
+
+      const imgStore = useImageStore.getState();
+      const hasIt = await imgStore.hasImage(meta.id);
+      if (!hasIt) {
+        const typedBlob = new Blob([buffer], { type: meta.mime });
+
+        // Verify content hash matches the claimed ID
+        const hash = await computeHash(typedBlob);
+        if (hash !== meta.id) {
+          console.warn('P2P image hash mismatch for', meta.id, '— computed', hash);
+          return;
+        }
+
+        await imgStore.storeImage({
+          id: meta.id,
+          blob: typedBlob,
+          mimeType: meta.mime,
+          width: meta.width,
+          height: meta.height,
+          sizeBytes: meta.size,
+          createdAt: new Date().toISOString(),
+          source: 'p2p',
+        } as EmbeddedImage);
+        console.log('Stored P2P image:', meta.id);
+      }
     });
   }, [loadGame, addOrUpdateElement, deleteElement, addPlayer, removePlayer, toggleFog, updateGridSettings, addChatMessage, switchScene, updateScene]);
 
@@ -872,6 +1095,30 @@ export function useRoom() {
     }
   }, [roomState.isHost]);
 
+  // Broadcast an embedded image to all peers (GM pushes image after upload)
+  const broadcastImage = useCallback(async (imageId: string) => {
+    const imgStore = useImageStore.getState();
+    const image = await imgStore.getImage(imageId);
+    if (image && actionsRef.current.sendImgMeta && actionsRef.current.sendImgData) {
+      actionsRef.current.sendImgMeta({
+        id: image.id,
+        mime: image.mimeType,
+        width: image.width,
+        height: image.height,
+        size: image.sizeBytes,
+      });
+      const buffer = await image.blob.arrayBuffer();
+      actionsRef.current.sendImgData(buffer);
+    }
+  }, []);
+
+  // Request an image from the GM (player only)
+  const requestImage = useCallback((imageId: string) => {
+    if (actionsRef.current.sendImgReq) {
+      actionsRef.current.sendImgReq(imageId);
+    }
+  }, []);
+
   // Request AI from GM (player only) — returns a promise
   const requestAI = useCallback((type: string, payload: Record<string, unknown>): Promise<AIResponse> => {
     const myPeer = useGameStore.getState().myPeerId;
@@ -900,6 +1147,14 @@ export function useRoom() {
     });
   }, []);
 
+  // Wire requestAI into aiStore so generateImage can relay via P2P for players
+  useEffect(() => {
+    if (roomState.roomId && !roomState.isHost) {
+      setRequestAIFn(requestAI);
+    }
+    return () => setRequestAIFn(null);
+  }, [roomState.roomId, roomState.isHost, requestAI]);
+
   // Leave room
   const leaveRoom = useCallback(() => {
     if (roomRef.current) {
@@ -914,6 +1169,7 @@ export function useRoom() {
       presenceRoomRef.current = null;
     }
     presenceActionsRef.current = {};
+    setImageMissingCallback(null);
     setRoomState({
       roomId: null,
       peers: [],
@@ -964,5 +1220,7 @@ export function useRoom() {
     broadcastCharacterDelete,
     broadcastAICapabilities,
     requestAI,
+    broadcastImage,
+    requestImage,
   };
 }

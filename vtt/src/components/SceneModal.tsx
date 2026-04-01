@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, TextInput, Stack, Button, Group, Checkbox, NumberInput, ColorInput, Select } from '@mantine/core';
 import type { Scene, GridSettings } from '../types';
+import ImageInput, { type ImageInputValue } from './ImageInput';
 
 interface SceneModalProps {
   opened: boolean;
@@ -8,16 +9,18 @@ interface SceneModalProps {
   onSubmit: (data: {
     name: string;
     backgroundUrl?: string;
+    backgroundImageId?: string;
     gridSettings: GridSettings;
     copyFromCurrent: boolean;
   }) => void;
   scene?: Scene; // If editing existing scene
   defaultGridSettings: GridSettings;
+  aiAvailable?: boolean;
 }
 
-export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGridSettings }: SceneModalProps) {
+export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGridSettings, aiAvailable }: SceneModalProps) {
   const [name, setName] = useState('');
-  const [backgroundUrl, setBackgroundUrl] = useState('');
+  const [bgValue, setBgValue] = useState<ImageInputValue>({});
   const [copyFromCurrent, setCopyFromCurrent] = useState(false);
 
   // Grid settings
@@ -35,7 +38,10 @@ export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGr
       if (scene) {
         // Editing existing scene
         setName(scene.name);
-        setBackgroundUrl(scene.backgroundUrl || '');
+        setBgValue({
+          imageUrl: scene.backgroundUrl || undefined,
+          imageId: scene.backgroundImageId || undefined,
+        });
         setCellSize(scene.gridSettings.cellSize);
         setGridWidth(scene.gridSettings.width);
         setGridHeight(scene.gridSettings.height);
@@ -47,7 +53,7 @@ export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGr
       } else {
         // Creating new scene - use defaults
         setName('');
-        setBackgroundUrl('');
+        setBgValue({});
         setCellSize(defaultGridSettings.cellSize);
         setGridWidth(defaultGridSettings.width);
         setGridHeight(defaultGridSettings.height);
@@ -75,14 +81,15 @@ export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGr
 
     onSubmit({
       name: name.trim(),
-      backgroundUrl: backgroundUrl.trim() || undefined,
+      backgroundUrl: bgValue.imageUrl?.trim() || undefined,
+      backgroundImageId: bgValue.imageId || undefined,
       gridSettings,
       copyFromCurrent,
     });
 
     // Reset form
     setName('');
-    setBackgroundUrl('');
+    setBgValue({});
     setCopyFromCurrent(false);
     onClose();
   };
@@ -104,12 +111,12 @@ export default function SceneModal({ opened, onClose, onSubmit, scene, defaultGr
           data-autofocus
         />
 
-        <TextInput
-          label="Background Image URL (optional)"
-          placeholder="https://..."
-          value={backgroundUrl}
-          onChange={(e) => setBackgroundUrl(e.currentTarget.value)}
-          description="Paste a URL to an image to use as the map background"
+        <ImageInput
+          value={bgValue}
+          onChange={setBgValue}
+          label="Background Image (optional)"
+          placeholder="https://... or drop/upload an image"
+          aiAvailable={aiAvailable}
         />
 
         {!scene && (

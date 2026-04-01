@@ -32,9 +32,9 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
   const previousTool = useRef<ToolType>('select');
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in input/textarea
+    // Don't trigger shortcuts when typing in input/textarea/contenteditable
     const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       return;
     }
 

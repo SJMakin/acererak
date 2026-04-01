@@ -8,6 +8,18 @@ export interface SavedAIImage extends AIImage {
   // Additional DB-specific fields if needed
 }
 
+export interface SavedEmbeddedImage {
+  id: string;           // SHA-256 hex of the WebP blob
+  blob: Blob;
+  mimeType: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  createdAt: string;
+  source: 'upload' | 'ai' | 'p2p';
+  prompt?: string;
+}
+
 export interface SavedGame {
   id: string;
   name: string;
@@ -36,40 +48,16 @@ const db = new Dexie('LychgateVTTDatabase') as Dexie & {
   characters: Table<SavedCharacter, string>;
   snippets: Table<SavedSnippet, string>;
   aiImages: Table<SavedAIImage, string>;
+  images: Table<SavedEmbeddedImage, string>;
 };
 
 db.version(1).stores({
   games: 'id, name, lastUpdated, isGM',
-});
-
-// Version 2: Add library table
-db.version(2).stores({
-  games: 'id, name, lastUpdated, isGM',
-  library: 'id, type, name, *tags, createdAt, updatedAt',
-});
-
-// Version 3: Add characters table
-db.version(3).stores({
-  games: 'id, name, lastUpdated, isGM',
-  library: 'id, type, name, *tags, createdAt, updatedAt',
-  characters: 'id, name, createdAt, updatedAt',
-});
-
-// Version 4: Add snippets table (GM only)
-db.version(4).stores({
-  games: 'id, name, lastUpdated, isGM',
   library: 'id, type, name, *tags, createdAt, updatedAt',
   characters: 'id, name, createdAt, updatedAt',
   snippets: 'id, name, category, *tags, createdAt, updatedAt',
-});
-
-// Version 5: Add AI images table
-db.version(5).stores({
-  games: 'id, name, lastUpdated, isGM',
-  library: 'id, type, name, *tags, createdAt, updatedAt',
-  characters: 'id, name, createdAt, updatedAt',
-  snippets: 'id, name, category, *tags, createdAt, updatedAt',
-  aiImages: 'id, modelId, createdAt',
+  aiImages: 'id, imageId, modelId, createdAt',
+  images: 'id, createdAt, source, sizeBytes',
 });
 
 export { db };

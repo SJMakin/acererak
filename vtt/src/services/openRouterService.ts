@@ -1,4 +1,4 @@
-import { generateText, streamText, generateImage, generateObject, listModels } from 'xsai';
+import { generateText, streamText, generateObject, listModels } from 'xsai';
 import type { Message } from 'xsai';
 import type { Schema } from 'xsschema';
 import type { AIModelInfo } from '../types/ai';
@@ -78,14 +78,98 @@ export function createTextStream(
   return streamText({ apiKey, baseURL: OPENROUTER_BASE_URL, model, messages, ...opts });
 }
 
-/** Generate an image */
-export function createImageGeneration(
+/** Generate an image via OpenRouter chat completions (images come back in message.images[]) */
+export async function createImageGeneration(
   apiKey: string,
   model: string,
   prompt: string,
-  opts?: Record<string, unknown>,
-) {
-  return generateImage({ apiKey, baseURL: OPENROUTER_BASE_URL, model, prompt, ...opts });
+  _opts?: Record<string, unknown>,
+): Promise<{ blob: Blob; revisedPrompt?: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000); // 90s timeout
+
+  let response: Response;
+  try {
+    response = await fetch(`${OPENROUTER_BASE_URL}chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        modalities: ['image', 'text'],
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Image generation timed out');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Image generation failed (HTTP ${response.status})`);
+  }
+
+  const json = await response.json() as {
+    choices?: Array<{
+      message?: {
+        content?: string | Array<{ type: string; text?: string; image_url?: { url?: string } }>;
+        images?: Array<{ image_url?: { url?: string } }>;
+      };
+    }>;
+  };
+
+  const message = json.choices?.[0]?.message;
+
+  // Primary: OpenRouter images array
+  let imageUrl = message?.images?.[0]?.image_url?.url;
+
+  // Fallback: some models return images as multipart content blocks
+  if (!imageUrl && Array.isArray(message?.content)) {
+    const imagePart = message.content.find(
+      (p) => p.type === 'image_url' && p.image_url?.url,
+    );
+    imageUrl = imagePart?.image_url?.url;
+  }
+
+  if (!imageUrl) {
+    // Log the response shape for debugging (keys only, no sensitive data)
+    const msgKeys = message ? Object.keys(message) : [];
+    const contentType = Array.isArray(message?.content) ? 'array' : typeof message?.content;
+    console.warn('[AI Image] No image in response. message keys:', msgKeys, 'content type:', contentType);
+    throw new Error('No image returned from model');
+  }
+
+  // Extract text content for revisedPrompt (content may be string or multipart array)
+  const revisedPrompt = typeof message?.content === 'string'
+    ? message.content || undefined
+    : Array.isArray(message?.content)
+      ? message.content.find((p) => p.type === 'text')?.text || undefined
+      : undefined;
+
+  // Handle data URI (base64-encoded image)
+  if (imageUrl.startsWith('data:')) {
+    const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) throw new Error('Invalid data URI format');
+    const [, mimeType, base64Data] = match;
+    const byteChars = atob(base64Data);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteArray[i] = byteChars.charCodeAt(i);
+    }
+    return { blob: new Blob([byteArray], { type: mimeType }), revisedPrompt };
+  }
+
+  // Handle regular URL
+  const imgResponse = await fetch(imageUrl);
+  if (!imgResponse.ok) throw new Error('Failed to fetch generated image');
+  return { blob: await imgResponse.blob(), revisedPrompt };
 }
 
 /** Generate a structured JSON object */

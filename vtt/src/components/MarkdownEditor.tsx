@@ -42,8 +42,14 @@ function parseMarkdown(markdown: string): string {
     .replace(/~~(.+?)~~/g, '<del>$1</del>')
     // Inline code
     .replace(/`(.+?)`/g, '<code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">$1</code>')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color: #7c3aed;">$1</a>')
+    // Links (only allow http/https to prevent javascript: XSS)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, url) => {
+      const trimmed = url.trim().toLowerCase();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return `<a href="${url}" target="_blank" rel="noopener" style="color: #7c3aed;">${text}</a>`;
+      }
+      return text;
+    })
     // Horizontal rule
     .replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 8px 0;">')
     // Unordered lists

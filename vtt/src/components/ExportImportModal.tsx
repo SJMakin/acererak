@@ -19,6 +19,9 @@ import {
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useLibraryStore } from '../stores/libraryStore';
+import { useImageStore } from '../stores/imageStore';
+import { blobToBase64, base64ToBlob, computeHash } from '../services/imageService';
+import type { EmbeddedImage } from '../services/imageService';
 import type {
   GameState,
   CanvasElement,
@@ -32,20 +35,22 @@ import type {
 } from '../types';
 
 // Current export format version
-const EXPORT_VERSION = 3;
+const EXPORT_VERSION = 4;
 
-// Enhanced export format with selective data (v3)
+// Enhanced export format with selective data (v4 — adds embedded images)
 interface EnhancedExport {
-  version: 3;
+  version: 3 | 4;
   exportedAt: string;
   format: 'full' | 'selective';
-  // Scenes (new for v3)
+  // Scenes
   scenes?: Scene[];
   // Global state (persists across scenes)
   combat?: CombatTracker;
   chatMessages?: ChatMessage[];
   campaignNotes?: CampaignNote[];
   libraryItems?: LibraryItem[];
+  // Embedded images (v4): imageId → base64 WebP
+  embeddedImages?: Record<string, string>;
 }
 
 // Legacy v2 format for backward compatibility
@@ -274,43 +279,68 @@ export default function ExportImportModal({
   };
   
   // Export handler
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!game) return;
-    
+
     const exportData: EnhancedExport = {
-      version: EXPORT_VERSION,
+      version: EXPORT_VERSION as 4,
       exportedAt: new Date().toISOString(),
       format: 'selective',
     };
-    
+
     // Add selected scenes
     const selectedScenes = scenes.filter((s) => selection.scenes.has(s.id));
     if (selectedScenes.length > 0) {
       exportData.scenes = selectedScenes;
     }
-    
+
     // Add campaign notes
     const selectedNotes = campaignNotes.filter((n) => selection.campaignNotes.has(n.id));
     if (selectedNotes.length > 0) {
       exportData.campaignNotes = selectedNotes;
     }
-    
+
     // Add library items
     const selectedLibrary = libraryItems.filter((i) => selection.libraryItems.has(i.id));
     if (selectedLibrary.length > 0) {
       exportData.libraryItems = selectedLibrary;
     }
-    
+
     // Add combat state
     if (selection.combat && game.combat) {
       exportData.combat = game.combat;
     }
-    
+
     // Add chat messages
     if (selection.chatMessages && chatMessages.length > 0) {
       exportData.chatMessages = chatMessages;
     }
-    
+
+    // Collect embedded images from selected scenes
+    const imageIds = new Set<string>();
+    for (const scene of selectedScenes) {
+      if (scene.backgroundImageId) imageIds.add(scene.backgroundImageId);
+      for (const el of scene.elements) {
+        if ('imageId' in el && (el as { imageId?: string }).imageId) {
+          imageIds.add((el as { imageId: string }).imageId);
+        }
+      }
+    }
+
+    if (imageIds.size > 0) {
+      const imgStore = useImageStore.getState();
+      const embeddedImages: Record<string, string> = {};
+      for (const id of imageIds) {
+        const blob = await imgStore.getImageBlob(id);
+        if (blob) {
+          embeddedImages[id] = await blobToBase64(blob);
+        }
+      }
+      if (Object.keys(embeddedImages).length > 0) {
+        exportData.embeddedImages = embeddedImages;
+      }
+    }
+
     // Download file
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -319,7 +349,7 @@ export default function ExportImportModal({
     a.download = `${game.name.replace(/\s+/g, '-').toLowerCase()}.vtt.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     onClose();
   };
   
@@ -434,11 +464,43 @@ export default function ExportImportModal({
   // Import handler
   const handleImport = async () => {
     if (!importData || !game) return;
-    
+
     const data = importData as EnhancedExport;
     const gameStore = useGameStore.getState();
     const libraryStore = useLibraryStore.getState();
-    
+    const imgStore = useImageStore.getState();
+
+    // Import embedded images first (so elements can reference them)
+    if (data.embeddedImages) {
+      for (const [id, b64] of Object.entries(data.embeddedImages)) {
+        const hasIt = await imgStore.hasImage(id);
+        if (!hasIt) {
+          const blob = base64ToBlob(b64, 'image/webp');
+          // Verify hash matches
+          const hash = await computeHash(blob);
+          if (hash === id) {
+            // Resolve actual dimensions from the blob
+            const bitmap = await createImageBitmap(blob);
+            const width = bitmap.width;
+            const height = bitmap.height;
+            bitmap.close();
+            await imgStore.storeImage({
+              id,
+              blob,
+              mimeType: 'image/webp',
+              width,
+              height,
+              sizeBytes: blob.size,
+              createdAt: new Date().toISOString(),
+              source: 'upload',
+            } as EmbeddedImage);
+          } else {
+            console.warn('Image hash mismatch during import:', id, 'got:', hash);
+          }
+        }
+      }
+    }
+
     // Import scenes (always add, never replace)
     if (data.scenes && selection.allScenes) {
       const scenesToImport = data.scenes.filter((s) => selection.scenes.has(s.id));

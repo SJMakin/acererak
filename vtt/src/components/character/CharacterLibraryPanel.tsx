@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useCharacterStore } from '../../stores/characterStore';
 import type { Character } from '../../types';
-import { CharacterSheetModal } from './CharacterSheetModal';
 import { getAllTemplates, getTemplateById, type TemplateId } from '../../services/characterTemplates';
 import './CharacterLibraryPanel.css';
 
@@ -14,9 +13,7 @@ export function CharacterLibraryPanel({
   onSelectCharacter,
   onLinkToToken,
 }: CharacterLibraryPanelProps) {
-  const { characters, deleteCharacter, addCharacter } = useCharacterStore();
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { characters, deleteCharacter, addCharacter, openCharacterSheet } = useCharacterStore();
   const [filter, setFilter] = useState('');
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
@@ -30,8 +27,7 @@ export function CharacterLibraryPanel({
   );
 
   const handleEdit = (characterId: string) => {
-    setSelectedCharacterId(characterId);
-    setIsModalOpen(true);
+    openCharacterSheet(characterId);
   };
 
   const handleCreateNew = () => {
@@ -41,12 +37,10 @@ export function CharacterLibraryPanel({
   const handleTemplateSelect = (templateId: TemplateId) => {
     const template = getTemplateById(templateId);
     if (template) {
-      setSelectedCharacterId(null);
       setShowTemplatePicker(false);
-      // Open modal with template content
-      setIsModalOpen(true);
       // Store template content in a way the modal can access it
       localStorage.setItem('pendingTemplate', template.content);
+      openCharacterSheet(null);
     }
   };
 
@@ -307,15 +301,6 @@ export function CharacterLibraryPanel({
         </div>
       )}
 
-      <CharacterSheetModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedCharacterId(null);
-          localStorage.removeItem('pendingTemplate');
-        }}
-        characterId={selectedCharacterId}
-      />
     </div>
   );
 }

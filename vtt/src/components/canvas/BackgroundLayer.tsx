@@ -7,6 +7,7 @@ interface BackgroundLayerProps {
   gridSettings: GridSettings;
   settings: Settings;
   backgroundUrl?: string;
+  backgroundImageId?: string;
   layerVisibility: {
     grid: boolean;
     map: boolean;
@@ -21,11 +22,12 @@ export function BackgroundLayer({
   gridSettings,
   settings,
   backgroundUrl,
+  backgroundImageId,
   layerVisibility,
 }: BackgroundLayerProps) {
   const gridWidth = gridSettings.width * gridSettings.cellSize;
   const gridHeight = gridSettings.height * gridSettings.cellSize;
-  const [bgImage] = useImage(backgroundUrl || '');
+  const [bgImage] = useImage(backgroundUrl || '', backgroundImageId);
 
   return (
     <Layer listening={false}>

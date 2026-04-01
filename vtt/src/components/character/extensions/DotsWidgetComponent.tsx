@@ -1,19 +1,25 @@
-import { NodeViewWrapper, ReactNodeViewProps } from '@tiptap/react';
+import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useCallback } from 'react';
+import { useShadowState } from './ShadowStateContext';
 import './DotsWidget.css';
-
-interface DotsWidgetComponentProps extends ReactNodeViewProps {
-  shadowState?: Record<string, number | string>;
-  onUpdateStat?: (key: string, newValue: string | number) => void;
-}
 
 export function DotsWidgetComponent({
   node,
-  shadowState = {},
-  onUpdateStat,
-}: DotsWidgetComponentProps) {
+  updateAttributes,
+}: ReactNodeViewProps) {
+  const { shadowState: fullState, onUpdateStat } = useShadowState();
+  const shadowState = fullState.stats as Record<string, number | string>;
   const [parsedCurrent, setParsedCurrent] = useState<number | null>(null);
   const [parsedMax, setParsedMax] = useState<number | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editCurrent, setEditCurrent] = useState(node.attrs.current);
+  const [editMax, setEditMax] = useState(node.attrs.max);
+
+  // Sync edit fields when attrs change externally
+  useEffect(() => {
+    setEditCurrent(node.attrs.current);
+    setEditMax(node.attrs.max);
+  }, [node.attrs.current, node.attrs.max]);
 
   // Parse current value (can be variable name or number)
   useEffect(() => {
@@ -66,6 +72,7 @@ export function DotsWidgetComponent({
 
   const handleDotClick = useCallback(
     (index: number) => {
+      if (isEditing) return;
       const currentKey = node.attrs.current;
 
       // Determine new value: clicking an empty dot fills up to that dot
@@ -85,10 +92,91 @@ export function DotsWidgetComponent({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- node.attrs is a TipTap mutable ref
-    [displayCurrent, node.attrs.current, shadowState, onUpdateStat]
+    [displayCurrent, node.attrs.current, shadowState, onUpdateStat, isEditing]
+  );
+
+  const handleEdit = useCallback(() => {
+    if (!isEditing) {
+      setEditCurrent(node.attrs.current);
+      setEditMax(node.attrs.max);
+      setIsEditing(true);
+    }
+  }, [isEditing, node.attrs.current, node.attrs.max]);
+
+  const handleSave = useCallback(() => {
+    updateAttributes({ current: editCurrent, max: editMax });
+    setIsEditing(false);
+  }, [editCurrent, editMax, updateAttributes]);
+
+  const handleCancel = useCallback(() => {
+    setEditCurrent(node.attrs.current);
+    setEditMax(node.attrs.max);
+    setIsEditing(false);
+  }, [node.attrs.current, node.attrs.max]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'Escape') {
+        handleCancel();
+      }
+    },
+    [handleSave, handleCancel]
   );
 
   const dots = Array.from({ length: displayMax }, (_, i) => i);
+
+  if (isEditing) {
+    return (
+      <NodeViewWrapper className="dots-widget dots-widget--editing">
+        <div className="dots-widget__edit-form">
+          <label className="dots-widget__edit-label">
+            Current:
+            <input
+              type="text"
+              className="dots-widget__edit-input"
+              value={editCurrent}
+              onChange={(e) => setEditCurrent(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            />
+          </label>
+          <label className="dots-widget__edit-label">
+            Max:
+            <input
+              type="text"
+              className="dots-widget__edit-input"
+              value={editMax}
+              onChange={(e) => setEditMax(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+          </label>
+          <button type="button" className="dots-widget__save-btn" onClick={handleSave}>
+            ✓
+          </button>
+          <button type="button" className="dots-widget__cancel-btn" onClick={handleCancel}>
+            ✕
+          </button>
+        </div>
+        <div className="dots-widget__dots">
+          {dots.map((index) => (
+            <span
+              key={index}
+              className={`dots-widget__dot ${
+                index < displayCurrent ? 'dots-widget__dot--filled' : 'dots-widget__dot--empty'
+              }`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Dot ${index + 1} of ${displayMax}`}
+            />
+          ))}
+        </div>
+      </NodeViewWrapper>
+    );
+  }
 
   return (
     <NodeViewWrapper className="dots-widget">
@@ -108,6 +196,12 @@ export function DotsWidgetComponent({
             />
           ))}
         </div>
+        <button
+          type="button"
+          className="dots-widget__edit-trigger"
+          onClick={handleEdit}
+          title="Click to edit"
+        />
       </div>
     </NodeViewWrapper>
   );

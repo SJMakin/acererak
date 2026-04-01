@@ -2,9 +2,9 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 4px;
-  background: #f0f4f8;
+  background: rgba(124, 58, 237, 0.08);
   border-radius: 4px;
-  border: 1px solid #d0d8e0;
+  border: 1px solid rgba(124, 58, 237, 0.2);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.95em;
   cursor: default;
@@ -13,23 +13,23 @@
 }
 
 .expression:hover {
-  background: #e4ecf4;
+  background: rgba(124, 58, 237, 0.15);
 }
 
 .expression--editing {
-  background: #fff;
-  border-color: #4a90d9;
-  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
 }
 
 .expression__bracket {
-  color: #6b7280;
+  color: rgba(124, 58, 237, 0.5);
   font-weight: 500;
   margin: 0 1px;
 }
 
 .expression__result {
-  color: #1e40af;
+  color: #c4b5fd;
   font-weight: 600;
   padding: 0 2px;
 }
@@ -39,46 +39,72 @@
   background: transparent;
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.95em;
-  color: #1e40af;
+  color: #c4b5fd;
   font-weight: 600;
   width: 120px;
   outline: none;
   padding: 0 2px;
 }
 
-.expression__tooltip {
+/* Edit trigger — invisible overlay, visible on hover */
+.expression__edit-trigger {
   position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
+  inset: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* Save / Cancel buttons in editing mode */
+.expression__save-btn,
+.expression__cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.expression__save-btn {
+  color: #22c55e;
+}
+
+.expression__cancel-btn {
+  color: #ef4444;
+}
+
+.expression__save-btn:hover {
+  color: #4ade80;
+}
+
+.expression__cancel-btn:hover {
+  color: #f87171;
+}
+
+/* Tooltip — fixed positioning to avoid overflow clipping */
+.expression__tooltip {
+  position: fixed;
+  transform: translateX(-50%) translateY(-100%);
+  background: #1a1a2e;
   color: white;
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.85em;
   white-space: nowrap;
-  z-index: 100;
+  z-index: 9999;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.expression__tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(124, 58, 237, 0.2);
 }
 
 .expression__tooltip-formula {
   font-family: 'SF Mono', 'Fira Code', monospace;
-  color: #fbbf24;
+  color: #c4a35a;
   margin-bottom: 4px;
 }
 
 .expression__tooltip-label {
   font-size: 0.8em;
-  color: #9ca3af;
+  color: #6b6b80;
 }

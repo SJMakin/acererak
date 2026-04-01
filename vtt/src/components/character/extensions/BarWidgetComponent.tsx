@@ -1,17 +1,13 @@
-import { NodeViewWrapper, ReactNodeViewProps } from '@tiptap/react';
+import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useCallback } from 'react';
+import { useShadowState } from './ShadowStateContext';
 import './BarWidget.css';
-
-interface BarWidgetComponentProps extends ReactNodeViewProps {
-  shadowState?: Record<string, number | string>;
-  onUpdateStat?: (key: string, newValue: string | number) => void;
-}
 
 export function BarWidgetComponent({
   node,
-  shadowState = {},
-  onUpdateStat,
-}: BarWidgetComponentProps) {
+}: ReactNodeViewProps) {
+  const { shadowState: fullState, onUpdateStat } = useShadowState();
+  const shadowState = fullState.stats as Record<string, number | string>;
   const [showControls, setShowControls] = useState(false);
   const [parsedCurrent, setParsedCurrent] = useState<number | null>(null);
   const [parsedMax, setParsedMax] = useState<number | null>(null);

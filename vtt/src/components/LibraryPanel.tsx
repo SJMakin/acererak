@@ -25,8 +25,6 @@ import type {
   TokenElement,
   CanvasElement,
 } from '../types';
-import { CharacterSheetModal } from './character/CharacterSheetModal';
-
 interface LibraryPanelProps {
   room: {
     broadcastElementUpdate: (element: CanvasElement) => void;
@@ -46,7 +44,7 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
     updateLibraryItem,
   } = useLibraryStore();
 
-  const { characters, deleteCharacter } = useCharacterStore();
+  const { characters, deleteCharacter, openCharacterSheet } = useCharacterStore();
 
   const { game, addElement } = useGameStore();
 
@@ -57,10 +55,6 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
-
-  // Character modal state
-  const [characterModalOpen, setCharacterModalOpen] = useState(false);
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
 
   // Load library on mount
   useEffect(() => {
@@ -116,13 +110,11 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
   };
 
   const handleCreateCharacter = () => {
-    setSelectedCharacterId(null);
-    setCharacterModalOpen(true);
+    openCharacterSheet(null);
   };
 
   const handleEditCharacter = (characterId: string) => {
-    setSelectedCharacterId(characterId);
-    setCharacterModalOpen(true);
+    openCharacterSheet(characterId);
   };
 
   const handleDeleteCharacter = (characterId: string, e: React.MouseEvent) => {
@@ -369,15 +361,6 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
         </Stack>
       </Modal>
 
-      {/* Character Sheet Modal */}
-      <CharacterSheetModal
-        isOpen={characterModalOpen}
-        onClose={() => {
-          setCharacterModalOpen(false);
-          setSelectedCharacterId(null);
-        }}
-        characterId={selectedCharacterId}
-      />
     </Stack>
   );
 }

@@ -1,10 +1,10 @@
 import { NodeViewWrapper } from '@tiptap/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { nanoid } from 'nanoid';
 import { executeDiceRoll, resolveVariables } from '../../../services/diceParser';
 import { useGameStore } from '../../../stores/gameStore';
-import type { ShadowState } from '../../../services/shadowStateService';
 import type { ChatMessage } from '../../../types';
+import { useShadowState } from './ShadowStateContext';
 import './ActionButton.css';
 
 interface ActionButtonComponentProps {
@@ -20,10 +20,6 @@ interface ActionButtonComponentProps {
   extension: {
     name: string;
   };
-  // Shadow state passed from the editor for variable resolution
-  shadowState?: ShadowState;
-  // Callback to handle stat updates (for cost deduction)
-  onUpdateStat?: (key: string, newValue: string | number) => void;
   // Callback for broadcasting rolls to P2P
   onBroadcastRoll?: (message: ChatMessage) => void;
 }
@@ -31,29 +27,38 @@ interface ActionButtonComponentProps {
 export function ActionButtonComponent({
   node,
   updateAttributes,
-  selected,
-  shadowState,
-  onUpdateStat,
   onBroadcastRoll,
 }: ActionButtonComponentProps) {
+  const { shadowState, onUpdateStat } = useShadowState();
   const { label, action, cost } = node.attrs;
   const [isRolling, setIsRolling] = useState(false);
-  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLabel, setEditLabel] = useState(label);
+  const [editAction, setEditAction] = useState(action);
+  const [editCost, setEditCost] = useState(cost || '');
+
   const { game, myPeerId, addChatMessage } = useGameStore();
   const myPlayer = myPeerId && game?.players[myPeerId];
 
+  // Sync edit fields when attrs change externally
+  useEffect(() => {
+    setEditLabel(label);
+    setEditAction(action);
+    setEditCost(cost || '');
+  }, [label, action, cost]);
+
   const handleClick = useCallback(async () => {
-    if (isRolling || !myPlayer || !myPeerId) return;
-    
+    if (isRolling || isEditing || !myPlayer || !myPeerId) return;
+
     setIsRolling(true);
 
     try {
       // Resolve variables in the action formula
       const resolvedFormula = resolveVariables(action, shadowState?.stats || {});
-      
+
       // Execute the dice roll
       const rollResult = executeDiceRoll(resolvedFormula);
-      
+
       // Create a roll-type chat message
       const rollMessage: ChatMessage = {
         id: nanoid(10),
@@ -71,7 +76,7 @@ export function ActionButtonComponent({
 
       // Add to local store (this will show in chat)
       addChatMessage(rollMessage);
-      
+
       // Broadcast to other players via P2P
       if (onBroadcastRoll) {
         onBroadcastRoll(rollMessage);
@@ -95,40 +100,84 @@ export function ActionButtonComponent({
     } finally {
       setTimeout(() => setIsRolling(false), 500);
     }
-  }, [action, cost, shadowState, isRolling, myPlayer, myPeerId, addChatMessage, onBroadcastRoll, onUpdateStat]);
+  }, [action, cost, shadowState, isRolling, isEditing, myPlayer, myPeerId, addChatMessage, onBroadcastRoll, onUpdateStat]);
 
-  if (selected) {
+  const handleEdit = useCallback(() => {
+    if (!isEditing) {
+      setEditLabel(label);
+      setEditAction(action);
+      setEditCost(cost || '');
+      setIsEditing(true);
+    }
+  }, [isEditing, label, action, cost]);
+
+  const handleSave = useCallback(() => {
+    updateAttributes({
+      label: editLabel,
+      action: editAction,
+      cost: editCost || undefined,
+    });
+    setIsEditing(false);
+  }, [editLabel, editAction, editCost, updateAttributes]);
+
+  const handleCancel = useCallback(() => {
+    setEditLabel(label);
+    setEditAction(action);
+    setEditCost(cost || '');
+    setIsEditing(false);
+  }, [label, action, cost]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'Escape') {
+        handleCancel();
+      }
+    },
+    [handleSave, handleCancel]
+  );
+
+  if (isEditing) {
     return (
       <NodeViewWrapper className="action-button action-button--editing">
         <span className="action-button__bracket">[</span>
         <input
           type="text"
           className="action-button__input"
-          value={label}
-          onChange={(e) => updateAttributes({ label: e.target.value })}
+          value={editLabel}
+          onChange={(e) => setEditLabel(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Label"
+          autoFocus
         />
         <span className="action-button__separator">](</span>
         <input
           type="text"
           className="action-button__input"
-          value={action}
-          onChange={(e) => updateAttributes({ action: e.target.value })}
+          value={editAction}
+          onChange={(e) => setEditAction(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="action: dice formula"
         />
-        {cost && (
-          <>
-            <span className="action-button__separator">; cost: </span>
-            <input
-              type="text"
-              className="action-button__input action-button__input--small"
-              value={cost}
-              onChange={(e) => updateAttributes({ cost: e.target.value })}
-              placeholder="Stat"
-            />
-          </>
-        )}
+        <span className="action-button__separator">; cost: </span>
+        <input
+          type="text"
+          className="action-button__input action-button__input--small"
+          value={editCost}
+          onChange={(e) => setEditCost(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Stat (optional)"
+        />
         <span className="action-button__bracket">)</span>
+        <button type="button" className="action-button__save-btn" onClick={handleSave}>
+          ✓
+        </button>
+        <button type="button" className="action-button__cancel-btn" onClick={handleCancel}>
+          ✕
+        </button>
       </NodeViewWrapper>
     );
   }
@@ -145,6 +194,12 @@ export function ActionButtonComponent({
         {label}
         {cost && <span className="action-button__cost"> ({cost})</span>}
       </button>
+      <button
+        type="button"
+        className="action-button__edit-trigger"
+        onClick={handleEdit}
+        title="Edit action"
+      />
     </NodeViewWrapper>
   );
 }

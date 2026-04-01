@@ -11,6 +11,7 @@
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.15s ease;
+  position: relative;
 }
 
 .dots-widget__container:hover {
@@ -39,27 +40,33 @@
 }
 
 .dots-widget__dot--empty {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .dots-widget__dot--empty:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .dots-widget__dot--filled {
   background-color: var(--dots-filled, #f59e0b);
   border-color: var(--dots-filled-border, #d97706);
-  box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  box-shadow:
+    0 0 4px rgba(245, 158, 11, 0.4),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 .dots-widget__dot--filled:hover {
   background-color: var(--dots-filled-hover, #fbbf24);
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  box-shadow:
+    0 0 8px rgba(245, 158, 11, 0.6),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
-/* Alternative color schemes for different types */
+/* Alternative color schemes */
 .dots-widget[data-type="success"] .dots-widget__dot--filled {
   --dots-filled: #22c55e;
   --dots-filled-border: #16a34a;
@@ -82,6 +89,100 @@
   --dots-filled: #ec4899;
   --dots-filled-border: #db2777;
   --dots-filled-hover: #f472b6;
+}
+
+/* Editing mode */
+.dots-widget--editing {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.dots-widget__edit-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.dots-widget__edit-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dots-widget__edit-input {
+  width: 3rem;
+  padding: 0.125rem 0.25rem;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  color: #fff;
+  text-align: center;
+}
+
+/* Edit trigger */
+.dots-widget__edit-trigger {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  background: rgba(124, 58, 237, 0.8);
+  border: 1px solid rgba(124, 58, 237, 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dots-widget__edit-trigger::after {
+  content: '✎';
+  font-size: 10px;
+}
+
+.dots-widget__container:hover .dots-widget__edit-trigger {
+  opacity: 1;
+}
+
+.dots-widget__edit-trigger:hover {
+  background: rgba(124, 58, 237, 1);
+}
+
+/* Save / Cancel buttons in editing mode */
+.dots-widget__save-btn,
+.dots-widget__cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.dots-widget__save-btn {
+  color: #22c55e;
+}
+
+.dots-widget__cancel-btn {
+  color: #ef4444;
+}
+
+.dots-widget__save-btn:hover {
+  color: #4ade80;
+}
+
+.dots-widget__cancel-btn:hover {
+  color: #f87171;
 }
 
 /* Keyboard focus styles */
@@ -109,19 +210,4 @@
 
 .dots-widget__dot {
   animation: dots-pop 0.15s ease-out;
-}
-
-/* Dark theme adjustments */
-[data-theme="dark"] .dots-widget__container:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .dots-widget__dot--empty {
-  background-color: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-[data-theme="dark"] .dots-widget__dot--empty:hover {
-  background-color: rgba(0, 0, 0, 0.5);
-  border-color: rgba(255, 255, 255, 0.3);
 }

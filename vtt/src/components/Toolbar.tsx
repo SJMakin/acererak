@@ -56,6 +56,7 @@ import {
 } from '@tabler/icons-react';
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
+import { useAIStore } from '../stores/aiStore';
 import type { ToolType, Scene } from '../types';
 import SettingsModal from './SettingsModal';
 import ExportImportModal from './ExportImportModal';
@@ -152,6 +153,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const { canUndo, canRedo } = useHistoryStore();
+  const aiAvailable = !!useAIStore((s) => s.capabilities.imageModel);
   const [settingsOpened, setSettingsOpened] = useState(false);
   const [exportImportOpened, setExportImportOpened] = useState(false);
   const [exportImportMode, setExportImportMode] = useState<'export' | 'import'>('export');
@@ -186,6 +188,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   const handleSceneSubmit = (data: {
     name: string;
     backgroundUrl?: string;
+    backgroundImageId?: string;
     gridSettings: import('../types').GridSettings;
     copyFromCurrent: boolean;
   }) => {
@@ -194,6 +197,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
       useGameStore.getState().updateScene(editingScene.id, {
         name: data.name,
         backgroundUrl: data.backgroundUrl,
+        backgroundImageId: data.backgroundImageId,
         gridSettings: data.gridSettings,
       });
       
@@ -210,9 +214,12 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
         data.copyFromCurrent
       );
       
-      // Update grid settings if not copying from current
+      // Update grid settings and backgroundImageId if not copying from current
       if (!data.copyFromCurrent) {
-        useGameStore.getState().updateScene(newSceneId, { gridSettings: data.gridSettings });
+        useGameStore.getState().updateScene(newSceneId, {
+          gridSettings: data.gridSettings,
+          backgroundImageId: data.backgroundImageId,
+        });
       }
       
       // Broadcast new scene to peers
@@ -401,7 +408,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
 
             <Menu shadow="md" width={240}>
               <Menu.Target>
-                <ActionIcon variant="subtle" size={compactActionSize}>
+                <ActionIcon variant="subtle" size={compactActionSize} aria-label="More options">
                   <IconDots size={menuIconSize} />
                 </ActionIcon>
               </Menu.Target>
@@ -1315,6 +1322,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
           gridColor: 'rgba(255, 255, 255, 0.2)',
           gridType: 'square',
         }}
+        aiAvailable={aiAvailable}
       />
 
       {/* Scene Manager Modal */}

@@ -15,7 +15,7 @@ export function MapImage({
   onDragEnd: (x: number, y: number) => void;
   isGM: boolean;
 }) {
-  const [image] = useImage(element.imageUrl);
+  const [image] = useImage(element.imageUrl, element.imageId);
 
   const visible = element.visibleTo === 'all' ||
     (isGM && (element.visibleTo === 'gm' || Array.isArray(element.visibleTo)));

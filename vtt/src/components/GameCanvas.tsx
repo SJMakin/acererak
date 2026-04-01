@@ -3,6 +3,7 @@ import { Stage } from 'react-konva';
 import type Konva from 'konva';
 import { useGesture } from '@use-gesture/react';
 import { useGameStore } from '../stores/gameStore';
+import { useAIStore } from '../stores/aiStore';
 import { useClipboard } from '../hooks/useClipboard';
 import { useCursorInterpolation } from '../hooks/useCursorInterpolation';
 import { useElementHandlers } from '../hooks/useElementHandlers';
@@ -46,6 +47,10 @@ export default function GameCanvas({ room }: GameCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+
+  // AI availability: GM has local image model; player checks peer capabilities
+  const aiCapabilities = useAIStore((s) => s.capabilities);
+  const aiAvailable = !!aiCapabilities.imageModel;
   
   // Touch gesture state
   const initialPinchDistance = useRef<number | null>(null);
@@ -173,6 +178,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       x: imagePlacementPosition.x,
       y: imagePlacementPosition.y,
       imageUrl: config.imageUrl,
+      imageId: config.imageId,
       width: config.width,
       height: config.height,
       name: config.name,
@@ -856,6 +862,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           gridSettings={gridSettings}
           settings={settings}
           backgroundUrl={activeScene.backgroundUrl}
+          backgroundImageId={activeScene.backgroundImageId}
           layerVisibility={layerVisibility}
         />
 
@@ -939,6 +946,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           setTokenPlacementPosition(null);
         }}
         onSubmit={handleTokenSubmit}
+        aiAvailable={aiAvailable}
       />
       
       {/* Text Input Modal */}
@@ -968,6 +976,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           setImagePlacementPosition(null);
         }}
         onSubmit={handleImageSubmit}
+        aiAvailable={aiAvailable}
       />
     </div>
   );

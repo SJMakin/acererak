@@ -15,6 +15,9 @@ export type { Snippet, SnippetCategory, SnippetCreateInput, SnippetUpdateInput }
 // Re-export AI types
 export type { AIModelInfo, AISettings, AIRequest, AIResponse, AICapabilities, AIImage } from './ai';
 
+// Re-export EmbeddedImage from imageService
+export type { EmbeddedImage } from '../services/imageService';
+
 export interface Point {
   x: number;
   y: number;
@@ -65,6 +68,7 @@ export interface BaseElement {
 export interface TokenElement extends BaseElement {
   type: 'token';
   imageUrl: string;
+  imageId?: string;      // SHA-256 hash of embedded image blob
   width: number;         // in grid cells
   height: number;        // in grid cells
   name: string;
@@ -79,6 +83,7 @@ export interface TokenElement extends BaseElement {
 export interface ImageElement extends BaseElement {
   type: 'image';
   imageUrl: string;
+  imageId?: string;      // SHA-256 hash of embedded image blob
   width: number;         // in pixels
   height: number;        // in pixels
   notes?: string;        // Markdown content
@@ -114,6 +119,7 @@ export interface Scene {
   id: string;
   name: string;
   backgroundUrl?: string;    // THE MAP (first-class, not an element)
+  backgroundImageId?: string; // Embedded background image (SHA-256 hash)
   gridSettings: GridSettings; // Per-scene grid config
   elements: CanvasElement[]; // Tokens, drawings, images, text
   fogOfWar: FogOfWar;        // Per-scene fog

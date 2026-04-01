@@ -13,10 +13,12 @@ import {
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
 import { useCharacterStore } from '../stores/characterStore';
+import ImageInput, { type ImageInputValue } from './ImageInput';
 
 export interface TokenConfig {
   name: string;
   imageUrl: string;
+  imageId?: string;
   size: number;
   hp?: { current: number; max: number };
   ac?: number;
@@ -28,6 +30,7 @@ interface TokenConfigModalProps {
   onClose: () => void;
   onSubmit: (config: TokenConfig) => void;
   existingCharacterId?: string | null; // For editing: pre-link character
+  aiAvailable?: boolean;
 }
 
 export default function TokenConfigModal({
@@ -35,12 +38,13 @@ export default function TokenConfigModal({
   onClose,
   onSubmit,
   existingCharacterId,
+  aiAvailable,
 }: TokenConfigModalProps) {
   const { settings } = useGameStore();
   const { characters, getCharacterById, addCharacter } = useCharacterStore();
   
   const [name, setName] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageValue, setImageValue] = useState<ImageInputValue>({});
   const [size, setSize] = useState(settings.defaultTokenSize);
   const [hpMax, setHpMax] = useState<number | string>(settings.defaultHP.max);
   const [ac, setAc] = useState<number | string>('');
@@ -56,8 +60,9 @@ export default function TokenConfigModal({
   // Reset form when modal opens
   useEffect(() => {
     if (opened) {
-      setName(selectedCharacter?.name || '');
-      setImageUrl(selectedCharacter?.projections ? '' : ''); // Clear image if character linked
+      const existingChar = existingCharacterId ? getCharacterById(existingCharacterId) : undefined;
+      setName(existingChar?.name || '');
+      setImageValue({}); // Clear image
       setSize(settings.defaultTokenSize);
       setHpMax(settings.defaultHP.max);
       setAc('');
@@ -65,7 +70,8 @@ export default function TokenConfigModal({
       setShowCreateCharacter(false);
       setNewCharacterName('');
     }
-  }, [opened, settings.defaultTokenSize, settings.defaultHP.max, existingCharacterId, selectedCharacter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
   // Auto-fill from character when selected
   useEffect(() => {
@@ -96,7 +102,8 @@ export default function TokenConfigModal({
 
     const config: TokenConfig = {
       name: name.trim(),
-      imageUrl: imageUrl.trim(),
+      imageUrl: imageValue.imageUrl?.trim() || '',
+      imageId: imageValue.imageId,
       size,
     };
 
@@ -177,12 +184,12 @@ export default function TokenConfigModal({
           data-autofocus
         />
         
-        <TextInput
+        <ImageInput
+          value={imageValue}
+          onChange={setImageValue}
           label="Image URL"
           placeholder="https://example.com/token.png (optional)"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.currentTarget.value)}
-          onKeyPress={handleKeyPress}
+          aiAvailable={aiAvailable}
         />
         
         <NumberInput
@@ -202,12 +209,14 @@ export default function TokenConfigModal({
           <>
             <Select
               label="Link Character"
-              placeholder="Select a character sheet..."
+              placeholder={characterOptions.length > 0 ? "Select a character sheet..." : "No characters yet — create one below"}
               value={selectedCharacterId}
               onChange={(val) => setSelectedCharacterId(val)}
               data={characterOptions}
               clearable
               searchable
+              nothingFoundMessage="No characters found"
+              comboboxProps={{ withinPortal: true, zIndex: 1000 }}
             />
 
             {/* Show linked character info */}

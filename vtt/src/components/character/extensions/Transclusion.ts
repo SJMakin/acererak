@@ -49,6 +49,11 @@ export const Transclusion = Node.create<TransclusionOptions>({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-component': 'transclusion' }), 0];
   },
 
+  renderText({ node }) {
+    const snippetName = node.attrs.snippetName || '';
+    return `![[${snippetName}]]`;
+  },
+
   addCommands() {
     return {
       insertTransclusion:
