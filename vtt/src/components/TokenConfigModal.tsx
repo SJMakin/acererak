@@ -5,31 +5,32 @@ import {
   TextInput,
   NumberInput,
   Button,
-  Group,
-  Select,
   Divider,
+  Group,
   Text,
+  Paper,
   Badge,
+  Select,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import { useCharacterStore } from '../stores/characterStore';
+import { useSheetStore } from '../stores/sheetStore';
 import ImageInput, { type ImageInputValue } from './ImageInput';
 
 export interface TokenConfig {
   name: string;
-  imageUrl: string;
+  imageUrl?: string;
   imageId?: string;
   size: number;
   hp?: { current: number; max: number };
   ac?: number;
-  characterId?: string;
+  sheetId?: string;
 }
 
 interface TokenConfigModalProps {
   opened: boolean;
   onClose: () => void;
   onSubmit: (config: TokenConfig) => void;
-  existingCharacterId?: string | null; // For editing: pre-link character
+  existingCharacterId?: string | null; // For editing: pre-link sheet
   aiAvailable?: boolean;
 }
 
@@ -41,61 +42,57 @@ export default function TokenConfigModal({
   aiAvailable,
 }: TokenConfigModalProps) {
   const { settings } = useGameStore();
-  const { characters, getCharacterById, addCharacter } = useCharacterStore();
+  const { sheets, getSheetById } = useSheetStore();
   
   const [name, setName] = useState('');
   const [imageValue, setImageValue] = useState<ImageInputValue>({});
   const [size, setSize] = useState(settings.defaultTokenSize);
   const [hpMax, setHpMax] = useState<number | string>(settings.defaultHP.max);
   const [ac, setAc] = useState<number | string>('');
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(existingCharacterId || null);
-  const [showCreateCharacter, setShowCreateCharacter] = useState(false);
-  const [newCharacterName, setNewCharacterName] = useState('');
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(existingCharacterId || null);
 
-  // Get selected character data
-  const selectedCharacter = selectedCharacterId 
-    ? getCharacterById(selectedCharacterId) 
+  // Get selected sheet data
+  const selectedSheet = selectedSheetId 
+    ? getSheetById(selectedSheetId) 
     : undefined;
 
   // Reset form when modal opens
   useEffect(() => {
     if (opened) {
-      const existingChar = existingCharacterId ? getCharacterById(existingCharacterId) : undefined;
-      setName(existingChar?.name || '');
+      const existingSheet = existingCharacterId ? getSheetById(existingCharacterId) : undefined;
+      setName(existingSheet?.name || '');
       setImageValue({}); // Clear image
       setSize(settings.defaultTokenSize);
       setHpMax(settings.defaultHP.max);
       setAc('');
-      setSelectedCharacterId(existingCharacterId || null);
-      setShowCreateCharacter(false);
-      setNewCharacterName('');
+      setSelectedSheetId(existingCharacterId || null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened]);
 
-  // Auto-fill from character when selected
+  // Auto-fill from sheet when selected
   useEffect(() => {
-    if (selectedCharacter) {
-      setName(selectedCharacter.name);
-      // Auto-fill HP from character projections
-      if (selectedCharacter.shadowState && selectedCharacter.projections) {
-        const barKey = selectedCharacter.projections.bar || 'HP';
-        const barMaxKey = selectedCharacter.projections.barMax || 'MaxHP';
-        const hp = selectedCharacter.shadowState[barKey];
-        const maxHp = selectedCharacter.shadowState[barMaxKey];
+    if (selectedSheet) {
+      setName(selectedSheet.name);
+      // Auto-fill HP from sheet projections
+      if (selectedSheet.shadowState && selectedSheet.projections) {
+        const barKey = selectedSheet.projections.bar || 'HP';
+        const barMaxKey = selectedSheet.projections.barMax || 'MaxHP';
+        const hp = selectedSheet.shadowState[barKey];
+        const maxHp = selectedSheet.shadowState[barMaxKey];
         if (hp !== undefined) {
           setHpMax(typeof maxHp === 'number' ? maxHp : parseInt(String(maxHp)) || 10);
         }
       }
-      // Auto-fill AC from character projections
-      if (selectedCharacter.projections?.badge) {
-        const ac = selectedCharacter.shadowState[selectedCharacter.projections.badge];
+      // Auto-fill AC from sheet projections
+      if (selectedSheet.projections?.badge) {
+        const ac = selectedSheet.shadowState[selectedSheet.projections.badge];
         if (ac !== undefined) {
           setAc(typeof ac === 'number' ? ac : parseInt(String(ac)) || 10);
         }
       }
     }
-  }, [selectedCharacter]);
+  }, [selectedSheet]);
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -117,40 +114,17 @@ export default function TokenConfigModal({
       config.ac = ac;
     }
 
-    // Add character link if selected
-    if (selectedCharacterId) {
-      config.characterId = selectedCharacterId;
+    // Add sheet link if selected
+    if (selectedSheetId) {
+      config.sheetId = selectedSheetId;
     }
 
     onSubmit(config);
     onClose();
   };
 
-  const handleCreateCharacter = () => {
-    if (!newCharacterName.trim()) return;
-
-    const newId = addCharacter({
-      name: newCharacterName.trim(),
-      content: '{"type":"doc","content":[{"type":"paragraph"}]}',
-      shadowState: {
-        HP: hpMax && typeof hpMax === 'number' ? hpMax : 10,
-        MaxHP: hpMax && typeof hpMax === 'number' ? hpMax : 10,
-        AC: ac && typeof ac === 'number' ? ac : 10,
-      },
-      projections: {
-        bar: 'HP',
-        barMax: 'MaxHP',
-        badge: 'AC',
-      },
-    });
-
-    setSelectedCharacterId(newId);
-    setShowCreateCharacter(false);
-    setNewCharacterName('');
-  };
-
-  const handleUnlinkCharacter = () => {
-    setSelectedCharacterId(null);
+  const handleUnlinkSheet = () => {
+    setSelectedSheetId(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -159,10 +133,10 @@ export default function TokenConfigModal({
     }
   };
 
-  // Prepare character options for dropdown
-  const characterOptions = characters.map((char) => ({
-    value: char.id,
-    label: char.name,
+  // Prepare sheet options for dropdown
+  const sheetOptions = sheets.map((s) => ({
+    value: s.id,
+    label: s.name,
   }));
 
   return (
@@ -202,107 +176,47 @@ export default function TokenConfigModal({
           required
         />
 
-        {/* Character Linking Section */}
-        <Divider label="Character Link (Optional)" labelPosition="center" />
+        {/* Sheet Linking Section */}
+        <Divider label="Link Sheet (Optional)" labelPosition="center" />
         
-        {!showCreateCharacter ? (
-          <>
-            <Select
-              label="Link Character"
-              placeholder={characterOptions.length > 0 ? "Select a character sheet..." : "No characters yet — create one below"}
-              value={selectedCharacterId}
-              onChange={(val) => setSelectedCharacterId(val)}
-              data={characterOptions}
-              clearable
-              searchable
-              nothingFoundMessage="No characters found"
-              comboboxProps={{ withinPortal: true, zIndex: 1000 }}
-            />
+        <Select
+          label="Link Sheet"
+          placeholder={sheetOptions.length > 0 ? "Select a sheet..." : "No sheets yet — create one in the Library"}
+          value={selectedSheetId}
+          onChange={(val) => setSelectedSheetId(val)}
+          data={sheetOptions}
+          clearable
+          searchable
+          nothingFoundMessage="No sheets found"
+          comboboxProps={{ withinPortal: true, zIndex: 1000 }}
+        />
 
-            {/* Show linked character info */}
-            {selectedCharacter && (
-              <Paper p="sm" withBorder style={{ backgroundColor: 'rgba(124, 58, 237, 0.05)' }}>
-                <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={600}>Linked Character</Text>
-                  <Badge color="violet">{selectedCharacter.name}</Badge>
-                </Group>
-                <Text size="xs" c="dimmed">
-                  HP: {selectedCharacter.shadowState[selectedCharacter.projections.bar || 'HP'] || '—'} / 
-                  {selectedCharacter.shadowState[selectedCharacter.projections.barMax || 'MaxHP'] || '—'} • 
-                  AC: {selectedCharacter.shadowState[selectedCharacter.projections.badge || 'AC'] || '—'}
-                </Text>
-                <Button 
-                  size="xs" 
-                  variant="subtle" 
-                  color="red" 
-                  mt="xs"
-                  onClick={handleUnlinkCharacter}
-                >
-                  Unlink Character
-                </Button>
-              </Paper>
-            )}
-
-            {/* Create new character option */}
+        {/* Show linked sheet info */}
+        {selectedSheet && (
+          <Paper p="sm" withBorder style={{ backgroundColor: 'rgba(124, 58, 237, 0.05)' }}>
+            <Group justify="space-between" mb="xs">
+              <Text size="sm" fw={600}>Linked Sheet</Text>
+              <Badge color="violet">{selectedSheet.name}</Badge>
+            </Group>
+            <Text size="xs" c="dimmed">
+              HP: {selectedSheet.shadowState[selectedSheet.projections.bar || 'HP'] || '—'} / 
+              {selectedSheet.shadowState[selectedSheet.projections.barMax || 'MaxHP'] || '—'} • 
+              AC: {selectedSheet.shadowState[selectedSheet.projections.badge || 'AC'] || '—'}
+            </Text>
             <Button 
+              size="xs" 
               variant="subtle" 
-              size="sm"
-              onClick={() => {
-                setShowCreateCharacter(true);
-                setSelectedCharacterId(null);
-              }}
+              color="red" 
+              mt="xs"
+              onClick={handleUnlinkSheet}
             >
-              + Create New Character
+              Unlink Sheet
             </Button>
-          </>
-        ) : (
-          <>
-            <TextInput
-              label="New Character Name"
-              placeholder="Enter character name..."
-              value={newCharacterName}
-              onChange={(e) => setNewCharacterName(e.currentTarget.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleCreateCharacter()}
-              autoFocus
-            />
-
-            {/* Preview HP/AC for new character */}
-            <Group grow>
-              <NumberInput
-                label="HP"
-                value={hpMax}
-                onChange={setHpMax}
-                min={1}
-              />
-              <NumberInput
-                label="AC"
-                value={ac}
-                onChange={setAc}
-                min={0}
-              />
-            </Group>
-
-            <Group gap="xs">
-              <Button 
-                variant="subtle" 
-                size="sm"
-                onClick={() => setShowCreateCharacter(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                size="sm"
-                onClick={handleCreateCharacter}
-                disabled={!newCharacterName.trim()}
-              >
-                Create & Link
-              </Button>
-            </Group>
-          </>
+          </Paper>
         )}
 
         {/* HP and AC - only show when not linked or as fallback */}
-        {!selectedCharacter && (
+        {!selectedSheet && (
           <>
             <Divider label="Stats" labelPosition="center" />
             <Group grow>
@@ -325,29 +239,15 @@ export default function TokenConfigModal({
           </>
         )}
 
-        <Group justify="flex-end" mt="md">
+        <Group justify="flex-end" gap="sm">
           <Button variant="subtle" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={!name.trim()}>
-            Place Token
+            Create Token
           </Button>
         </Group>
       </Stack>
     </Modal>
-  );
-}
-
-// Simple Paper component helper since we're in a modal already
-function Paper({ children, p, withBorder, style }: { children: React.ReactNode; p?: string; withBorder?: boolean; style?: React.CSSProperties }) {
-  return (
-    <div style={{
-      padding: p || '8px',
-      border: withBorder ? '1px solid #e5e7eb' : undefined,
-      borderRadius: '4px',
-      ...style,
-    }}>
-      {children}
-    </div>
   );
 }

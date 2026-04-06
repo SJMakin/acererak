@@ -33,9 +33,9 @@ import { ShadowStateContext } from './extensions/ShadowStateContext';
 import { BubbleToolbar } from './BubbleToolbar';
 import { FloatingInsertMenu } from './FloatingInsertMenu';
 import { DslHelpPopover } from './DslHelpPopover';
-import './CharacterSheetEditor.css';
+import './SheetEditor.css';
 
-interface CharacterSheetEditorProps {
+interface SheetEditorProps {
   content: string;
   contentVersion?: number;
   onChange: (content: string, shadowState?: ShadowState) => void;
@@ -52,13 +52,13 @@ interface CommandItem {
   category: 'stats' | 'widgets' | 'actions' | 'utility';
 }
 
-export function CharacterSheetEditor({
+export function SheetEditor({
   content,
   contentVersion = 0,
   onChange,
   readOnly = false,
   shadowState: externalShadowState,
-}: CharacterSheetEditorProps) {
+}: SheetEditorProps) {
   const [localShadowState, setLocalShadowState] = useState<ShadowState>({ stats: {}, projections: {} });
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandFilter, setCommandFilter] = useState('');
@@ -441,15 +441,15 @@ export function CharacterSheetEditor({
 
   if (!editor) {
     return (
-      <div className="character-sheet-editor">
-        <div className="character-sheet-editor__loading">Loading editor...</div>
+      <div className="sheet-editor">
+        <div className="sheet-editor__loading">Loading editor...</div>
       </div>
     );
   }
 
   return (
-    <div className="character-sheet-editor" ref={editorContainerRef}>
-      <div className="character-sheet-editor__content" onKeyDown={handleEditorKeyDown}>
+    <div className="sheet-editor" ref={editorContainerRef}>
+      <div className="sheet-editor__content" onKeyDown={handleEditorKeyDown}>
         <ShadowStateContext.Provider value={{ shadowState: currentShadowState, onUpdateStat }}>
           <EditorContent editor={editor} />
         </ShadowStateContext.Provider>
@@ -466,6 +466,7 @@ export function CharacterSheetEditor({
         createPortal(
         <div
           className="command-palette-backdrop"
+          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
           onClick={() => setShowCommandPalette(false)}
         >
           <div
@@ -595,7 +596,7 @@ export function CharacterSheetEditor({
 
       {/* Shadow State Debug Panel (development) */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="character-sheet-editor__debug">
+        <div className="sheet-editor__debug">
           <details>
             <summary>Shadow State ({Object.keys(currentShadowState.stats).length} stats)</summary>
             <pre>{JSON.stringify(currentShadowState, null, 2)}</pre>

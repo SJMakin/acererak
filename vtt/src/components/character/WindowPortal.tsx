@@ -102,7 +102,7 @@ export function WindowPortal({ windowRef, children, onClose }: WindowPortalProps
       popup.removeEventListener('beforeunload', handlePopupUnload);
       window.removeEventListener('beforeunload', handleParentUnload);
       // Do NOT close the popup here — StrictMode double-invokes effects.
-      // The popup is closed explicitly by CharacterSheetModal's handlers
+      // The popup is closed explicitly by SheetModal's handlers
       // (handleClose, handleSave, handlePopIn) or by the user closing it.
     };
   }, [windowRef]);

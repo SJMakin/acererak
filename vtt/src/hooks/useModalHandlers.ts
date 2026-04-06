@@ -52,7 +52,7 @@ export function useModalHandlers({
       type: 'token',
       layer: 'token',
       name: config.name,
-      imageUrl: config.imageUrl,
+      imageUrl: config.imageUrl || '',
       imageId: config.imageId,
       x,
       y,
@@ -63,7 +63,7 @@ export function useModalHandlers({
       zIndex: activeScene.elements.length,
       hp: config.hp,
       ac: config.ac,
-      characterId: config.characterId,
+      sheetId: config.sheetId,
     };
 
     const id = addElement(token);

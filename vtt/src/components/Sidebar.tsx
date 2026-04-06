@@ -2,22 +2,20 @@ import { useState } from 'react';
 import {
   Stack,
   Tabs,
-  TextInput,
-  Button,
   Paper,
   Text,
   Group,
   ActionIcon,
   ScrollArea,
   Badge,
-  NumberInput,
-  Select,
   Divider,
   Checkbox,
   Switch,
+  Select,
+  Button,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import { useLibraryStore } from '../stores/libraryStore';
+import { useSheetStore } from '../stores/sheetStore';
 import type { TokenElement, CanvasElement, Visibility, ChatMessage, Point } from '../types';
 import DiceRoller from './DiceRoller';
 import PropertyInspector from './PropertyInspector';
@@ -42,7 +40,6 @@ export default function Sidebar({ room }: SidebarProps) {
     game,
     selectedElementId,
     isGM,
-    addElement,
     updateElement,
     deleteElement,
     selectElement,
@@ -52,45 +49,15 @@ export default function Sidebar({ room }: SidebarProps) {
     setPreviewAsPlayer,
   } = useGameStore();
 
-  const [activeTab, setActiveTab] = useState<string | null>('tokens');
+  const { getSheetById, openSheet } = useSheetStore();
 
-  // Token creation form
-  const [newTokenName, setNewTokenName] = useState('');
-  const [newTokenUrl, setNewTokenUrl] = useState('');
-  const [newTokenSize, setNewTokenSize] = useState(1);
+  const [activeTab, setActiveTab] = useState<string | null>('tokens');
 
   // Get active scene
   const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
 
   // Get selected element
   const selectedElement = activeScene?.elements.find(e => e.id === selectedElementId);
-
-  const handleAddToken = () => {
-    if (!newTokenName.trim()) return;
-
-    const token: Omit<TokenElement, 'id'> = {
-      type: 'token',
-      layer: 'token',
-      name: newTokenName,
-      imageUrl: newTokenUrl || '',
-      x: 100,
-      y: 100,
-      width: newTokenSize,
-      height: newTokenSize,
-      visibleTo: 'all',
-      locked: false,
-      zIndex: activeScene?.elements.length || 0,
-    };
-
-    const id = addElement(token);
-    const fullToken = { ...token, id } as TokenElement;
-    room.broadcastElementUpdate(fullToken);
-
-    // Reset form
-    setNewTokenName('');
-    setNewTokenUrl('');
-    setNewTokenSize(1);
-  };
 
   const handleDeleteElement = (elementId: string) => {
     deleteElement(elementId);
@@ -121,12 +88,6 @@ export default function Sidebar({ room }: SidebarProps) {
     }
   };
 
-  const { addTokenToLibrary } = useLibraryStore();
-
-  const handleAddToLibrary = async (token: TokenElement) => {
-    await addTokenToLibrary(token, undefined, undefined, []);
-  };
-
   return (
     <Stack h="100%">
       <Tabs value={activeTab} onChange={setActiveTab}>
@@ -144,95 +105,82 @@ export default function Sidebar({ room }: SidebarProps) {
         <ScrollArea h="calc(100vh - 180px)" mt="md">
           <Tabs.Panel value="tokens">
             <Stack>
-              {/* Add token form */}
-              <Paper p="sm" withBorder>
-                <Text size="sm" fw={500} mb="xs">Add Token</Text>
-                <Stack gap="xs">
-                  <TextInput
-                    placeholder="Token name"
-                    value={newTokenName}
-                    onChange={(e) => setNewTokenName(e.currentTarget.value)}
-                    size="xs"
-                  />
-                  <TextInput
-                    placeholder="Image URL (optional)"
-                    value={newTokenUrl}
-                    onChange={(e) => setNewTokenUrl(e.currentTarget.value)}
-                    size="xs"
-                  />
-                  <Group gap="xs">
-                    <NumberInput
-                      placeholder="Size"
-                      value={newTokenSize}
-                      onChange={(val) => setNewTokenSize(Number(val) || 1)}
-                      min={1}
-                      max={10}
-                      size="xs"
-                      style={{ flex: 1 }}
-                    />
-                    <Button size="xs" onClick={handleAddToken}>
-                      Add
-                    </Button>
-                  </Group>
-                </Stack>
-              </Paper>
-
               <Divider label="Tokens on Map" labelPosition="center" />
 
               {/* Token list */}
-              {tokens.map((token) => (
-                <Paper
-                  key={token.id}
-                  p="xs"
-                  withBorder
-                  style={{
-                    borderColor: selectedElementId === token.id ? '#7c3aed' : undefined,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => selectElement(token.id)}
-                >
-                  <Group justify="space-between">
-                    <Group gap="xs">
-                      <Text size="sm" fw={500}>
-                        {(token as TokenElement).name || 'Unnamed'}
-                      </Text>
-                      {token.visibleTo === 'gm' && (
-                        <Badge size="xs" color="violet">GM Only</Badge>
-                      )}
+              {tokens.map((token) => {
+                const t = token as TokenElement;
+                const sheet = t.sheetId ? getSheetById(t.sheetId) : undefined;
+                const hp = sheet
+                  ? { current: sheet.shadowState[sheet.projections.bar || 'HP'], max: sheet.shadowState[sheet.projections.barMax || 'MaxHP'] }
+                  : t.hp;
+                const ac = sheet
+                  ? sheet.shadowState[sheet.projections.badge || 'AC']
+                  : t.ac;
+
+                return (
+                  <Paper
+                    key={token.id}
+                    p="xs"
+                    withBorder
+                    style={{
+                      borderColor: selectedElementId === token.id ? '#7c3aed' : undefined,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => selectElement(token.id)}
+                  >
+                    <Group justify="space-between" wrap="nowrap">
+                      <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                        <Group gap="xs">
+                          <Text size="sm" fw={500} truncate>
+                            {t.name || 'Unnamed'}
+                          </Text>
+                          {token.visibleTo === 'gm' && (
+                            <Badge size="xs" color="violet">GM</Badge>
+                          )}
+                          {sheet && (
+                            <Badge size="xs" variant="light" color="violet">linked</Badge>
+                          )}
+                        </Group>
+                        {hp && (
+                          <Text size="xs" c="dimmed">
+                            HP: {hp.current}/{hp.max}
+                            {ac !== undefined ? ` · AC: ${ac}` : ''}
+                          </Text>
+                        )}
+                      </Stack>
+                      <Group gap={4}>
+                        {sheet && (
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="violet"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openSheet(sheet.id);
+                            }}
+                            title="Open sheet"
+                          >
+                            📋
+                          </ActionIcon>
+                        )}
+                        <ActionIcon
+                          size="xs"
+                          color="red"
+                          variant="subtle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteElement(token.id);
+                          }}
+                          title="Delete"
+                        >
+                          ×
+                        </ActionIcon>
+                      </Group>
                     </Group>
-                    <Group gap={4}>
-                      <ActionIcon
-                        size="xs"
-                        color="blue"
-                        variant="subtle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToLibrary(token as TokenElement);
-                        }}
-                        title="Save to Library"
-                      >
-                        📚
-                      </ActionIcon>
-                      <ActionIcon
-                        size="xs"
-                        color="red"
-                        variant="subtle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteElement(token.id);
-                        }}
-                      >
-                        🗑️
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                  {(token as TokenElement).hp && (
-                    <Text size="xs" c="dimmed">
-                      HP: {(token as TokenElement).hp?.current}/{(token as TokenElement).hp?.max}
-                    </Text>
-                  )}
-                </Paper>
-              ))}
+                  </Paper>
+                );
+              })}
 
               {tokens.length === 0 && (
                 <Text size="sm" c="dimmed" ta="center">
@@ -290,7 +238,7 @@ export default function Sidebar({ room }: SidebarProps) {
           </Tabs.Panel>
 
           <Tabs.Panel value="properties">
-            <PropertyInspector room={room} />
+            <PropertyInspector room={room}/>
           </Tabs.Panel>
 
           {isGM && (

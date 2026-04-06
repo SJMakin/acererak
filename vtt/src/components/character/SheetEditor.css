@@ -1,0 +1,40 @@
+.sheet-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.sheet-editor__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-editor__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #a0a0b0;
+}
+
+.sheet-editor__debug {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  max-height: 200px;
+  overflow: auto;
+  z-index: 100;
+}
+
+.sheet-editor__debug pre {
+  margin: 0;
+  white-space: pre-wrap;
+}

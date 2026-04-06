@@ -1,16 +1,17 @@
-// Character templates for the Reactive Character Sheet System
+// Sheet templates for the generic markdown-based content pad system
 
-export type TemplateId = 'dnd5e' | 'pf2e' | 'osr' | 'blank';
+export type TemplateId = 'dnd5e' | 'pf2e' | 'osr' | 'blank' | 'token-stat' | 'location' | 'note';
 
-export interface CharacterTemplate {
+export interface SheetTemplate {
   id: TemplateId;
   name: string;
   description: string;
   content: string; // TipTap JSON document
   defaultStats: Record<string, string | number>;
+  category?: string;
 }
 
-export const characterTemplates: CharacterTemplate[] = [
+export const sheetTemplates: SheetTemplate[] = [
   {
     id: 'dnd5e',
     name: 'D&D 5e',
@@ -399,32 +400,109 @@ export const characterTemplates: CharacterTemplate[] = [
     description: 'Start from scratch',
     content: JSON.stringify({
       type: 'doc',
+      content: [{ type: 'paragraph' }],
+    }),
+    defaultStats: {},
+  },
+  {
+    id: 'token-stat',
+    name: 'Token Stat Block',
+    description: 'Simple stat block for tokens on the canvas',
+    content: JSON.stringify({
+      type: 'doc',
       content: [
         {
           type: 'heading',
           attrs: { level: 1 },
-          content: [{ type: 'text', text: '{Character Name}' }],
+          content: [{ type: 'text', text: '{Token Name}' }],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: 'Add your character details here. Use ' },
-            { type: 'text', marks: [{ type: 'code' }], text: 'StatName:: value' },
-            { type: 'text', text: ' to declare stats, and ' },
-            { type: 'text', marks: [{ type: 'code' }], text: '{{ formula }}' },
-            { type: 'text', text: ' for expressions.' },
+            { type: 'text', text: 'HP:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{HP}' },
+            { type: 'text', text: ' / MaxHP:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{MaxHP}' },
           ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'AC:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{AC}' },
+            { type: 'text', text: ' | Speed:: ' },
+            { type: 'text', marks: [{ type: 'bold' }], text: '{Speed}' },
+            { type: 'text', text: ' ft' },
+          ],
+        },
+        { type: 'horizontalRule' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Abilities' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Add abilities and actions here.' }],
+        },
+      ],
+    }),
+    defaultStats: {
+      HP: 10,
+      MaxHP: 10,
+      AC: 10,
+      Speed: 30,
+    },
+    category: 'Token',
+  },
+  {
+    id: 'location',
+    name: 'Location',
+    description: 'A location or place in the world',
+    content: JSON.stringify({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: '{Location Name}' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Describe this location...' }],
         },
       ],
     }),
     defaultStats: {},
+    category: 'Location',
+  },
+  {
+    id: 'note',
+    name: 'Note',
+    description: 'A simple note or reminder',
+    content: JSON.stringify({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: '{Note Title}' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Write your note here...' }],
+        },
+      ],
+    }),
+    defaultStats: {},
+    category: 'Note',
   },
 ];
 
-export function getTemplateById(id: TemplateId): CharacterTemplate | undefined {
-  return characterTemplates.find((template) => template.id === id);
+export function getTemplateById(id: TemplateId): SheetTemplate | undefined {
+  return sheetTemplates.find((template) => template.id === id);
 }
 
-export function getAllTemplates(): CharacterTemplate[] {
-  return characterTemplates;
+export function getAllTemplates(): SheetTemplate[] {
+  return sheetTemplates;
 }

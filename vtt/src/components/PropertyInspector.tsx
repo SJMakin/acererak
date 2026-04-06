@@ -19,7 +19,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useGameStore } from '../stores/gameStore';
-import { useCharacterStore } from '../stores/characterStore';
+import { useSheetStore } from '../stores/sheetStore';
 import type { CanvasElement, TokenElement, ShapeElement, TextElement, ImageElement, Visibility } from '../types';
 import MarkdownEditor from './MarkdownEditor';
 
@@ -28,12 +28,11 @@ interface PropertyInspectorProps {
     broadcastElementUpdate: (element: CanvasElement) => void;
     broadcastElementDelete: (elementId: string) => void;
   };
-  onOpenCharacterSheet?: (characterId: string) => void;
 }
 
-export default function PropertyInspector({ room, onOpenCharacterSheet }: PropertyInspectorProps) {
+export default function PropertyInspector({ room }: PropertyInspectorProps) {
   const { game, selectedElementId, isGM, updateElement, deleteElement, selectElement } = useGameStore();
-  const { characters, getCharacterById } = useCharacterStore();
+  const { sheets, getSheetById, openSheet } = useSheetStore();
 
   // Get active scene
   const activeScene = game?.scenes.find((s) => s.id === game?.activeSceneId);
@@ -52,9 +51,9 @@ export default function PropertyInspector({ room, onOpenCharacterSheet }: Proper
     setNewCondition('');
   }, [selectedElementId]);
 
-  // Check if token is linked to a character
-  const linkedCharacter = selectedElement?.type === 'token' && (selectedElement as TokenElement).characterId
-    ? getCharacterById((selectedElement as TokenElement).characterId!)
+  // Check if token is linked to a sheet
+  const linkedSheet = selectedElement?.type === 'token' && (selectedElement as TokenElement).sheetId
+    ? getSheetById((selectedElement as TokenElement).sheetId!)
     : undefined;
 
   if (!selectedElement) {
@@ -230,46 +229,43 @@ export default function PropertyInspector({ room, onOpenCharacterSheet }: Proper
               Token Properties
             </Text>
 
-            {/* Character Link Status */}
-            {linkedCharacter ? (
+            {/* Sheet Link */}
+            {linkedSheet ? (
               <Paper p="sm" withBorder style={{ backgroundColor: 'rgba(124, 58, 237, 0.05)' }}>
                 <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={600}>Linked Character</Text>
-                  <Badge color="violet">{linkedCharacter.name}</Badge>
+                  <Text size="sm" fw={600}>Linked Sheet</Text>
+                  <Badge color="violet">{linkedSheet.name}</Badge>
                 </Group>
                 <Text size="xs" c="dimmed" mb="xs">
-                  HP: {linkedCharacter.shadowState[linkedCharacter.projections.bar || 'HP'] || '—'} / 
-                  {linkedCharacter.shadowState[linkedCharacter.projections.barMax || 'MaxHP'] || '—'} • 
-                  AC: {linkedCharacter.shadowState[linkedCharacter.projections.badge || 'AC'] || '—'}
+                  HP: {linkedSheet.shadowState[linkedSheet.projections.bar || 'HP'] || '—'} /
+                  {linkedSheet.shadowState[linkedSheet.projections.barMax || 'MaxHP'] || '—'} •
+                  AC: {linkedSheet.shadowState[linkedSheet.projections.badge || 'AC'] || '—'}
                 </Text>
-                {onOpenCharacterSheet && (
-                  <Button
-                    size="xs"
-                    fullWidth
-                    onClick={() => onOpenCharacterSheet(linkedCharacter.id)}
-                  >
-                    Edit Character Sheet
-                  </Button>
-                )}
+                <Button
+                  size="xs"
+                  fullWidth
+                  onClick={() => openSheet(linkedSheet.id)}
+                >
+                  Edit Sheet
+                </Button>
                 <Button
                   size="xs"
                   variant="subtle"
                   color="red"
                   fullWidth
                   mt="xs"
-                  onClick={() => handleUpdate({ characterId: undefined })}
+                  onClick={() => handleUpdate({ sheetId: undefined })}
                 >
-                  Unlink Character
+                  Unlink
                 </Button>
               </Paper>
             ) : (
-              /* Character Link Selector for unlinked tokens */
               <Select
-                label="Link Character"
-                placeholder="Select a character sheet..."
-                value={(selectedElement as TokenElement).characterId || null}
-                onChange={(val) => handleUpdate({ characterId: val || undefined })}
-                data={characters.map((char) => ({ value: char.id, label: char.name }))}
+                label="Link Sheet"
+                placeholder="Select a sheet..."
+                value={(selectedElement as TokenElement).sheetId || null}
+                onChange={(val) => handleUpdate({ sheetId: val || undefined })}
+                data={sheets.map((s) => ({ value: s.id, label: s.name }))}
                 clearable
                 searchable
                 size="xs"
@@ -306,7 +302,7 @@ export default function PropertyInspector({ room, onOpenCharacterSheet }: Proper
             />
 
             {/* HP Section - only show for unlinked tokens */}
-            {!linkedCharacter && (
+            {!linkedSheet && (
               <>
                 <Divider label="Hit Points" labelPosition="center" />
                 <Group grow>
@@ -426,7 +422,7 @@ export default function PropertyInspector({ room, onOpenCharacterSheet }: Proper
               <MarkdownEditor
                 value={(selectedElement as TokenElement).notes || ''}
                 onChange={(val) => handleUpdate({ notes: val })}
-                placeholder="Character backstory, abilities, GM notes..."
+                placeholder="Backstory, abilities, GM notes..."
                 minRows={3}
                 maxRows={8}
               />

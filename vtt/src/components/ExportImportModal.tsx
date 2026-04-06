@@ -18,15 +18,12 @@ import {
   FileButton,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import { useLibraryStore } from '../stores/libraryStore';
 import { useImageStore } from '../stores/imageStore';
 import { blobToBase64, base64ToBlob, computeHash } from '../services/imageService';
 import type { EmbeddedImage } from '../services/imageService';
 import type {
   GameState,
   CanvasElement,
-  TokenElement,
-  LibraryItem,
   CampaignNote,
   GameExport,
   Scene,
@@ -48,7 +45,8 @@ interface EnhancedExport {
   combat?: CombatTracker;
   chatMessages?: ChatMessage[];
   campaignNotes?: CampaignNote[];
-  libraryItems?: LibraryItem[];
+  // Legacy field — ignored on import, never exported
+  libraryItems?: unknown[];
   // Embedded images (v4): imageId → base64 WebP
   embeddedImages?: Record<string, string>;
 }
@@ -69,7 +67,6 @@ interface EnhancedExportV2 {
     text: CanvasElement[];
   };
   campaignNotes?: CampaignNote[];
-  libraryItems?: LibraryItem[];
   combat?: GameState['combat'];
 }
 
@@ -80,9 +77,6 @@ interface SelectionState {
   // Campaign notes
   campaignNotes: Set<string>;
   allNotes: boolean;
-  // Library items
-  libraryItems: Set<string>;
-  allLibrary: boolean;
   // Combat
   combat: boolean;
   // Chat messages
@@ -173,7 +167,6 @@ export default function ExportImportModal({
   room,
 }: ExportImportModalProps) {
   const { game } = useGameStore();
-  const { items: libraryItems } = useLibraryStore();
   
   const [activeTab, setActiveTab] = useState<string | null>(initialMode);
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
@@ -184,7 +177,6 @@ export default function ExportImportModal({
   const [expanded, setExpanded] = useState({
     scenes: true,
     notes: false,
-    library: false,
     global: false,
   });
   
@@ -194,8 +186,6 @@ export default function ExportImportModal({
     allScenes: true,
     campaignNotes: new Set(),
     allNotes: true,
-    libraryItems: new Set(),
-    allLibrary: false,
     combat: true,
     chatMessages: false,
   });
@@ -217,8 +207,6 @@ export default function ExportImportModal({
         allScenes: true,
         campaignNotes: new Set(notes.map((n) => n.id)),
         allNotes: true,
-        libraryItems: new Set(),
-        allLibrary: false,
         combat: true,
         chatMessages: false,
       });
@@ -233,9 +221,9 @@ export default function ExportImportModal({
   
   // Toggle all items of a type
   const toggleAllOfType = (
-    type: 'scenes' | 'campaignNotes' | 'libraryItems',
+    type: 'scenes' | 'campaignNotes',
     items: { id: string }[],
-    allKey: 'allScenes' | 'allNotes' | 'allLibrary'
+    allKey: 'allScenes' | 'allNotes'
   ) => {
     setSelection((prev) => {
       const newAll = !prev[allKey];
@@ -249,10 +237,10 @@ export default function ExportImportModal({
   
   // Toggle single item
   const toggleItem = (
-    type: 'scenes' | 'campaignNotes' | 'libraryItems',
+    type: 'scenes' | 'campaignNotes',
     id: string,
     allItems: { id: string }[],
-    allKey: 'allScenes' | 'allNotes' | 'allLibrary'
+    allKey: 'allScenes' | 'allNotes'
   ) => {
     setSelection((prev) => {
       const newSet = new Set(prev[type]);
@@ -271,7 +259,7 @@ export default function ExportImportModal({
   
   // Calculate indeterminate state
   const getIndeterminate = (
-    setKey: 'scenes' | 'campaignNotes' | 'libraryItems',
+    setKey: 'scenes' | 'campaignNotes',
     allItems: { id: string }[]
   ) => {
     const selected = selection[setKey].size;
@@ -298,12 +286,6 @@ export default function ExportImportModal({
     const selectedNotes = campaignNotes.filter((n) => selection.campaignNotes.has(n.id));
     if (selectedNotes.length > 0) {
       exportData.campaignNotes = selectedNotes;
-    }
-
-    // Add library items
-    const selectedLibrary = libraryItems.filter((i) => selection.libraryItems.has(i.id));
-    if (selectedLibrary.length > 0) {
-      exportData.libraryItems = selectedLibrary;
     }
 
     // Add combat state
@@ -418,7 +400,6 @@ export default function ExportImportModal({
             }] : [],
             campaignNotes: v2Data.campaignNotes,
             combat: v2Data.combat,
-            libraryItems: v2Data.libraryItems,
           };
           setImportData(converted);
         } else {
@@ -454,8 +435,6 @@ export default function ExportImportModal({
       allScenes: true,
       campaignNotes: new Set(enhancedData.campaignNotes?.map((n) => n.id) || []),
       allNotes: true,
-      libraryItems: new Set(enhancedData.libraryItems?.map((i) => i.id) || []),
-      allLibrary: true,
       combat: !!enhancedData.combat,
       chatMessages: !!enhancedData.chatMessages,
     });
@@ -467,7 +446,6 @@ export default function ExportImportModal({
 
     const data = importData as EnhancedExport;
     const gameStore = useGameStore.getState();
-    const libraryStore = useLibraryStore.getState();
     const imgStore = useImageStore.getState();
 
     // Import embedded images first (so elements can reference them)
@@ -560,25 +538,6 @@ export default function ExportImportModal({
       }
     }
     
-    // Import library items
-    if (data.libraryItems) {
-      const itemsToImport = data.libraryItems.filter((i) =>
-        selection.libraryItems.has(i.id)
-      );
-      for (const item of itemsToImport) {
-        const existing = libraryItems.find((i) => i.id === item.id);
-        if (!existing && item.type === 'token') {
-          // Add to library store (using direct method)
-          await libraryStore.addTokenToLibrary(
-            item.data as TokenElement,
-            item.name,
-            item.description,
-            item.tags
-          );
-        }
-      }
-    }
-    
     // Broadcast sync if room is available
     if (room) {
       room.broadcastSync();
@@ -592,7 +551,6 @@ export default function ExportImportModal({
   const selectedCount = {
     scenes: selection.scenes.size,
     notes: selection.campaignNotes.size,
-    library: selection.libraryItems.size,
   };
   
   // Get import data counts
@@ -603,7 +561,6 @@ export default function ExportImportModal({
     return {
       scenes: data.scenes?.length || 0,
       notes: data.campaignNotes?.length || 0,
-      library: data.libraryItems?.length || 0,
       combat: data.combat ? 1 : 0,
       chat: data.chatMessages?.length || 0,
     };
@@ -739,49 +696,6 @@ export default function ExportImportModal({
                   </>
                 )}
                 
-                {/* Library Items */}
-                {libraryItems.length > 0 && (
-                  <>
-                    <Divider />
-                    <TreeItem
-                      label="Library Items"
-                      icon="📚"
-                      checked={selection.allLibrary}
-                      indeterminate={getIndeterminate('libraryItems', libraryItems)}
-                      onChange={() =>
-                        toggleAllOfType('libraryItems', libraryItems, 'allLibrary')
-                      }
-                      count={libraryItems.length}
-                      expanded={expanded.library}
-                      onToggleExpand={() =>
-                        setExpanded((prev) => ({ ...prev, library: !prev.library }))
-                      }
-                    >
-                      {libraryItems.map((item) => (
-                        <TreeItem
-                          key={item.id}
-                          label={item.name}
-                          icon={
-                            item.type === 'token'
-                              ? '👤'
-                              : item.type === 'map'
-                              ? '🗺️'
-                              : '🎬'
-                          }
-                          checked={selection.libraryItems.has(item.id)}
-                          onChange={() =>
-                            toggleItem(
-                              'libraryItems',
-                              item.id,
-                              libraryItems,
-                              'allLibrary'
-                            )
-                          }
-                        />
-                      ))}
-                    </TreeItem>
-                  </>
-                )}
               </Stack>
             </ScrollArea>
             
@@ -796,8 +710,6 @@ export default function ExportImportModal({
                     allScenes: true,
                     campaignNotes: new Set(campaignNotes.map((n) => n.id)),
                     allNotes: true,
-                    libraryItems: new Set(libraryItems.map((i) => i.id)),
-                    allLibrary: true,
                     combat: true,
                     chatMessages: true,
                   }));
@@ -810,8 +722,6 @@ export default function ExportImportModal({
                     allScenes: false,
                     campaignNotes: new Set(),
                     allNotes: false,
-                    libraryItems: new Set(),
-                    allLibrary: false,
                     combat: false,
                     chatMessages: false,
                   });
@@ -819,7 +729,7 @@ export default function ExportImportModal({
                   Select None
                 </Button>
               </Group>
-              <Button onClick={handleExport} disabled={selectedCount.scenes === 0 && selectedCount.notes === 0 && selectedCount.library === 0 && !selection.combat && !selection.chatMessages}>
+              <Button onClick={handleExport} disabled={selectedCount.scenes === 0 && selectedCount.notes === 0 && !selection.combat && !selection.chatMessages}>
                 Export Selected
               </Button>
             </Group>
@@ -894,18 +804,6 @@ export default function ExportImportModal({
                               setSelection((prev) => ({
                                 ...prev,
                                 allNotes: !prev.allNotes,
-                              }))
-                            }
-                          />
-                        )}
-                        {importCounts.library > 0 && (
-                          <Checkbox
-                            label={`Library Items (${importCounts.library})`}
-                            checked={selection.allLibrary}
-                            onChange={() =>
-                              setSelection((prev) => ({
-                                ...prev,
-                                allLibrary: !prev.allLibrary,
                               }))
                             }
                           />

@@ -51,7 +51,7 @@ export function FloatingPanel({
       if (first) {
         const target = event.target as HTMLElement;
         // Only drag when starting on the header, but not on interactive elements
-        const inHeader = !!target.closest('.character-sheet-modal__header');
+        const inHeader = !!target.closest('.sheet-modal__header');
         const onInteractive = !!target.closest('input, button, [contenteditable]');
         isDragging.current = inHeader && !onInteractive;
       }
@@ -91,7 +91,7 @@ export function FloatingPanel({
 
   return (
     <div
-      className="floating-panel character-sheet-modal"
+      className="floating-panel sheet-modal"
       style={{
         transform: `translate(${pos.x}px, ${pos.y}px)`,
         width: size.width,

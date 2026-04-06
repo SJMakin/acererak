@@ -1,4 +1,4 @@
-.character-sheet-modal {
+.sheet-modal {
   background: #1a1a2e !important;
   border: 1px solid rgba(124, 58, 237, 0.2);
   height: 85vh;
@@ -12,7 +12,7 @@
     0 0 120px rgba(124, 58, 237, 0.04);
 }
 
-.character-sheet-modal__body {
+.sheet-modal__body {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -21,13 +21,13 @@
   padding: 0 !important;
 }
 
-.character-sheet-modal__overlay {
+.sheet-modal__overlay {
   backdrop-filter: blur(4px);
 }
 
 /* --- Header bar with title + close --- */
 
-.character-sheet-modal__header {
+.sheet-modal__header {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -37,7 +37,7 @@
   background: linear-gradient(180deg, rgba(26, 26, 46, 1) 0%, rgba(30, 30, 46, 0.95) 100%);
 }
 
-.character-sheet-modal__title {
+.sheet-modal__title {
   flex: 1;
   background: transparent;
   border: none;
@@ -52,23 +52,23 @@
   transition: border-color 0.2s ease;
 }
 
-.character-sheet-modal__title::placeholder {
+.sheet-modal__title::placeholder {
   color: #4a4a60;
 }
 
-.character-sheet-modal__title:focus {
+.sheet-modal__title:focus {
   border-bottom-color: rgba(124, 58, 237, 0.4);
 }
 
 /* --- Mode toggle buttons (float / pop-in / window) --- */
 
-.character-sheet-modal__mode-buttons {
+.sheet-modal__mode-buttons {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
 }
 
-.character-sheet-modal__mode-btn {
+.sheet-modal__mode-btn {
   width: 28px;
   height: 28px;
   display: flex;
@@ -82,12 +82,12 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.character-sheet-modal__mode-btn:hover {
+.sheet-modal__mode-btn:hover {
   background: rgba(124, 58, 237, 0.12);
   color: #a78bfa;
 }
 
-.character-sheet-modal__close {
+.sheet-modal__close {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -104,14 +104,14 @@
   line-height: 1;
 }
 
-.character-sheet-modal__close:hover {
+.sheet-modal__close:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #a0a0b0;
 }
 
 /* --- Editor area --- */
 
-.character-sheet-modal__editor {
+.sheet-modal__editor {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -122,7 +122,7 @@
 
 /* --- Footer --- */
 
-.character-sheet-modal__footer {
+.sheet-modal__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;

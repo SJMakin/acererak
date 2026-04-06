@@ -5,12 +5,12 @@ import {
   IconArrowsMinimize,
   IconExternalLink,
 } from '@tabler/icons-react';
-import { CharacterSheetEditor } from './CharacterSheetEditor';
+import { SheetEditor } from './SheetEditor';
 import type { ShadowState } from '../../services/shadowStateService';
 
 export type SheetMode = 'modal' | 'floating' | 'window';
 
-interface CharacterSheetContentProps {
+interface SheetContentProps {
   name: string;
   onNameChange: (name: string) => void;
   content: string;
@@ -29,7 +29,7 @@ interface CharacterSheetContentProps {
   onPopOutWindow?: () => void;
 }
 
-export function CharacterSheetContent({
+export function SheetContent({
   name,
   onNameChange,
   content,
@@ -43,7 +43,7 @@ export function CharacterSheetContent({
   onFloat,
   onPopIn,
   onPopOutWindow,
-}: CharacterSheetContentProps) {
+}: SheetContentProps) {
   const titleRef = useRef<HTMLInputElement>(null);
 
   const handleSaveClick = useCallback(() => {
@@ -57,22 +57,22 @@ export function CharacterSheetContent({
   return (
     <>
       {/* Header */}
-      <div className="character-sheet-modal__header">
+      <div className="sheet-modal__header">
         <input
           ref={titleRef}
-          className="character-sheet-modal__title"
+          className="sheet-modal__title"
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="Untitled Character"
+          placeholder="Untitled Sheet"
           spellCheck={false}
         />
 
-        <div className="character-sheet-modal__mode-buttons">
+        <div className="sheet-modal__mode-buttons">
           {/* Float / Pop-in toggle */}
           {mode === 'modal' && onFloat && (
             <button
-              className="character-sheet-modal__mode-btn"
+              className="sheet-modal__mode-btn"
               onClick={onFloat}
               aria-label="Float"
               title="Float panel"
@@ -82,7 +82,7 @@ export function CharacterSheetContent({
           )}
           {(mode === 'floating' || mode === 'window') && onPopIn && (
             <button
-              className="character-sheet-modal__mode-btn"
+              className="sheet-modal__mode-btn"
               onClick={onPopIn}
               aria-label="Pop in"
               title="Return to modal"
@@ -94,7 +94,7 @@ export function CharacterSheetContent({
           {/* Pop out to window */}
           {mode !== 'window' && onPopOutWindow && (
             <button
-              className="character-sheet-modal__mode-btn"
+              className="sheet-modal__mode-btn"
               onClick={onPopOutWindow}
               aria-label="Pop out"
               title="Open in new window"
@@ -105,7 +105,7 @@ export function CharacterSheetContent({
         </div>
 
         <button
-          className="character-sheet-modal__close"
+          className="sheet-modal__close"
           onClick={onClose}
           aria-label="Close"
         >
@@ -114,8 +114,8 @@ export function CharacterSheetContent({
       </div>
 
       {/* Editor */}
-      <div className="character-sheet-modal__editor">
-        <CharacterSheetEditor
+      <div className="sheet-modal__editor">
+        <SheetEditor
           key={mode}
           content={content}
           contentVersion={contentVersion}
@@ -124,7 +124,7 @@ export function CharacterSheetContent({
       </div>
 
       {/* Footer */}
-      <div className="character-sheet-modal__footer">
+      <div className="sheet-modal__footer">
         {isEditing ? (
           <Button
             variant="subtle"
@@ -142,7 +142,7 @@ export function CharacterSheetContent({
             Cancel
           </Button>
           <Button variant="filled" color="violet" size="sm" onClick={handleSaveClick}>
-            {isEditing ? 'Save Changes' : 'Create Character'}
+            {isEditing ? 'Save Changes' : 'Create Sheet'}
           </Button>
         </Group>
       </div>

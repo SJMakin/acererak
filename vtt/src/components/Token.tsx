@@ -2,7 +2,7 @@ import type { TokenElement } from '@/types';
 import type Konva from 'konva';
 import { Group, Image, Circle, Rect, Text } from 'react-konva';
 import useImage from '../hooks/useImage';
-import { useCharacterStore } from '../stores/characterStore';
+import { useSheetStore } from '../stores/sheetStore';
 
 // Token component with character sheet integration
 export function Token({
@@ -25,24 +25,24 @@ export function Token({
   const width = element.width * cellSize;
   const height = element.height * cellSize;
 
-  // Get linked character data
-  const character = element.characterId
-    ? useCharacterStore.getState().getCharacterById(element.characterId)
+  // Get linked sheet data
+  const sheet = element.sheetId
+    ? useSheetStore.getState().getSheetById(element.sheetId)
     : undefined;
 
-  // Determine display name: character name if linked, otherwise token name
-  const displayName = character?.name || element.name;
+  // Determine display name: sheet name if linked, otherwise token name
+  const displayName = sheet?.name || element.name;
 
-  // Get HP data from character or token
+  // Get HP data from sheet or token
   const hpData = (() => {
-    if (character && character.shadowState && character.projections) {
-      const barKey = character.projections.bar || 'HP';
-      const barMaxKey = character.projections.barMax || 'MaxHP';
-      const hp = character.shadowState[barKey];
-      const maxHp = character.shadowState[barMaxKey];
+    if (sheet && sheet.shadowState && sheet.projections) {
+      const barKey = sheet.projections.bar || 'HP';
+      const barMaxKey = sheet.projections.barMax || 'MaxHP';
+      const hp = sheet.shadowState[barKey];
+      const maxHp = sheet.shadowState[barMaxKey];
       
       if (hp !== undefined && maxHp !== undefined) {
-        return { 
+        return {
           current: typeof hp === 'number' ? hp : parseInt(String(hp)) || 0,
           max: typeof maxHp === 'number' ? maxHp : parseInt(String(maxHp)) || 1
         };
@@ -51,10 +51,10 @@ export function Token({
     return element.hp;
   })();
 
-  // Get AC data from character or token
+  // Get AC data from sheet or token
   const acValue = (() => {
-    if (character && character.shadowState && character.projections?.badge) {
-      const ac = character.shadowState[character.projections.badge];
+    if (sheet && sheet.shadowState && sheet.projections?.badge) {
+      const ac = sheet.shadowState[sheet.projections.badge];
       if (ac !== undefined) {
         return typeof ac === 'number' ? ac : parseInt(String(ac)) || undefined;
       }
@@ -89,7 +89,7 @@ export function Token({
 
   // Handle damage click on HP bar (GM only, for character sync)
   const handleHpBarClick = () => {
-    if (isGM && onDamage && character) {
+    if (isGM && onDamage && sheet) {
       onDamage(-1); // -1 damage by default (could be made configurable)
     }
   };

@@ -1,6 +1,6 @@
-// Token migration service for converting old tokens to Characters
+// Token migration service for converting old tokens to Sheets
 
-import { useCharacterStore } from '../stores/characterStore';
+import { useSheetStore } from '../stores/sheetStore';
 
 interface LegacyTokenData {
   id: string;
@@ -18,14 +18,14 @@ interface LegacyTokenData {
 
 interface MigrationResult {
   success: boolean;
-  characterId?: string;
+  sheetId?: string;
   error?: string;
 }
 
 /**
- * Migrate a legacy token to a Character
+ * Migrate a legacy token to a Sheet
  */
-export async function migrateTokenToCharacter(
+export async function migrateTokenToSheet(
   tokenData: LegacyTokenData,
   options: {
     keepHpOnToken?: boolean;
@@ -33,14 +33,14 @@ export async function migrateTokenToCharacter(
     keepConditionsOnToken?: boolean;
   } = {}
 ): Promise<MigrationResult> {
-  const { addCharacter } = useCharacterStore.getState();
+  const { addSheet } = useSheetStore.getState();
   
   try {
     // Convert legacy notes HTML to TipTap JSON
     const content = convertHtmlToTipTap(tokenData.notes || '');
     
-    // Create the character
-    const characterId = addCharacter({
+    // Create the sheet
+    const sheetId = addSheet({
       name: tokenData.name,
       content,
       shadowState: {},
@@ -53,7 +53,7 @@ export async function migrateTokenToCharacter(
 
     return {
       success: true,
-      characterId,
+      sheetId,
     };
   } catch (error) {
     console.error('Failed to migrate token:', error);
@@ -103,7 +103,7 @@ function convertHtmlToTipTap(html: string): string {
 /**
  * Batch migrate multiple tokens
  */
-export async function migrateTokensToCharacters(
+export async function migrateTokensToSheets(
   tokens: LegacyTokenData[],
   options: {
     keepHpOnToken?: boolean;
@@ -120,7 +120,7 @@ export async function migrateTokensToCharacters(
   let failed = 0;
 
   for (const token of tokens) {
-    const result = await migrateTokenToCharacter(token, options);
+    const result = await migrateTokenToSheet(token, options);
     results.push(result);
     
     if (result.success) {

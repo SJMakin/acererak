@@ -1,13 +1,13 @@
 // Core types for Lychgate VTT
 
-import type { Character } from './character';
+import type { Sheet } from './character';
 
 export type ElementType = 'token' | 'image' | 'shape' | 'text';
 export type LayerType = 'map' | 'gm' | 'token' | 'drawing';
 export type Visibility = 'all' | 'gm' | string[]; // string[] = specific peer IDs
 
-// Re-export Character types
-export type { Character, CharacterP2PMessage, CharacterUpdateMessage, CharacterDeleteMessage } from './character';
+// Re-export Sheet types
+export type { Sheet, SheetP2PMessage, SheetUpdateMessage, SheetDeleteMessage } from './character';
 
 // Re-export Snippet types
 export type { Snippet, SnippetCategory, SnippetCreateInput, SnippetUpdateInput } from './snippet';
@@ -77,7 +77,7 @@ export interface TokenElement extends BaseElement {
   conditions?: string[];
   notes?: string;
   controlledBy?: string; // peer ID who can move this token
-  characterId?: string;  // links to Character.id for character sheet
+  sheetId?: string;      // links to Sheet.id for sheet content
 }
 
 export interface ImageElement extends BaseElement {
@@ -166,7 +166,7 @@ export interface GameState {
   diceRolls?: DiceRoll[];    // dice roll history
   campaignNotes?: CampaignNote[]; // Campaign journal notes
   chatMessages?: ChatMessage[]; // In-game chat messages
-  characters?: Character[];  // Character sheets (Phase 1)
+  sheets?: Sheet[];          // Sheets (generic content pads)
 
   // Legacy fields for migration (deprecated - use scenes instead)
   /** @deprecated Use scenes[].gridSettings instead */
@@ -307,33 +307,6 @@ export interface SceneExport {
   gridSettings: GridSettings;
   elements: CanvasElement[];
   fogOfWar: FogOfWar;
-}
-
-// Library types for reusable tokens
-// Note: Maps are just URLs (paste when creating scene background)
-// Note: Scenes are shared via export/import (file sharing)
-export type LibraryItemType = 'token';
-
-// Template data types (without id, position, zIndex - assigned when placed)
-export type TokenTemplateData = Omit<TokenElement, 'id'>;
-
-export interface LibraryItem {
-  id: string;
-  type: LibraryItemType;
-  name: string;
-  description?: string;
-  notes?: string;  // Markdown content
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  // Data is always a token template (maps/scenes removed from library)
-  data: TokenTemplateData;
-}
-
-export interface LibraryExport {
-  version: 1;
-  exportedAt: string;
-  items: LibraryItem[];
 }
 
 // Tool types for canvas

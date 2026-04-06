@@ -16,11 +16,20 @@ async function createAndStartGame(page: Page) {
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 5000 });
 }
 
-/** Open Library tab, click "+ Create Character", wait for modal. */
-async function openNewCharacterModal(page: Page) {
+/** Open Library tab, click "+ New Sheet", fill in name, select Blank template, create, wait for sheet modal. */
+async function openNewSheetModal(page: Page, name?: string) {
   await page.getByRole('tab', { name: /Library/i }).click();
-  await page.getByRole('button', { name: /Create Character/i }).click();
-  await expect(page.getByPlaceholder('Untitled Character')).toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: /New Sheet/i }).click();
+  // New sheet creation modal appears
+  const createModal = page.locator('.mantine-Modal-content').last();
+  await expect(createModal.getByLabel('Name')).toBeVisible({ timeout: 5000 });
+  await createModal.getByLabel('Name').fill(name || 'Test Sheet');
+  // Select Blank template so the editor starts empty
+  await createModal.getByLabel('Template').click();
+  await page.getByRole('option', { name: 'Blank' }).click();
+  await createModal.getByRole('button', { name: /Create$/i }).click();
+  // Sheet editor modal opens automatically after creation
+  await expect(page.getByPlaceholder('Untitled Sheet')).toBeVisible({ timeout: 5000 });
 }
 
 /** Shorthand: the TipTap editor element inside the character sheet modal. */
@@ -37,24 +46,24 @@ async function typeStat(page: Page, text: string) {
   await page.keyboard.press('Enter');
 }
 
-/** Save the character currently open in the modal. */
-async function saveCharacter(page: Page) {
+/** Save the sheet currently open in the modal. */
+async function saveSheet(page: Page) {
   // Small delay to let debounced onChange flush content to parent
   await page.waitForTimeout(400);
-  const saveBtn = page.locator('.character-sheet-modal__footer').getByRole('button', { name: /Create Character|Save Changes/i });
+  const saveBtn = page.locator('.sheet-modal__footer').getByRole('button', { name: /Create Sheet|Save Changes/i });
   await saveBtn.click();
-  await expect(page.getByPlaceholder('Untitled Character')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByPlaceholder('Untitled Sheet')).not.toBeVisible({ timeout: 5000 });
 }
 
-/** Scroll to find a character in the library and click Edit. */
-async function editCharacterFromLibrary(page: Page, name: string) {
+/** Scroll to find a sheet in the library and click it to open. */
+async function editSheetFromLibrary(page: Page, name: string) {
   const scrollArea = page.locator('[class*="mantine-ScrollArea"]').last();
   await scrollArea.evaluate(el => el.scrollTop = el.scrollHeight);
   await expect(page.getByText(name)).toBeVisible({ timeout: 5000 });
-  // Find the Paper that contains the character name, then click its edit button
-  const charCard = page.locator('[class*="mantine-Paper"]', { hasText: name });
-  await charCard.locator('button', { hasText: '✏️' }).first().click();
-  await expect(page.getByPlaceholder('Untitled Character')).toBeVisible({ timeout: 5000 });
+  // Click the sheet row to open it
+  const sheetCard = page.locator('[class*="mantine-Paper"]', { hasText: name });
+  await sheetCard.click();
+  await expect(page.getByPlaceholder('Untitled Sheet')).toBeVisible({ timeout: 5000 });
 }
 
 /** Copy all editor content, paste into title input, return as plain text. */
@@ -62,7 +71,7 @@ async function getEditorTextViaCopy(page: Page): Promise<string> {
   await editor(page).click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+c');
-  const titleInput = page.getByPlaceholder('Untitled Character');
+  const titleInput = page.getByPlaceholder('Untitled Sheet');
   await titleInput.click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+v');
@@ -78,8 +87,9 @@ async function getEditorTextViaCopy(page: Page): Promise<string> {
  *  cursor settlement and keydown handler).
  */
 async function insertViaCommandPalette(page: Page, commandLabel: string) {
-  // Ensure cursor is in the editor and settled
+  // Ensure cursor is not mid-word so '/' triggers the palette
   await editor(page).press('End');
+  await page.keyboard.type(' ');
   const palette = page.locator('.command-palette');
 
   // First attempt
@@ -94,7 +104,11 @@ async function insertViaCommandPalette(page: Page, commandLabel: string) {
     await expect(palette).toBeVisible({ timeout: 2000 });
   }
 
-  await palette.locator('.command-palette__item', { hasText: new RegExp(commandLabel, 'i') }).click();
+  // Use keyboard to filter and select — avoids viewport/z-index click issues
+  const searchInput = palette.locator('.command-palette__header input');
+  await searchInput.fill(commandLabel);
+  await expect(palette.locator('.command-palette__item').first()).toBeVisible({ timeout: 2000 });
+  await searchInput.press('Enter');
   await expect(palette).not.toBeVisible();
 }
 
@@ -111,8 +125,7 @@ test.describe('Character Sheet', () => {
     // This test builds a realistic character sheet using typed DSL syntax,
     // verifying each widget type renders correctly and content persists.
 
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Thorin Ironfist');
+    await openNewSheetModal(page, 'Thorin Ironfist');
 
     const ed = editor(page);
     await ed.click();
@@ -189,7 +202,7 @@ test.describe('Character Sheet', () => {
     await expect(expression).not.toContainText('Error');
 
     // -- Save and verify it appears in library --
-    await saveCharacter(page);
+    await saveSheet(page);
 
     const scrollArea = page.locator('[class*="mantine-ScrollArea"]').last();
     await scrollArea.evaluate(el => el.scrollTop = el.scrollHeight);
@@ -200,8 +213,7 @@ test.describe('Character Sheet', () => {
     // Creates a character purely via the / command palette, saves it,
     // reopens it, and verifies all widgets survived the round-trip.
 
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Elara the Mage');
+    await openNewSheetModal(page, 'Elara the Mage');
 
     const ed = editor(page);
     await ed.click();
@@ -245,12 +257,12 @@ test.describe('Character Sheet', () => {
     await page.keyboard.type('Notes: Elara carries a staff of power.');
 
     // Save
-    await saveCharacter(page);
+    await saveSheet(page);
 
     // -- Reopen and verify everything survived --
-    await editCharacterFromLibrary(page, 'Elara the Mage');
+    await editSheetFromLibrary(page, 'Elara the Mage');
 
-    await expect(page.getByPlaceholder('Untitled Character')).toHaveValue('Elara the Mage');
+    await expect(page.getByPlaceholder('Untitled Sheet')).toHaveValue('Elara the Mage');
     await expect(page.getByRole('button', { name: /Save Changes/i })).toBeVisible();
 
     // All widgets should still be rendered
@@ -268,7 +280,7 @@ test.describe('Character Sheet', () => {
     // Insert one of each widget, copy, paste into plain text input,
     // verify the DSL source syntax comes through (not rendered DOM text).
 
-    await openNewCharacterModal(page);
+    await openNewSheetModal(page);
     const ed = editor(page);
     await ed.click();
 
@@ -303,8 +315,7 @@ test.describe('Character Sheet', () => {
     // Tests the real UX: multiple widgets left-to-right on the same line,
     // with text labels between them — the dense stat-block layout.
 
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Inline Test');
+    await openNewSheetModal(page, 'Inline Test');
 
     const ed = editor(page);
     await ed.click();
@@ -375,8 +386,8 @@ test.describe('Character Sheet', () => {
     await expect(firstDots.locator('.dots-widget__dot')).toHaveCount(8, { timeout: 3000 });
 
     // Save and reopen — all inline widgets must survive round-trip
-    await saveCharacter(page);
-    await editCharacterFromLibrary(page, 'Inline Test');
+    await saveSheet(page);
+    await editSheetFromLibrary(page, 'Inline Test');
 
     await expect(ed.locator('.stat-declaration')).toHaveCount(6, { timeout: 5000 });
     await expect(ed.locator('.bar-widget')).toHaveCount(3);
@@ -394,8 +405,7 @@ test.describe('Character Sheet', () => {
     // lines. Tests that formatting shortcuts don't break widget rendering
     // and vice versa, and everything survives save/load.
 
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Vex the Warlock');
+    await openNewSheetModal(page, 'Vex the Warlock');
 
     const ed = editor(page);
     await ed.click();
@@ -507,8 +517,8 @@ test.describe('Character Sheet', () => {
     await expect(ed).toContainText('Equipment: Arcane focus');
 
     // -- Save and verify full round-trip --
-    await saveCharacter(page);
-    await editCharacterFromLibrary(page, 'Vex the Warlock');
+    await saveSheet(page);
+    await editSheetFromLibrary(page, 'Vex the Warlock');
 
     // Everything must survive the save/load cycle
     await expect(ed.locator('.stat-declaration')).toHaveCount(11, { timeout: 5000 });
@@ -526,7 +536,7 @@ test.describe('Character Sheet', () => {
   test('command palette: open, filter, navigate, insert, and resume typing', async ({ page }) => {
     // Comprehensive command palette test covering the full interaction cycle.
 
-    await openNewCharacterModal(page);
+    await openNewSheetModal(page);
     const ed = editor(page);
     await ed.click();
 
@@ -569,7 +579,7 @@ test.describe('Character Sheet', () => {
   });
 
   test('action button: hover to reveal edit trigger, edit label and formula', async ({ page }) => {
-    await openNewCharacterModal(page);
+    await openNewSheetModal(page);
     const ed = editor(page);
     await ed.click();
 
@@ -597,18 +607,17 @@ test.describe('Character Sheet', () => {
   });
 
   test('delete character with confirmation', async ({ page }) => {
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Doomed Hero');
+    await openNewSheetModal(page, 'Doomed Hero');
     const ed = editor(page);
     await ed.click();
     await page.keyboard.type('This character will be deleted.');
-    await saveCharacter(page);
+    await saveSheet(page);
 
     // Reopen for editing
-    await editCharacterFromLibrary(page, 'Doomed Hero');
+    await editSheetFromLibrary(page, 'Doomed Hero');
 
     // Click delete
-    await page.locator('.character-sheet-modal__footer').getByRole('button', { name: /Delete/i }).click();
+    await page.locator('.sheet-modal__footer').getByRole('button', { name: /Delete/i }).click();
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
 
     // Cancel first — character should survive
@@ -616,10 +625,10 @@ test.describe('Character Sheet', () => {
     await expect(page.getByText(/cannot be undone/i)).not.toBeVisible();
 
     // Now actually delete
-    await page.locator('.character-sheet-modal__footer').getByRole('button', { name: /Delete/i }).click();
+    await page.locator('.sheet-modal__footer').getByRole('button', { name: /Delete/i }).click();
     await page.locator('.mantine-Modal-content').last().getByRole('button', { name: /Delete/i }).click();
 
-    await expect(page.getByPlaceholder('Untitled Character')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.getByPlaceholder('Untitled Sheet')).not.toBeVisible({ timeout: 3000 });
     // Character should be gone from library
     await expect(page.getByText('Doomed Hero')).not.toBeVisible({ timeout: 2000 });
   });
@@ -652,14 +661,13 @@ test.describe('Character Sheet — Float Mode', () => {
 
   test('float and interact with editor', async ({ page }) => {
     test.slow(); // this test does several mode switches
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Float Test');
+    await openNewSheetModal(page, 'Float Test');
 
     // Switch to floating
     await floatCharacterSheet(page);
 
     // Modal overlay should be gone
-    await expect(page.locator('.character-sheet-modal__overlay')).not.toBeVisible();
+    await expect(page.locator('.sheet-modal__overlay')).not.toBeVisible();
 
     // Floating panel should be present
     const panel = page.locator('.floating-panel');
@@ -673,7 +681,7 @@ test.describe('Character Sheet — Float Mode', () => {
 
     // Save from float
     await page.waitForTimeout(400);
-    const saveBtn = panel.locator('.character-sheet-modal__footer').getByRole('button', { name: /Create Character/i });
+    const saveBtn = panel.locator('.sheet-modal__footer').getByRole('button', { name: /Create Sheet|Save Changes/i });
     await saveBtn.click();
 
     // Float should close after save
@@ -686,8 +694,7 @@ test.describe('Character Sheet — Float Mode', () => {
   });
 
   test('float preserves content on mode switch', async ({ page }) => {
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Mode Switch');
+    await openNewSheetModal(page, 'Mode Switch');
 
     // Type content in modal
     const ed = editor(page);
@@ -713,7 +720,7 @@ test.describe('Character Sheet — Float Mode', () => {
   });
 
   test('float panel is rendered with position and resize handle', async ({ page }) => {
-    await openNewCharacterModal(page);
+    await openNewSheetModal(page);
     await floatCharacterSheet(page);
 
     const panel = page.locator('.floating-panel');
@@ -743,8 +750,7 @@ test.describe('Character Sheet — Window Mode', () => {
   });
 
   test('pop out to window and interact', async ({ page }) => {
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Window Test');
+    await openNewSheetModal(page, 'Window Test');
 
     // Type some content first
     const ed = editor(page);
@@ -789,7 +795,7 @@ test.describe('Character Sheet — Window Mode', () => {
     // with Playwright's click completion in Firefox. Catch the close error.
     await popup.waitForTimeout(400);
     try {
-      await popup.locator('.character-sheet-modal__footer').getByRole('button', { name: /Create Character/i }).click();
+      await popup.locator('.sheet-modal__footer').getByRole('button', { name: /Create Sheet/i }).click();
     } catch {
       // Expected in Firefox — popup closes mid-click
     }
@@ -801,7 +807,7 @@ test.describe('Character Sheet — Window Mode', () => {
   });
 
   test('closing popup window resets to modal-ready state', async ({ page }) => {
-    await openNewCharacterModal(page);
+    await openNewSheetModal(page);
 
     // Pop out to window
     const popupPromise = page.waitForEvent('popup', { timeout: 5000 });
@@ -832,8 +838,8 @@ test.describe('Character Sheet — Window Mode', () => {
     await page.waitForTimeout(200);
 
     // Opening a new character should work in modal mode
-    await openNewCharacterModal(page);
-    await expect(page.locator('.mantine-Modal-content')).toBeVisible({ timeout: 3000 });
+    await openNewSheetModal(page);
+    await expect(page.locator('.sheet-modal')).toBeVisible({ timeout: 3000 });
   });
 });
 
@@ -847,8 +853,7 @@ test.describe('Character Sheet — Cross-Mode', () => {
   });
 
   test('mode switch round-trip preserves widgets', async ({ page }) => {
-    await openNewCharacterModal(page);
-    await page.getByPlaceholder('Untitled Character').fill('Round Trip');
+    await openNewSheetModal(page, 'Round Trip');
 
     // Build content in modal
     const ed = editor(page);
@@ -870,8 +875,8 @@ test.describe('Character Sheet — Cross-Mode', () => {
     await expect(ed.locator('.bar-widget')).toHaveCount(1, { timeout: 3000 });
 
     // Save and reopen — verify persistence
-    await saveCharacter(page);
-    await editCharacterFromLibrary(page, 'Round Trip');
+    await saveSheet(page);
+    await editSheetFromLibrary(page, 'Round Trip');
     await expect(ed.locator('.stat-declaration')).toHaveCount(1, { timeout: 5000 });
     await expect(ed.locator('.bar-widget')).toHaveCount(1, { timeout: 3000 });
   });

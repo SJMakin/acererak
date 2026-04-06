@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { GameState, LibraryItem, LibraryItemType, Character } from '../types';
+import type { GameState, Sheet } from '../types';
 import type { Snippet } from '../types/snippet';
 import type { AIImage } from '../types/ai';
 
@@ -29,11 +29,7 @@ export interface SavedGame {
   isGM: boolean;
 }
 
-export interface SavedLibraryItem extends LibraryItem {
-  // Additional DB-specific fields if needed
-}
-
-export interface SavedCharacter extends Character {
+export interface SavedSheet extends Sheet {
   // Additional DB-specific fields if needed
 }
 
@@ -44,8 +40,7 @@ export interface SavedSnippet extends Snippet {
 // Use factory function pattern instead of class extension to avoid bundling issues
 const db = new Dexie('LychgateVTTDatabase') as Dexie & {
   games: Table<SavedGame, string>;
-  library: Table<SavedLibraryItem, string>;
-  characters: Table<SavedCharacter, string>;
+  sheets: Table<SavedSheet, string>;
   snippets: Table<SavedSnippet, string>;
   aiImages: Table<SavedAIImage, string>;
   images: Table<SavedEmbeddedImage, string>;
@@ -53,8 +48,7 @@ const db = new Dexie('LychgateVTTDatabase') as Dexie & {
 
 db.version(1).stores({
   games: 'id, name, lastUpdated, isGM',
-  library: 'id, type, name, *tags, createdAt, updatedAt',
-  characters: 'id, name, createdAt, updatedAt',
+  sheets: 'id, name, category, *tags, createdAt, updatedAt',
   snippets: 'id, name, category, *tags, createdAt, updatedAt',
   aiImages: 'id, imageId, modelId, createdAt',
   images: 'id, createdAt, source, sizeBytes',
@@ -101,61 +95,27 @@ export async function getGMGames(): Promise<SavedGame[]> {
     .sortBy('lastUpdated');
 }
 
-// Library operations
-export async function saveLibraryItem(item: SavedLibraryItem): Promise<void> {
-  await db.library.put(item);
-}
-
-export async function getLibraryItem(id: string): Promise<SavedLibraryItem | undefined> {
-  return db.library.get(id);
-}
-
-export async function deleteLibraryItem(id: string): Promise<void> {
-  await db.library.delete(id);
-}
-
-export async function getAllLibraryItems(): Promise<SavedLibraryItem[]> {
-  return db.library.toArray();
-}
-
-export async function getLibraryItemsByType(type: LibraryItemType): Promise<SavedLibraryItem[]> {
-  return db.library.where('type').equals(type).toArray();
-}
-
-export async function getLibraryItemsByTag(tag: string): Promise<SavedLibraryItem[]> {
-  return db.library.where('tags').equals(tag).toArray();
-}
-
-export async function searchLibraryItems(query: string): Promise<SavedLibraryItem[]> {
-  const lowerQuery = query.toLowerCase();
-  return db.library.filter(item =>
-    item.name.toLowerCase().includes(lowerQuery) ||
-    item.description?.toLowerCase().includes(lowerQuery) ||
-    item.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-  ).toArray();
-}
-
-// Character operations
-export async function saveCharacters(characters: Character[]): Promise<void> {
+// Sheet operations
+export async function saveSheets(sheets: Sheet[]): Promise<void> {
   // Clear existing and bulk add for simplicity
-  await db.characters.clear();
-  await db.characters.bulkPut(characters as SavedCharacter[]);
+  await db.sheets.clear();
+  await db.sheets.bulkPut(sheets as SavedSheet[]);
 }
 
-export async function loadCharacters(): Promise<Character[]> {
-  return db.characters.toArray() as Promise<Character[]>;
+export async function loadSheets(): Promise<Sheet[]> {
+  return db.sheets.toArray() as Promise<Sheet[]>;
 }
 
-export async function saveCharacter(character: Character): Promise<void> {
-  await db.characters.put(character as SavedCharacter);
+export async function saveSheet(sheet: Sheet): Promise<void> {
+  await db.sheets.put(sheet as SavedSheet);
 }
 
-export async function getCharacter(id: string): Promise<Character | undefined> {
-  return db.characters.get(id) as Promise<Character | undefined>;
+export async function getSheet(id: string): Promise<Sheet | undefined> {
+  return db.sheets.get(id) as Promise<Sheet | undefined>;
 }
 
-export async function deleteCharacter(id: string): Promise<void> {
-  await db.characters.delete(id);
+export async function deleteSheet(id: string): Promise<void> {
+  await db.sheets.delete(id);
 }
 
 // Snippet operations (GM only)

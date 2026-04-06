@@ -15,10 +15,10 @@ export function DslHelpPopover() {
         width={400}
         shadow="lg"
         withArrow
-        withinPortal={false}
+        withinPortal
       >
         <Popover.Target>
-          <Tooltip label="Syntax Help" position="left" openDelay={300} withinPortal={false}>
+          <Tooltip label="Syntax Help" position="left" openDelay={300} withinPortal>
             <ActionIcon
               size="md"
               variant="subtle"

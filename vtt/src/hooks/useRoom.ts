@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
-import { useCharacterStore, handleIncomingCharacterUpdate, handleIncomingCharacterDelete } from '../stores/characterStore';
+import { useSheetStore, handleIncomingSheetUpdate, handleIncomingSheetDelete } from '../stores/sheetStore';
 import { useAIStore, setRequestAIFn } from '../stores/aiStore';
 import { useImageStore, setImageMissingCallback } from '../stores/imageStore';
 import { generateAndStore } from '../services/aiImageService';
@@ -18,7 +18,7 @@ import type {
   GridSettings,
   ChatMessage,
   Scene,
-  Character,
+  Sheet,
   AIRequest,
   AIResponse,
   AICapabilities,
@@ -199,8 +199,8 @@ export function useRoom() {
     sendChat?: ActionSender<ChatMessage>;
     sendSceneSwitch?: ActionSender<string>;
     sendSceneUpdate?: ActionSender<Scene>;
-    sendCharacterUpdate?: ActionSender<Character>;
-    sendCharacterDelete?: ActionSender<string>;
+    sendSheetUpdate?: ActionSender<Sheet>;
+    sendSheetDelete?: ActionSender<string>;
     sendAIReq?: ActionSender<AIRequest>;
     sendAIRes?: ActionSender<AIResponse>;
     sendAICap?: ActionSender<AICapabilities>;
@@ -393,8 +393,8 @@ export function useRoom() {
     const [sendChat, onChat] = room.makeAction<ChatMessage>('chat');
     const [sendSceneSwitch, onSceneSwitch] = room.makeAction<string>('sceneSwi');
     const [sendSceneUpdate, onSceneUpdate] = room.makeAction<Scene>('sceneUpd');
-    const [sendCharacterUpdate, onCharacterUpdate] = room.makeAction<Character>('charUpd');
-    const [sendCharacterDelete, onCharacterDelete] = room.makeAction<string>('charDel');
+    const [sendSheetUpdate, onSheetUpdate] = room.makeAction<Sheet>('sheetUpd');
+    const [sendSheetDelete, onSheetDelete] = room.makeAction<string>('sheetDel');
     const [sendAIReq, onAIReq] = room.makeAction<AIRequest>('aiReq');
     const [sendAIRes, onAIRes] = room.makeAction<AIResponse>('aiRes');
     const [sendAICap, onAICap] = room.makeAction<AICapabilities>('aiCaps');
@@ -416,8 +416,8 @@ export function useRoom() {
       sendChat,
       sendSceneSwitch,
       sendSceneUpdate,
-      sendCharacterUpdate,
-      sendCharacterDelete,
+      sendSheetUpdate,
+      sendSheetDelete,
       sendAIReq,
       sendAIRes,
       sendAICap,
@@ -434,16 +434,16 @@ export function useRoom() {
       }
     });
 
-    // Setup character store P2P handlers
-    useCharacterStore.getState().setP2PHandlers(
-      (character) => {
-        if (actionsRef.current.sendCharacterUpdate) {
-          actionsRef.current.sendCharacterUpdate(character);
+    // Setup sheet store P2P handlers
+    useSheetStore.getState().setP2PHandlers(
+      (sheet) => {
+        if (actionsRef.current.sendSheetUpdate) {
+          actionsRef.current.sendSheetUpdate(sheet);
         }
       },
-      (characterId) => {
-        if (actionsRef.current.sendCharacterDelete) {
-          actionsRef.current.sendCharacterDelete(characterId);
+      (sheetId) => {
+        if (actionsRef.current.sendSheetDelete) {
+          actionsRef.current.sendSheetDelete(sheetId);
         }
       }
     );
@@ -471,7 +471,7 @@ export function useRoom() {
         console.log('Sending game sync to new peer:', peerId);
         const syncPayload = {
           ...currentGame,
-          characters: useCharacterStore.getState().characters,
+          sheets: useSheetStore.getState().sheets,
         };
         sendSync(syncPayload, [peerId]);
 
@@ -541,8 +541,8 @@ export function useRoom() {
     onSync((gameState: GameState, peerId: string) => {
       console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
-      if (gameState.characters) {
-        useCharacterStore.getState().setCharacters(gameState.characters);
+      if (gameState.sheets) {
+        useSheetStore.getState().setSheets(gameState.sheets);
       }
       // Track sync time and GM peer ID
       setRoomState(prev => ({
@@ -594,7 +594,7 @@ export function useRoom() {
         console.log('Sending game sync on request to peer:', peerId);
         const syncPayload = {
           ...currentGame,
-          characters: useCharacterStore.getState().characters,
+          sheets: useSheetStore.getState().sheets,
         };
         sendSync(syncPayload, [peerId]);
       }
@@ -751,16 +751,16 @@ export function useRoom() {
       }
     });
 
-    // Handle character updates (from any peer)
-    onCharacterUpdate((character: Character, _peerId: string) => {
-      console.log('Received character update:', character.name);
-      handleIncomingCharacterUpdate(character);
+    // Handle sheet updates (from any peer)
+    onSheetUpdate((sheet: Sheet, _peerId: string) => {
+      console.log('Received sheet update:', sheet.name);
+      handleIncomingSheetUpdate(sheet);
     });
 
-    // Handle character deletions (from any peer)
-    onCharacterDelete((characterId: string, _peerId: string) => {
-      console.log('Received character delete:', characterId);
-      handleIncomingCharacterDelete(characterId);
+    // Handle sheet deletions (from any peer)
+    onSheetDelete((sheetId: string, _peerId: string) => {
+      console.log('Received sheet delete:', sheetId);
+      handleIncomingSheetDelete(sheetId);
     });
 
     // Handle AI request (player → GM)
@@ -1007,7 +1007,7 @@ export function useRoom() {
     if (actionsRef.current.sendSync && game) {
       actionsRef.current.sendSync({
         ...game,
-        characters: useCharacterStore.getState().characters,
+        sheets: useSheetStore.getState().sheets,
       });
     }
   }, [game]);
@@ -1074,17 +1074,17 @@ export function useRoom() {
     }
   }, [roomState.isHost]);
 
-  // Broadcast character update (any peer)
-  const broadcastCharacterUpdate = useCallback((character: Character) => {
-    if (actionsRef.current.sendCharacterUpdate) {
-      actionsRef.current.sendCharacterUpdate(character);
+  // Broadcast sheet update (any peer)
+  const broadcastSheetUpdate = useCallback((sheet: Sheet) => {
+    if (actionsRef.current.sendSheetUpdate) {
+      actionsRef.current.sendSheetUpdate(sheet);
     }
   }, []);
 
-  // Broadcast character delete (any peer)
-  const broadcastCharacterDelete = useCallback((characterId: string) => {
-    if (actionsRef.current.sendCharacterDelete) {
-      actionsRef.current.sendCharacterDelete(characterId);
+  // Broadcast sheet delete (any peer)
+  const broadcastSheetDelete = useCallback((sheetId: string) => {
+    if (actionsRef.current.sendSheetDelete) {
+      actionsRef.current.sendSheetDelete(sheetId);
     }
   }, []);
 
@@ -1216,8 +1216,8 @@ export function useRoom() {
     broadcastChat,
     broadcastSceneSwitch,
     broadcastSceneUpdate,
-    broadcastCharacterUpdate,
-    broadcastCharacterDelete,
+    broadcastSheetUpdate,
+    broadcastSheetDelete,
     broadcastAICapabilities,
     requestAI,
     broadcastImage,

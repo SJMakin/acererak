@@ -33,10 +33,19 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /ai-image-generation/,
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+      testIgnore: /ai-image-generation/,
+    },
+    // Costly tests that hit real paid APIs — run explicitly:
+    //   npx playwright test --project=ai
+    {
+      name: 'ai',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /ai-image-generation/,
     },
   ],
   // Auto-start dev server unless testing against a deployed URL

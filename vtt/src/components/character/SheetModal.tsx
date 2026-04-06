@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal, Button, Group } from '@mantine/core';
-import { useCharacterStore } from '../../stores/characterStore';
-import { CharacterSheetContent } from './CharacterSheetContent';
+import { useSheetStore } from '../../stores/sheetStore';
+import { SheetContent } from './SheetContent';
 import { FloatingPanel } from './FloatingPanel';
 import { WindowPortal } from './WindowPortal';
-import type { Character } from '../../types';
-import './CharacterSheetModal.css';
+import type { Sheet } from '../../types';
+import './SheetModal.css';
 
 const DEFAULT_FLOATING_BOUNDS = {
   x: Math.max(0, (typeof window !== 'undefined' ? window.innerWidth : 1200) / 2 - 350),
@@ -14,27 +14,27 @@ const DEFAULT_FLOATING_BOUNDS = {
   height: typeof window !== 'undefined' ? window.innerHeight * 0.8 : 700,
 };
 
-export function CharacterSheetModal() {
+export function SheetModal() {
   const {
-    addCharacter,
-    updateCharacter,
-    getCharacterById,
-    deleteCharacter,
-    sheetCharacterId,
+    addSheet,
+    updateSheet,
+    getSheetById,
+    deleteSheet,
+    sheetId,
     sheetDisplayMode,
     sheetFloatingBounds,
-    closeCharacterSheet,
+    closeSheet,
     setSheetDisplayMode,
     setSheetFloatingBounds,
-  } = useCharacterStore();
+  } = useSheetStore();
 
-  const opened = sheetCharacterId !== null;
-  const characterId = sheetCharacterId === 'new' ? null : sheetCharacterId;
+  const opened = sheetId !== null;
+  const currentSheetId = sheetId === 'new' ? null : sheetId;
 
   const [name, setName] = useState('');
   const [content, setContent] = useState('{"type":"doc","content":[{"type":"paragraph"}]}');
   const [shadowState, setShadowState] = useState<Record<string, number | string>>({});
-  const [projections, setProjections] = useState<Character['projections']>({});
+  const [projections, setProjections] = useState<Sheet['projections']>({});
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contentVersion, setContentVersion] = useState(0);
@@ -51,15 +51,15 @@ export function CharacterSheetModal() {
     };
   }, []);
 
-  // Load existing character data
+  // Load existing sheet data
   useEffect(() => {
-    if (characterId) {
-      const character = getCharacterById(characterId);
-      if (character) {
-        setName(character.name);
-        setContent(character.content);
-        setShadowState(character.shadowState);
-        setProjections(character.projections);
+    if (currentSheetId) {
+      const sheet = getSheetById(currentSheetId);
+      if (sheet) {
+        setName(sheet.name);
+        setContent(sheet.content);
+        setShadowState(sheet.shadowState);
+        setProjections(sheet.projections);
         setIsEditing(true);
       }
     } else if (opened) {
@@ -71,20 +71,20 @@ export function CharacterSheetModal() {
       setIsEditing(false);
     }
     setContentVersion((v) => v + 1);
-  }, [characterId, opened, getCharacterById]);
+  }, [currentSheetId, opened, getSheetById]);
 
   const handleSave = useCallback(() => {
     if (!name.trim()) return;
 
-    if (isEditing && characterId) {
-      updateCharacter(characterId, {
+    if (isEditing && currentSheetId) {
+      updateSheet(currentSheetId, {
         name: name.trim(),
         content,
         shadowState,
         projections,
       });
     } else {
-      addCharacter({
+      addSheet({
         name: name.trim(),
         content,
         shadowState,
@@ -97,8 +97,8 @@ export function CharacterSheetModal() {
       popupWindowRef.current.close();
       popupWindowRef.current = null;
     }
-    closeCharacterSheet();
-  }, [name, content, shadowState, projections, isEditing, characterId, addCharacter, updateCharacter, closeCharacterSheet]);
+    closeSheet();
+  }, [name, content, shadowState, projections, isEditing, currentSheetId, addSheet, updateSheet, closeSheet]);
 
   const handleClose = useCallback(() => {
     if (popupWindowRef.current && !popupWindowRef.current.closed) {
@@ -106,20 +106,20 @@ export function CharacterSheetModal() {
       popupWindowRef.current = null;
     }
     localStorage.removeItem('pendingTemplate');
-    closeCharacterSheet();
-  }, [closeCharacterSheet]);
+    closeSheet();
+  }, [closeSheet]);
 
   const handleDelete = useCallback(() => {
-    if (characterId) {
-      deleteCharacter(characterId);
+    if (currentSheetId) {
+      deleteSheet(currentSheetId);
       setShowDeleteConfirm(false);
       if (popupWindowRef.current && !popupWindowRef.current.closed) {
         popupWindowRef.current.close();
         popupWindowRef.current = null;
       }
-      closeCharacterSheet();
+      closeSheet();
     }
-  }, [characterId, deleteCharacter, closeCharacterSheet]);
+  }, [currentSheetId, deleteSheet, closeSheet]);
 
   const handleContentChange = useCallback(
     (
@@ -173,7 +173,7 @@ export function CharacterSheetModal() {
   const floatingBounds = sheetFloatingBounds ?? DEFAULT_FLOATING_BOUNDS;
 
   const sheetContent = (
-    <CharacterSheetContent
+    <SheetContent
       name={name}
       onNameChange={setName}
       content={content}
@@ -204,9 +204,9 @@ export function CharacterSheetModal() {
           padding={0}
           radius="lg"
           classNames={{
-            content: 'character-sheet-modal',
-            body: 'character-sheet-modal__body',
-            overlay: 'character-sheet-modal__overlay',
+            content: 'sheet-modal',
+            body: 'sheet-modal__body',
+            overlay: 'sheet-modal__overlay',
           }}
           overlayProps={{ backgroundOpacity: 0.65, blur: 3 }}
         >
@@ -227,7 +227,7 @@ export function CharacterSheetModal() {
       {/* Window mode */}
       {sheetDisplayMode === 'window' && (
         <WindowPortal windowRef={popupWindowRef} onClose={handleWindowClose}>
-          <div className="character-sheet-modal" style={{ height: '100vh', maxHeight: '100vh' }}>
+          <div className="sheet-modal" style={{ height: '100vh', maxHeight: '100vh' }}>
             {sheetContent}
           </div>
         </WindowPortal>
@@ -237,7 +237,7 @@ export function CharacterSheetModal() {
       <Modal
         opened={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Delete Character?"
+        title="Delete Sheet?"
         size="sm"
         centered
       >

@@ -5,15 +5,15 @@
   z-index: 150;
   display: flex;
   flex-direction: column;
-  /* Re-use .character-sheet-modal styles for bg/border/shadow via shared class */
+  /* Re-use .sheet-modal styles for bg/border/shadow via shared class */
   touch-action: none;
 }
 
-.floating-panel .character-sheet-modal__header {
+.floating-panel .sheet-modal__header {
   cursor: grab;
 }
 
-.floating-panel .character-sheet-modal__header:active {
+.floating-panel .sheet-modal__header:active {
   cursor: grabbing;
 }
 

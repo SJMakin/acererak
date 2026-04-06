@@ -14,7 +14,7 @@ import {
   ScrollArea,
 } from '@mantine/core';
 import { useGameStore } from '../stores/gameStore';
-import { useCharacterStore } from '../stores/characterStore';
+import { useSheetStore } from '../stores/sheetStore';
 import type { TokenElement, Combatant } from '../types';
 
 interface CombatTrackerProps {
@@ -34,7 +34,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     previousTurn,
   } = useGameStore();
 
-  const { updateCharacterStat, getCharacterById } = useCharacterStore();
+  const { updateSheetStat, getSheetById } = useSheetStore();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>('');
   const [initiative, setInitiative] = useState<number | string>(10);
@@ -52,13 +52,13 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
 
   // Helper function to get HP from character or token
   const getHpFromToken = (token: TokenElement): { current: number; max: number } => {
-    if (token.characterId) {
-      const character = getCharacterById(token.characterId);
-      if (character && character.shadowState && character.projections) {
-        const barKey = character.projections.bar || 'HP';
-        const barMaxKey = character.projections.barMax || 'MaxHP';
-        const hp = character.shadowState[barKey];
-        const maxHp = character.shadowState[barMaxKey];
+    if (token.sheetId) {
+      const sheet = getSheetById(token.sheetId);
+      if (sheet && sheet.shadowState && sheet.projections) {
+        const barKey = sheet.projections.bar || 'HP';
+        const barMaxKey = sheet.projections.barMax || 'MaxHP';
+        const hp = sheet.shadowState[barKey];
+        const maxHp = sheet.shadowState[barMaxKey];
         
         if (hp !== undefined && maxHp !== undefined) {
           return {
@@ -73,9 +73,9 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
 
   // Helper function to get display name from character or token
   const getDisplayName = (token: TokenElement): string => {
-    if (token.characterId) {
-      const character = getCharacterById(token.characterId);
-      if (character) return character.name;
+    if (token.sheetId) {
+      const sheet = getSheetById(token.sheetId);
+      if (sheet) return sheet.name;
     }
     return token.name;
   };
@@ -131,14 +131,14 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     // Update combatant
     updateCombatant(id, { hp: newHp });
     
-    // If token is linked to a character, sync HP to character
-    if (token?.characterId) {
-      const character = getCharacterById(token.characterId);
-      if (character?.projections?.bar) {
-        updateCharacterStat(token.characterId, character.projections.bar, newHp.current);
+    // If token is linked to a sheet, sync HP to sheet
+    if (token?.sheetId) {
+      const sheet = getSheetById(token.sheetId);
+      if (sheet?.projections?.bar) {
+        updateSheetStat(token.sheetId, sheet.projections.bar, newHp.current);
       }
-      if (character?.projections?.barMax && newHp.max !== combatant.hp.max) {
-        updateCharacterStat(token.characterId, character.projections.barMax, newHp.max);
+      if (sheet?.projections?.barMax && newHp.max !== combatant.hp.max) {
+        updateSheetStat(token.sheetId, sheet.projections.barMax, newHp.max);
       }
     }
     
@@ -256,7 +256,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
               onChange={(val) => setSelectedTokenId(val || '')}
               data={availableTokens.map((t) => ({ 
                 value: t.id, 
-                label: t.characterId ? `${getDisplayName(t)} (${t.name})` : t.name 
+                label: t.sheetId ? `${getDisplayName(t)} (${t.name})` : t.name
               }))}
               size="xs"
             />
@@ -321,7 +321,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                         <Badge size="xs" color="violet">Active</Badge>
                       )}
                       {/* Character indicator */}
-                      {tokens.find(t => t.id === combatant.id)?.characterId && (
+                      {tokens.find(t => t.id === combatant.id)?.sheetId && (
                         <Badge size="xs" color="blue">Linked</Badge>
                       )}
                     </Group>
