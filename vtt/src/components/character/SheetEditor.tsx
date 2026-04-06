@@ -466,7 +466,6 @@ export function SheetEditor({
         createPortal(
         <div
           className="command-palette-backdrop"
-          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
           onClick={() => setShowCommandPalette(false)}
         >
           <div
