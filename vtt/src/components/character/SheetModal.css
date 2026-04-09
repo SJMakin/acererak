@@ -25,39 +25,17 @@
   backdrop-filter: blur(4px);
 }
 
-/* --- Header bar with title + close --- */
+/* --- Toolbar overlay (floats over h1) --- */
 
-.sheet-modal__header {
+.sheet-modal__toolbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 24px 12px 28px;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(196, 163, 90, 0.1);
-  background: linear-gradient(180deg, rgba(26, 26, 46, 1) 0%, rgba(30, 30, 46, 0.95) 100%);
-}
-
-.sheet-modal__title {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #e8e8f0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  font-variant: small-caps;
-  letter-spacing: 0.03em;
-  padding: 2px 0;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.2s ease;
-}
-
-.sheet-modal__title::placeholder {
-  color: #4a4a60;
-}
-
-.sheet-modal__title:focus {
-  border-bottom-color: rgba(124, 58, 237, 0.4);
+  gap: 4px;
+  padding: 12px 16px;
 }
 
 /* --- Mode toggle buttons (float / pop-in / window) --- */

@@ -1,8 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Stack,
   TextInput,
-  SegmentedControl,
   Paper,
   Text,
   Group,
@@ -10,9 +9,7 @@ import {
   Badge,
   ScrollArea,
   Tooltip,
-  Modal,
   Button,
-  Select,
 } from '@mantine/core';
 import { useSheetStore } from '../stores/sheetStore';
 import { useGameStore } from '../stores/gameStore';
@@ -21,23 +18,6 @@ import type {
   CanvasElement,
   Sheet,
 } from '../types';
-import { getAllTemplates, type TemplateId } from '../services/sheetTemplates';
-
-type CategoryFilter = 'all' | 'Character' | 'Token' | 'Location' | 'Note';
-
-const CATEGORY_ICONS: Record<string, string> = {
-  Character: '\u{1F464}',
-  Token: '\u{1F3AD}',
-  Location: '\u{1F4CD}',
-  Note: '\u{1F4DD}',
-};
-
-const CATEGORY_TO_TEMPLATE: Record<string, TemplateId> = {
-  Character: 'dnd5e',
-  Token: 'token-stat',
-  Location: 'location',
-  Note: 'note',
-};
 
 interface LibraryPanelProps {
   room: {
@@ -45,89 +25,376 @@ interface LibraryPanelProps {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Inline rename input
+// ---------------------------------------------------------------------------
+
+function InlineRename({
+  initialName,
+  onConfirm,
+  onCancel,
+}: {
+  initialName: string;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const val = ref.current?.value.trim();
+      onConfirm(val || initialName);
+    } else if (e.key === 'Escape') {
+      onCancel();
+    }
+  };
+
+  return (
+    <input
+      ref={ref}
+      defaultValue={initialName}
+      onKeyDown={handleKeyDown}
+      onBlur={() => {
+        const val = ref.current?.value.trim();
+        onConfirm(val || initialName);
+      }}
+      style={{
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(124, 58, 237, 0.4)',
+        borderRadius: 4,
+        color: '#e8e8f0',
+        fontSize: 13,
+        padding: '2px 6px',
+        width: '100%',
+        outline: 'none',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Folder tree item (recursive)
+// ---------------------------------------------------------------------------
+
+function FolderTreeItem({
+  folder,
+  allSheets,
+  depth,
+  expanded,
+  onToggle,
+  onOpenSheet,
+  onDeleteSheet,
+  onPlaceToken,
+  onMoveItem,
+  dragId,
+  dropTargetId,
+  onDragStart,
+  onDragEnd,
+  onDragOverFolder,
+  onDropOnFolder,
+  renamingId,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+  expandedSet,
+  activeScene,
+}: {
+  folder: Sheet;
+  allSheets: Sheet[];
+  depth: number;
+  expanded: boolean;
+  onToggle: (id: string) => void;
+  onOpenSheet: (id: string) => void;
+  onDeleteSheet: (id: string, e: React.MouseEvent) => void;
+  onPlaceToken: (sheet: Sheet, e: React.MouseEvent) => void;
+  onMoveItem: (id: string, parentId: string | null) => void;
+  dragId: string | null;
+  dropTargetId: string | null;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+  onDragOverFolder: (id: string) => void;
+  onDropOnFolder: (id: string) => void;
+  renamingId: string | null;
+  onStartRename: (id: string) => void;
+  onConfirmRename: (id: string, name: string) => void;
+  onCancelRename: () => void;
+  expandedSet: Set<string>;
+  activeScene: { gridSettings: { cellSize: number }; elements: unknown[] } | undefined;
+}) {
+  const children = allSheets.filter((s) => s.parentId === folder.id);
+  const childFolders = children.filter((s) => s.isFolder);
+  const childSheets = children.filter((s) => !s.isFolder);
+  const isDropTarget = dropTargetId === folder.id && dragId !== folder.id;
+
+  return (
+    <div style={{ paddingLeft: depth > 0 ? 12 : 0 }}>
+      {/* Folder header */}
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          onDragStart(folder.id);
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDragOverFolder(folder.id);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDropOnFolder(folder.id);
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 6px',
+          borderRadius: 6,
+          cursor: 'pointer',
+          background: isDropTarget ? 'rgba(124, 58, 237, 0.15)' : 'transparent',
+          border: isDropTarget ? '1px dashed rgba(124, 58, 237, 0.4)' : '1px solid transparent',
+          transition: 'background 0.15s, border 0.15s',
+        }}
+        onClick={() => onToggle(folder.id)}
+      >
+        <Text size="xs" c="dimmed" style={{ width: 14, flexShrink: 0, userSelect: 'none' }}>
+          {expanded ? '▼' : '▶'}
+        </Text>
+        <Text size="xs" style={{ flexShrink: 0, userSelect: 'none' }}>📁</Text>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {renamingId === folder.id ? (
+            <InlineRename
+              initialName={folder.name}
+              onConfirm={(name) => onConfirmRename(folder.id, name)}
+              onCancel={onCancelRename}
+            />
+          ) : (
+            <Text
+              size="sm"
+              fw={500}
+              truncate
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onStartRename(folder.id);
+              }}
+            >
+              {folder.name}
+            </Text>
+          )}
+        </div>
+        <Tooltip label="Delete folder">
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            color="red"
+            onClick={(e) => onDeleteSheet(folder.id, e)}
+          >
+            ×
+          </ActionIcon>
+        </Tooltip>
+      </div>
+
+      {/* Children */}
+      {expanded && (
+        <div style={{ paddingLeft: 8 }}>
+          {childFolders.map((f) => (
+            <FolderTreeItem
+              key={f.id}
+              folder={f}
+              allSheets={allSheets}
+              depth={depth + 1}
+              expanded={expandedSet.has(f.id)}
+              onToggle={onToggle}
+              onOpenSheet={onOpenSheet}
+              onDeleteSheet={onDeleteSheet}
+              onPlaceToken={onPlaceToken}
+              onMoveItem={onMoveItem}
+              dragId={dragId}
+              dropTargetId={dropTargetId}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDragOverFolder={onDragOverFolder}
+              onDropOnFolder={onDropOnFolder}
+              renamingId={renamingId}
+              onStartRename={onStartRename}
+              onConfirmRename={onConfirmRename}
+              onCancelRename={onCancelRename}
+              expandedSet={expandedSet}
+              activeScene={activeScene}
+            />
+          ))}
+          {childSheets.map((sheet) => (
+            <SheetCard
+              key={sheet.id}
+              sheet={sheet}
+              onOpen={onOpenSheet}
+              onDelete={onDeleteSheet}
+              onPlace={onPlaceToken}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              dragId={dragId}
+            />
+          ))}
+          {childFolders.length === 0 && childSheets.length === 0 && (
+            <Text size="xs" c="dimmed" pl={22} py={2}>Empty</Text>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sheet card (leaf item)
+// ---------------------------------------------------------------------------
+
+function SheetCard({
+  sheet,
+  onOpen,
+  onDelete,
+  onPlace,
+  onDragStart,
+  onDragEnd,
+  dragId,
+}: {
+  sheet: Sheet;
+  onOpen: (id: string) => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+  onPlace: (sheet: Sheet, e: React.MouseEvent) => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+  dragId: string | null;
+}) {
+  return (
+    <Paper
+      p="xs"
+      withBorder
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        onDragStart(sheet.id);
+      }}
+      onDragEnd={onDragEnd}
+      style={{
+        cursor: 'pointer',
+        opacity: dragId === sheet.id ? 0.5 : 1,
+        transition: 'opacity 0.15s',
+      }}
+      onClick={() => onOpen(sheet.id)}
+    >
+      <Group justify="space-between" wrap="nowrap">
+        <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+            <Text size="sm" fw={500} truncate>
+              {sheet.name}
+            </Text>
+            {sheet.tags && sheet.tags.length > 0 && (
+              <Group gap={6}>
+                {sheet.tags.slice(0, 2).map(tag => (
+                  <Badge key={tag} size="xs" variant="light" color="gray">{tag}</Badge>
+                ))}
+                {sheet.tags.length > 2 && (
+                  <Badge size="xs" variant="light" color="gray">+{sheet.tags.length - 2}</Badge>
+                )}
+              </Group>
+            )}
+          </Stack>
+        </Group>
+        <Group gap={4}>
+          <Tooltip label="Place on map">
+            <ActionIcon
+              size="sm"
+              variant="light"
+              color="green"
+              onClick={(e) => onPlace(sheet, e)}
+            >
+              +
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Delete">
+            <ActionIcon
+              size="sm"
+              variant="light"
+              color="red"
+              onClick={(e) => onDelete(sheet.id, e)}
+            >
+              ×
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      </Group>
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
+
 export default function LibraryPanel({ room }: LibraryPanelProps) {
-  const { sheets, deleteSheet, openSheet, addSheet } = useSheetStore();
+  const { sheets, deleteSheet, openSheet, addFolder, moveItem, updateSheet } = useSheetStore();
   const { game, addElement } = useGameStore();
 
   const activeScene = game?.scenes.find(s => s.id === game.activeSceneId) || game?.scenes[0];
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
-  // New sheet creation
-  const [showNewSheetModal, setShowNewSheetModal] = useState(false);
-  const [newSheetName, setNewSheetName] = useState('');
-  const [newSheetCategory, setNewSheetCategory] = useState<string>('Character');
-  const [newSheetTemplate, setNewSheetTemplate] = useState<TemplateId>('dnd5e');
-
-  // Filter sheets by search and category
+  // Filter sheets by search
   const filteredSheets = useMemo(() => {
-    let result = sheets;
-
-    if (categoryFilter !== 'all') {
-      result = result.filter(s => s.category === categoryFilter);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(s =>
+    if (!searchQuery.trim()) return null; // null = show tree
+    const q = searchQuery.toLowerCase();
+    return sheets.filter(s =>
+      !s.isFolder && (
         s.name.toLowerCase().includes(q) ||
-        s.category?.toLowerCase().includes(q) ||
         s.tags?.some(t => t.toLowerCase().includes(q))
-      );
-    }
+      )
+    );
+  }, [sheets, searchQuery]);
 
-    return result;
-  }, [sheets, categoryFilter, searchQuery]);
+  const rootFolders = useMemo(
+    () => sheets.filter(s => s.isFolder && !s.parentId),
+    [sheets],
+  );
+  const rootSheets = useMemo(
+    () => sheets.filter(s => !s.isFolder && !s.parentId),
+    [sheets],
+  );
 
-  const handleCreateSheet = () => {
-    setNewSheetName('');
-    setNewSheetCategory('Character');
-    setNewSheetTemplate('dnd5e');
-    setShowNewSheetModal(true);
-  };
-
-  const handleCategoryChange = (category: string) => {
-    setNewSheetCategory(category);
-    // Auto-select a matching template
-    const defaultTemplate = CATEGORY_TO_TEMPLATE[category] || 'blank';
-    setNewSheetTemplate(defaultTemplate);
-  };
-
-  const handleSaveNewSheet = () => {
-    if (!newSheetName.trim()) return;
-
-    const templates = getAllTemplates();
-    const template = templates.find(t => t.id === newSheetTemplate);
-
-    const id = addSheet({
-      name: newSheetName.trim(),
-      content: template?.content || '{"type":"doc","content":[{"type":"paragraph"}]}',
-      shadowState: template?.defaultStats || {},
-      projections: {},
-      category: newSheetCategory,
-      tags: [],
+  const toggleFolder = useCallback((id: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+  }, []);
 
-    setShowNewSheetModal(false);
-
-    // Open the newly created sheet for editing
-    openSheet(id);
-  };
-
-  const handleDeleteSheet = (sheetId: string, e: React.MouseEvent) => {
+  const handleDeleteSheet = useCallback((sheetId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Delete this sheet? This cannot be undone.')) {
+    const item = sheets.find(s => s.id === sheetId);
+    const label = item?.isFolder ? 'folder and all its contents' : 'sheet';
+    if (confirm(`Delete this ${label}? This cannot be undone.`)) {
       deleteSheet(sheetId);
     }
-  };
+  }, [sheets, deleteSheet]);
 
-  const handlePlaceToken = (sheet: Sheet, e: React.MouseEvent) => {
+  const handlePlaceToken = useCallback((sheet: Sheet, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!game || !activeScene) return;
 
     const cellSize = activeScene.gridSettings.cellSize;
-
     const newToken: Omit<TokenElement, 'id'> = {
       type: 'token',
       layer: 'token',
@@ -146,28 +413,67 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
     const id = addElement(newToken);
     const fullToken = { ...newToken, id } as TokenElement;
     room.broadcastElementUpdate(fullToken);
-  };
+  }, [game, activeScene, addElement, room]);
 
-  const getCategoryIcon = (category?: string) => CATEGORY_ICONS[category || ''] || '\u{1F4C4}';
+  const handleNewFolder = useCallback(() => {
+    const id = addFolder('New Folder');
+    setExpandedFolders((prev) => new Set(prev));
+    setRenamingId(id);
+  }, [addFolder]);
 
-  const templateOptions = getAllTemplates().map(t => ({
-    value: t.id,
-    label: t.name,
-    description: t.description,
-  }));
+  const handleConfirmRename = useCallback((id: string, name: string) => {
+    updateSheet(id, { name });
+    setRenamingId(null);
+  }, [updateSheet]);
+
+  // Drag-drop handlers
+  const handleDragStart = useCallback((id: string) => setDragId(id), []);
+  const handleDragEnd = useCallback(() => {
+    setDragId(null);
+    setDropTargetId(null);
+  }, []);
+  const handleDragOverFolder = useCallback((id: string) => setDropTargetId(id), []);
+  const handleDropOnFolder = useCallback((folderId: string) => {
+    if (dragId && dragId !== folderId) {
+      moveItem(dragId, folderId);
+    }
+    setDragId(null);
+    setDropTargetId(null);
+  }, [dragId, moveItem]);
+
+  const handleDropOnRoot = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragId) {
+      moveItem(dragId, null);
+    }
+    setDragId(null);
+    setDropTargetId(null);
+  }, [dragId, moveItem]);
+
+  const totalSheets = sheets.filter(s => !s.isFolder).length;
 
   return (
     <Stack gap="sm">
-      {/* Create Sheet */}
-      <Button
-        variant="light"
-        color="violet"
-        size="xs"
-        onClick={handleCreateSheet}
-        fullWidth
-      >
-        + New Sheet
-      </Button>
+      {/* Create buttons */}
+      <Group gap="xs">
+        <Button
+          variant="light"
+          color="violet"
+          size="xs"
+          onClick={() => openSheet('new')}
+          style={{ flex: 1 }}
+        >
+          + New Sheet
+        </Button>
+        <Button
+          variant="light"
+          color="gray"
+          size="xs"
+          onClick={handleNewFolder}
+        >
+          + Folder
+        </Button>
+      </Group>
 
       {/* Search */}
       <TextInput
@@ -177,152 +483,94 @@ export default function LibraryPanel({ room }: LibraryPanelProps) {
         size="xs"
       />
 
-      {/* Category Filter */}
-      <SegmentedControl
-        value={categoryFilter}
-        onChange={(val) => setCategoryFilter(val as CategoryFilter)}
-        size="xs"
-        data={[
-          { label: 'All', value: 'all' },
-          { label: '\u{1F464}', value: 'Character' },
-          { label: '\u{1F3AD}', value: 'Token' },
-          { label: '\u{1F4CD}', value: 'Location' },
-          { label: '\u{1F4DD}', value: 'Note' },
-        ]}
-        fullWidth
-      />
-
-      {/* Sheets List */}
-      <ScrollArea h="calc(100vh - 340px)">
+      {/* Tree / Search results */}
+      <ScrollArea
+        h="calc(100vh - 280px)"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDropOnRoot}
+      >
         <Stack gap="xs">
-          {filteredSheets.length === 0 && (
-            <Stack align="center" py="xl" gap="xs">
-              <Text size="sm" c="dimmed" ta="center">
-                {searchQuery ? 'No matching sheets' : 'No sheets yet'}
-              </Text>
-              {!searchQuery && (
-                <Text size="xs" c="dimmed" ta="center">
-                  Create a sheet to get started
+          {filteredSheets !== null ? (
+            // Flat search results
+            <>
+              {filteredSheets.length === 0 && (
+                <Text size="sm" c="dimmed" ta="center" py="xl">
+                  No matching sheets
                 </Text>
               )}
-            </Stack>
+              {filteredSheets.map((sheet) => (
+                <SheetCard
+                  key={sheet.id}
+                  sheet={sheet}
+                  onOpen={openSheet}
+                  onDelete={handleDeleteSheet}
+                  onPlace={handlePlaceToken}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  dragId={dragId}
+                />
+              ))}
+            </>
+          ) : (
+            // Tree view
+            <>
+              {rootFolders.map((folder) => (
+                <FolderTreeItem
+                  key={folder.id}
+                  folder={folder}
+                  allSheets={sheets}
+                  depth={0}
+                  expanded={expandedFolders.has(folder.id)}
+                  onToggle={toggleFolder}
+                  onOpenSheet={openSheet}
+                  onDeleteSheet={handleDeleteSheet}
+                  onPlaceToken={handlePlaceToken}
+                  onMoveItem={moveItem}
+                  dragId={dragId}
+                  dropTargetId={dropTargetId}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragOverFolder={handleDragOverFolder}
+                  onDropOnFolder={handleDropOnFolder}
+                  renamingId={renamingId}
+                  onStartRename={setRenamingId}
+                  onConfirmRename={handleConfirmRename}
+                  onCancelRename={() => setRenamingId(null)}
+                  expandedSet={expandedFolders}
+                  activeScene={activeScene}
+                />
+              ))}
+              {rootSheets.map((sheet) => (
+                <SheetCard
+                  key={sheet.id}
+                  sheet={sheet}
+                  onOpen={openSheet}
+                  onDelete={handleDeleteSheet}
+                  onPlace={handlePlaceToken}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  dragId={dragId}
+                />
+              ))}
+              {rootFolders.length === 0 && rootSheets.length === 0 && (
+                <Stack align="center" py="xl" gap="xs">
+                  <Text size="sm" c="dimmed" ta="center">
+                    No sheets yet
+                  </Text>
+                  <Text size="xs" c="dimmed" ta="center">
+                    Create a sheet to get started
+                  </Text>
+                </Stack>
+              )}
+            </>
           )}
-
-          {filteredSheets.map((sheet) => (
-            <Paper
-              key={sheet.id}
-              p="xs"
-              withBorder
-              style={{ cursor: 'pointer' }}
-              onClick={() => openSheet(sheet.id)}
-            >
-              <Group justify="space-between" wrap="nowrap">
-                <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                  <Text size="lg">{getCategoryIcon(sheet.category)}</Text>
-                  <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="sm" fw={500} truncate>
-                      {sheet.name}
-                    </Text>
-                    <Group gap={6}>
-                      {sheet.category && (
-                        <Text size="xs" c="dimmed">{sheet.category}</Text>
-                      )}
-                      {sheet.tags && sheet.tags.length > 0 && (
-                        <>
-                          {sheet.tags.slice(0, 2).map(tag => (
-                            <Badge key={tag} size="xs" variant="light" color="gray">{tag}</Badge>
-                          ))}
-                          {sheet.tags.length > 2 && (
-                            <Badge size="xs" variant="light" color="gray">+{sheet.tags.length - 2}</Badge>
-                          )}
-                        </>
-                      )}
-                    </Group>
-                  </Stack>
-                </Group>
-                <Group gap={4}>
-                  <Tooltip label="Place on map">
-                    <ActionIcon
-                      size="sm"
-                      variant="light"
-                      color="green"
-                      onClick={(e) => handlePlaceToken(sheet, e)}
-                    >
-                      +
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Delete">
-                    <ActionIcon
-                      size="sm"
-                      variant="light"
-                      color="red"
-                      onClick={(e) => handleDeleteSheet(sheet.id, e)}
-                    >
-                      ×
-                    </ActionIcon>
-                  </Tooltip>
-                </Group>
-              </Group>
-            </Paper>
-          ))}
-
         </Stack>
       </ScrollArea>
 
       {/* Item count */}
       <Text size="xs" c="dimmed" ta="center">
-        {filteredSheets.length} sheet{filteredSheets.length !== 1 ? 's' : ''}
+        {totalSheets} sheet{totalSheets !== 1 ? 's' : ''}
       </Text>
-
-      {/* New Sheet Modal */}
-      <Modal
-        opened={showNewSheetModal}
-        onClose={() => setShowNewSheetModal(false)}
-        title="New Sheet"
-        size="sm"
-      >
-        <Stack gap="md">
-          <TextInput
-            label="Name"
-            value={newSheetName}
-            onChange={(e) => setNewSheetName(e.currentTarget.value)}
-            placeholder="Enter a name..."
-            data-autofocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newSheetName.trim()) handleSaveNewSheet();
-            }}
-          />
-          <Select
-            label="Category"
-            value={newSheetCategory}
-            onChange={(val) => handleCategoryChange(val || 'Character')}
-            data={[
-              { value: 'Character', label: '\u{1F464} Character' },
-              { value: 'Token', label: '\u{1F3AD} Token / NPC' },
-              { value: 'Location', label: '\u{1F4CD} Location' },
-              { value: 'Note', label: '\u{1F4DD} Note' },
-            ]}
-          />
-          <Select
-            label="Template"
-            value={newSheetTemplate}
-            onChange={(val) => setNewSheetTemplate((val as TemplateId) || 'blank')}
-            data={templateOptions}
-          />
-          <Group justify="flex-end">
-            <Button variant="subtle" onClick={() => setShowNewSheetModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              color="violet"
-              onClick={handleSaveNewSheet}
-              disabled={!newSheetName.trim()}
-            >
-              Create
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </Stack>
   );
 }

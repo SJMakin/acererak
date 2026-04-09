@@ -59,11 +59,10 @@
   font-variant: small-caps;
   letter-spacing: 0.05em;
   color: #e8e8f0;
-  margin: 20px 0 12px 0;
-  padding-bottom: 6px;
+  margin: 0 0 12px 0;
   border-bottom: 2px solid #c4a35a;
   background: linear-gradient(90deg, rgba(196, 163, 90, 0.08) 0%, transparent 80%);
-  padding: 4px 0 6px 0;
+  padding: 4px 100px 6px 0;
 }
 
 .sheet-editor__content .tiptap h2 {

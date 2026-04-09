@@ -4,6 +4,7 @@ import { useSheetStore } from '../../stores/sheetStore';
 import { SheetContent } from './SheetContent';
 import { FloatingPanel } from './FloatingPanel';
 import { WindowPortal } from './WindowPortal';
+import { extractNameFromContent, BLANK_SHEET_CONTENT } from '../../services/sheetNameUtils';
 import type { Sheet } from '../../types';
 import './SheetModal.css';
 
@@ -31,8 +32,7 @@ export function SheetModal() {
   const opened = sheetId !== null;
   const currentSheetId = sheetId === 'new' ? null : sheetId;
 
-  const [name, setName] = useState('');
-  const [content, setContent] = useState('{"type":"doc","content":[{"type":"paragraph"}]}');
+  const [content, setContent] = useState(BLANK_SHEET_CONTENT);
   const [shadowState, setShadowState] = useState<Record<string, number | string>>({});
   const [projections, setProjections] = useState<Sheet['projections']>({});
   const [isEditing, setIsEditing] = useState(false);
@@ -51,21 +51,18 @@ export function SheetModal() {
     };
   }, []);
 
-  // Load existing sheet data
+  // Load existing sheet data or initialize blank
   useEffect(() => {
     if (currentSheetId) {
       const sheet = getSheetById(currentSheetId);
       if (sheet) {
-        setName(sheet.name);
         setContent(sheet.content);
         setShadowState(sheet.shadowState);
         setProjections(sheet.projections);
         setIsEditing(true);
       }
     } else if (opened) {
-      const pendingTemplate = localStorage.getItem('pendingTemplate');
-      setName('');
-      setContent(pendingTemplate || '{"type":"doc","content":[{"type":"paragraph"}]}');
+      setContent(BLANK_SHEET_CONTENT);
       setShadowState({});
       setProjections({});
       setIsEditing(false);
@@ -74,18 +71,18 @@ export function SheetModal() {
   }, [currentSheetId, opened, getSheetById]);
 
   const handleSave = useCallback(() => {
-    if (!name.trim()) return;
+    const derivedName = extractNameFromContent(content);
 
     if (isEditing && currentSheetId) {
       updateSheet(currentSheetId, {
-        name: name.trim(),
+        name: derivedName,
         content,
         shadowState,
         projections,
       });
     } else {
       addSheet({
-        name: name.trim(),
+        name: derivedName,
         content,
         shadowState,
         projections,
@@ -98,14 +95,13 @@ export function SheetModal() {
       popupWindowRef.current = null;
     }
     closeSheet();
-  }, [name, content, shadowState, projections, isEditing, currentSheetId, addSheet, updateSheet, closeSheet]);
+  }, [content, shadowState, projections, isEditing, currentSheetId, addSheet, updateSheet, closeSheet]);
 
   const handleClose = useCallback(() => {
     if (popupWindowRef.current && !popupWindowRef.current.closed) {
       popupWindowRef.current.close();
       popupWindowRef.current = null;
     }
-    localStorage.removeItem('pendingTemplate');
     closeSheet();
   }, [closeSheet]);
 
@@ -171,11 +167,10 @@ export function SheetModal() {
   if (!opened) return null;
 
   const floatingBounds = sheetFloatingBounds ?? DEFAULT_FLOATING_BOUNDS;
+  const displayName = extractNameFromContent(content);
 
   const sheetContent = (
     <SheetContent
-      name={name}
-      onNameChange={setName}
       content={content}
       contentVersion={contentVersion}
       onContentChange={handleContentChange}
@@ -242,7 +237,7 @@ export function SheetModal() {
         centered
       >
         <p style={{ color: '#a0a0b0', margin: '0 0 20px 0' }}>
-          Are you sure you want to delete &ldquo;{name}&rdquo;? This action cannot be undone.
+          Are you sure you want to delete &ldquo;{displayName}&rdquo;? This action cannot be undone.
         </p>
         <Group justify="flex-end" gap="sm">
           <Button variant="subtle" color="gray" onClick={() => setShowDeleteConfirm(false)}>

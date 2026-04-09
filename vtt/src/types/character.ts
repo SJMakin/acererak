@@ -12,6 +12,8 @@ export type Sheet = {
     barMax?: string; // Key for HP max (e.g., "MaxHP")
     badge?: string; // Key for badge (e.g., "AC")
   };
+  parentId?: string | null; // null/undefined = root level
+  isFolder?: boolean; // true = folder node (no content)
   category?: string; // e.g., "Character", "Token", "Location", "Note"
   tags?: string[];
   createdAt: string;

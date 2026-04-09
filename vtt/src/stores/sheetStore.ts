@@ -31,6 +31,8 @@ interface SheetStore {
 
   // CRUD operations
   addSheet: (sheet: Omit<Sheet, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  addFolder: (name: string, parentId?: string) => string;
+  moveItem: (id: string, newParentId: string | null) => void;
   updateSheet: (id: string, updates: Partial<Sheet>) => void;
   deleteSheet: (id: string) => void;
 
@@ -122,6 +124,57 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     return id;
   },
 
+  addFolder: (name, parentId) => {
+    const id = nanoid(10);
+    const now = new Date().toISOString();
+    const folder: Sheet = {
+      id,
+      version: 1,
+      name,
+      content: '',
+      shadowState: {},
+      projections: {},
+      isFolder: true,
+      parentId: parentId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => {
+      const newSheets = [...state.sheets, folder];
+      if (state.isGM) {
+        saveSheets(newSheets).catch((err) => console.error('Failed to save sheets:', err));
+      }
+      return { sheets: newSheets };
+    });
+
+    const { onP2PUpdate } = get();
+    if (onP2PUpdate) onP2PUpdate(folder);
+
+    return id;
+  },
+
+  moveItem: (id, newParentId) => {
+    set((state) => {
+      const now = new Date().toISOString();
+      const existing = state.sheets.find((s) => s.id === id);
+      if (!existing) return state;
+      const updatedSheets = state.sheets.map((s) =>
+        s.id === id
+          ? { ...s, parentId: newParentId, version: (s.version || 0) + 1, updatedAt: now }
+          : s
+      );
+      if (state.isGM) {
+        saveSheets(updatedSheets).catch((err) => console.error('Failed to save sheets:', err));
+      }
+      return { sheets: updatedSheets };
+    });
+
+    const { onP2PUpdate, sheets } = get();
+    const updated = sheets.find((s) => s.id === id);
+    if (onP2PUpdate && updated) onP2PUpdate(updated);
+  },
+
   updateSheet: (id, updates) => {
     set((state) => {
       const now = new Date().toISOString();
@@ -159,23 +212,28 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   },
 
   deleteSheet: (id) => {
+    // Collect all descendant IDs (for folder deletion)
+    const collectDescendants = (parentId: string, sheets: Sheet[]): string[] => {
+      const children = sheets.filter((s) => s.parentId === parentId);
+      return children.flatMap((c) => [c.id, ...collectDescendants(c.id, sheets)]);
+    };
+
+    const state = get();
+    const idsToDelete = new Set([id, ...collectDescendants(id, state.sheets)]);
+
     set((state) => {
-      const filteredSheets = state.sheets.filter((s) => s.id !== id);
-
-      // Persist to IndexedDB if GM
+      const filteredSheets = state.sheets.filter((s) => !idsToDelete.has(s.id));
       if (state.isGM) {
-        saveSheets(filteredSheets).catch((err) => {
-          console.error('Failed to save sheets:', err);
-        });
+        saveSheets(filteredSheets).catch((err) => console.error('Failed to save sheets:', err));
       }
-
       return { sheets: filteredSheets };
     });
 
-    // Broadcast to P2P peers
     const { onP2PDelete } = get();
     if (onP2PDelete) {
-      onP2PDelete(id);
+      for (const deletedId of idsToDelete) {
+        onP2PDelete(deletedId);
+      }
     }
   },
 

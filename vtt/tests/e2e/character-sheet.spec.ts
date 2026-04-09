@@ -16,20 +16,17 @@ async function createAndStartGame(page: Page) {
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 5000 });
 }
 
-/** Open Library tab, click "+ New Sheet", fill in name, select Blank template, create, wait for sheet modal. */
-async function openNewSheetModal(page: Page, name?: string) {
+/** Open Library tab, click "+ New Sheet", wait for editor with h1, optionally type a name. */
+async function openNewSheet(page: Page, name?: string) {
   await page.getByRole('tab', { name: /Library/i }).click();
   await page.getByRole('button', { name: /New Sheet/i }).click();
-  // New sheet creation modal appears
-  const createModal = page.locator('.mantine-Modal-content').last();
-  await expect(createModal.getByLabel('Name')).toBeVisible({ timeout: 5000 });
-  await createModal.getByLabel('Name').fill(name || 'Test Sheet');
-  // Select Blank template so the editor starts empty
-  await createModal.getByLabel('Template').click();
-  await page.getByRole('option', { name: 'Blank' }).click();
-  await createModal.getByRole('button', { name: /Create$/i }).click();
-  // Sheet editor modal opens automatically after creation
-  await expect(page.getByPlaceholder('Untitled Sheet')).toBeVisible({ timeout: 5000 });
+  // Editor opens directly with an empty h1
+  await expect(page.locator('.tiptap h1')).toBeVisible({ timeout: 5000 });
+  if (name) {
+    await page.locator('.tiptap h1').click();
+    await page.keyboard.type(name);
+    await page.keyboard.press('Enter');
+  }
 }
 
 /** Shorthand: the TipTap editor element inside the character sheet modal. */
@@ -52,7 +49,7 @@ async function saveSheet(page: Page) {
   await page.waitForTimeout(400);
   const saveBtn = page.locator('.sheet-modal__footer').getByRole('button', { name: /Create Sheet|Save Changes/i });
   await saveBtn.click();
-  await expect(page.getByPlaceholder('Untitled Sheet')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.sheet-modal')).not.toBeVisible({ timeout: 5000 });
 }
 
 /** Scroll to find a sheet in the library and click it to open. */
@@ -63,21 +60,27 @@ async function editSheetFromLibrary(page: Page, name: string) {
   // Click the sheet row to open it
   const sheetCard = page.locator('[class*="mantine-Paper"]', { hasText: name });
   await sheetCard.click();
-  await expect(page.getByPlaceholder('Untitled Sheet')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.tiptap')).toBeVisible({ timeout: 5000 });
 }
 
-/** Copy all editor content, paste into title input, return as plain text. */
+/** Copy all editor content into a temp textarea and return as plain text. */
 async function getEditorTextViaCopy(page: Page): Promise<string> {
+  // Inject a hidden textarea to paste into
+  await page.evaluate(() => {
+    const ta = document.createElement('textarea');
+    ta.id = '__copy_target';
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+  });
   await editor(page).click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+c');
-  const titleInput = page.getByPlaceholder('Untitled Sheet');
-  await titleInput.click();
-  await page.keyboard.press('Control+a');
+  const ta = page.locator('#__copy_target');
+  await ta.focus();
   await page.keyboard.press('Control+v');
-  const text = await titleInput.inputValue();
-  // Restore the title
-  await page.keyboard.press('Control+z');
+  const text = await ta.inputValue();
+  await page.evaluate(() => document.getElementById('__copy_target')?.remove());
   return text;
 }
 
@@ -125,15 +128,12 @@ test.describe('Character Sheet', () => {
     // This test builds a realistic character sheet using typed DSL syntax,
     // verifying each widget type renders correctly and content persists.
 
-    await openNewSheetModal(page, 'Thorin Ironfist');
+    await openNewSheet(page, 'Thorin Ironfist');
 
     const ed = editor(page);
     await ed.click();
 
-    // -- Heading --
-    // Type a heading (## triggers H2 in TipTap markdown shortcuts)
-    await page.keyboard.type('# Thorin Ironfist');
-    await page.keyboard.press('Enter');
+    // h1 already has "Thorin Ironfist" from openNewSheet — continue with subtext
     await page.keyboard.type('Level 5 Dwarf Fighter');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
@@ -213,14 +213,12 @@ test.describe('Character Sheet', () => {
     // Creates a character purely via the / command palette, saves it,
     // reopens it, and verifies all widgets survived the round-trip.
 
-    await openNewSheetModal(page, 'Elara the Mage');
+    await openNewSheet(page, 'Elara the Mage');
 
     const ed = editor(page);
     await ed.click();
 
-    // Type a heading
-    await page.keyboard.type('# Elara the Mage');
-    await page.keyboard.press('Enter');
+    // h1 already has "Elara the Mage" from openNewSheet — continue
     await page.keyboard.press('Enter');
 
     // Insert HP stat via command palette
@@ -262,7 +260,7 @@ test.describe('Character Sheet', () => {
     // -- Reopen and verify everything survived --
     await editSheetFromLibrary(page, 'Elara the Mage');
 
-    await expect(page.getByPlaceholder('Untitled Sheet')).toHaveValue('Elara the Mage');
+    await expect(page.locator('.tiptap h1')).toContainText('Elara the Mage');
     await expect(page.getByRole('button', { name: /Save Changes/i })).toBeVisible();
 
     // All widgets should still be rendered
@@ -280,7 +278,7 @@ test.describe('Character Sheet', () => {
     // Insert one of each widget, copy, paste into plain text input,
     // verify the DSL source syntax comes through (not rendered DOM text).
 
-    await openNewSheetModal(page);
+    await openNewSheet(page);
     const ed = editor(page);
     await ed.click();
 
@@ -315,7 +313,7 @@ test.describe('Character Sheet', () => {
     // Tests the real UX: multiple widgets left-to-right on the same line,
     // with text labels between them — the dense stat-block layout.
 
-    await openNewSheetModal(page, 'Inline Test');
+    await openNewSheet(page, 'Inline Test');
 
     const ed = editor(page);
     await ed.click();
@@ -405,16 +403,12 @@ test.describe('Character Sheet', () => {
     // lines. Tests that formatting shortcuts don't break widget rendering
     // and vice versa, and everything survives save/load.
 
-    await openNewSheetModal(page, 'Vex the Warlock');
+    await openNewSheet(page, 'Vex the Warlock');
 
     const ed = editor(page);
     await ed.click();
 
-    // -- Heading with TipTap markdown shortcut --
-    await page.keyboard.type('# Vex the Warlock');
-    await page.keyboard.press('Enter');
-
-    // Subheading
+    // h1 already has "Vex the Warlock" from openNewSheet — add subheading
     await page.keyboard.type('## Ability Scores');
     await page.keyboard.press('Enter');
 
@@ -536,7 +530,7 @@ test.describe('Character Sheet', () => {
   test('command palette: open, filter, navigate, insert, and resume typing', async ({ page }) => {
     // Comprehensive command palette test covering the full interaction cycle.
 
-    await openNewSheetModal(page);
+    await openNewSheet(page);
     const ed = editor(page);
     await ed.click();
 
@@ -579,7 +573,7 @@ test.describe('Character Sheet', () => {
   });
 
   test('action button: hover to reveal edit trigger, edit label and formula', async ({ page }) => {
-    await openNewSheetModal(page);
+    await openNewSheet(page);
     const ed = editor(page);
     await ed.click();
 
@@ -607,7 +601,7 @@ test.describe('Character Sheet', () => {
   });
 
   test('delete character with confirmation', async ({ page }) => {
-    await openNewSheetModal(page, 'Doomed Hero');
+    await openNewSheet(page, 'Doomed Hero');
     const ed = editor(page);
     await ed.click();
     await page.keyboard.type('This character will be deleted.');
@@ -628,7 +622,7 @@ test.describe('Character Sheet', () => {
     await page.locator('.sheet-modal__footer').getByRole('button', { name: /Delete/i }).click();
     await page.locator('.mantine-Modal-content').last().getByRole('button', { name: /Delete/i }).click();
 
-    await expect(page.getByPlaceholder('Untitled Sheet')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.sheet-modal')).not.toBeVisible({ timeout: 3000 });
     // Character should be gone from library
     await expect(page.getByText('Doomed Hero')).not.toBeVisible({ timeout: 2000 });
   });
@@ -661,7 +655,7 @@ test.describe('Character Sheet — Float Mode', () => {
 
   test('float and interact with editor', async ({ page }) => {
     test.slow(); // this test does several mode switches
-    await openNewSheetModal(page, 'Float Test');
+    await openNewSheet(page, 'Float Test');
 
     // Switch to floating
     await floatCharacterSheet(page);
@@ -694,7 +688,7 @@ test.describe('Character Sheet — Float Mode', () => {
   });
 
   test('float preserves content on mode switch', async ({ page }) => {
-    await openNewSheetModal(page, 'Mode Switch');
+    await openNewSheet(page, 'Mode Switch');
 
     // Type content in modal
     const ed = editor(page);
@@ -720,7 +714,7 @@ test.describe('Character Sheet — Float Mode', () => {
   });
 
   test('float panel is rendered with position and resize handle', async ({ page }) => {
-    await openNewSheetModal(page);
+    await openNewSheet(page);
     await floatCharacterSheet(page);
 
     const panel = page.locator('.floating-panel');
@@ -750,7 +744,7 @@ test.describe('Character Sheet — Window Mode', () => {
   });
 
   test('pop out to window and interact', async ({ page }) => {
-    await openNewSheetModal(page, 'Window Test');
+    await openNewSheet(page, 'Window Test');
 
     // Type some content first
     const ed = editor(page);
@@ -807,7 +801,7 @@ test.describe('Character Sheet — Window Mode', () => {
   });
 
   test('closing popup window resets to modal-ready state', async ({ page }) => {
-    await openNewSheetModal(page);
+    await openNewSheet(page);
 
     // Pop out to window
     const popupPromise = page.waitForEvent('popup', { timeout: 5000 });
@@ -838,7 +832,7 @@ test.describe('Character Sheet — Window Mode', () => {
     await page.waitForTimeout(200);
 
     // Opening a new character should work in modal mode
-    await openNewSheetModal(page);
+    await openNewSheet(page);
     await expect(page.locator('.sheet-modal')).toBeVisible({ timeout: 3000 });
   });
 });
@@ -853,7 +847,7 @@ test.describe('Character Sheet — Cross-Mode', () => {
   });
 
   test('mode switch round-trip preserves widgets', async ({ page }) => {
-    await openNewSheetModal(page, 'Round Trip');
+    await openNewSheet(page, 'Round Trip');
 
     // Build content in modal
     const ed = editor(page);

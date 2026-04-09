@@ -1,7 +1,8 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { DOMSerializer } from '@tiptap/pm/model';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -21,6 +22,7 @@ import {
   IconFileImport,
   IconSquarePlus,
   IconNote,
+  IconTemplate,
 } from '@tabler/icons-react';
 import { StatDeclaration } from './extensions/StatDeclaration';
 import { Expression } from './extensions/Expression';
@@ -29,6 +31,7 @@ import { BarWidget } from './extensions/BarWidget';
 import { DotsWidget } from './extensions/DotsWidget';
 import { Transclusion } from './extensions/Transclusion';
 import { parseShadowState, type ShadowState } from '../../services/shadowStateService';
+import { getAllTemplates } from '../../services/sheetTemplates';
 import { ShadowStateContext } from './extensions/ShadowStateContext';
 import { BubbleToolbar } from './BubbleToolbar';
 import { FloatingInsertMenu } from './FloatingInsertMenu';
@@ -49,7 +52,7 @@ interface CommandItem {
   hint?: string;
   icon: React.ReactNode;
   action: () => void;
-  category: 'stats' | 'widgets' | 'actions' | 'utility';
+  category: 'stats' | 'widgets' | 'actions' | 'utility' | 'templates';
 }
 
 export function SheetEditor({
@@ -122,6 +125,24 @@ export function SheetEditor({
     return content;
   });
 
+  // Enforce that the first block in the document is always an h1
+  const EnforceH1FirstBlock = useMemo(() => Extension.create({
+    name: 'enforceH1FirstBlock',
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey('enforceH1FirstBlock'),
+          appendTransaction(_transactions, _oldState, newState) {
+            const first = newState.doc.firstChild;
+            if (!first) return null;
+            if (first.type.name === 'heading' && first.attrs.level === 1) return null;
+            return newState.tr.setNodeMarkup(0, newState.schema.nodes.heading, { level: 1 });
+          },
+        }),
+      ];
+    },
+  }), []);
+
   // Memoize extensions to avoid TipTap view recreation on re-render
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const extensions = useMemo(() => [
@@ -147,7 +168,8 @@ export function SheetEditor({
     Transclusion.configure({
       HTMLAttributes: { class: 'transclusion-node' },
     }),
-  ], []);
+    EnforceH1FirstBlock,
+  ], [EnforceH1FirstBlock]);
 
   const editor = useEditor({
     extensions,
@@ -405,6 +427,28 @@ export function SheetEditor({
     // Utility
     { label: 'Import Markdown', description: 'Paste markdown to import', icon: <IconFileImport size={iconSize} />, category: 'utility', action: () => { setShowCommandPalette(false); setShowMarkdownImport(true); } },
     { label: 'Snippet', description: 'Embed a snippet from library', hint: '[[SnippetName]]', icon: <IconNote size={iconSize} />, category: 'utility', action: () => { /* TODO: open snippet picker */ } },
+
+    // Templates
+    ...getAllTemplates()
+      .filter(t => t.id !== 'blank')
+      .map(t => ({
+        label: t.name,
+        description: t.description,
+        icon: <IconTemplate size={iconSize} />,
+        category: 'templates' as const,
+        action: () => {
+          if (!editor) return;
+          try {
+            const doc = JSON.parse(t.content);
+            editor.commands.setContent(doc);
+            const json = JSON.stringify(editor.getJSON());
+            const result = parseShadowState(JSON.parse(json));
+            onChangeRef.current(json, result);
+          } catch (e) {
+            console.error('Failed to apply template:', e);
+          }
+        },
+      })),
   ];
 
   const filteredCommands = commandItems.filter(cmd => {
@@ -416,12 +460,13 @@ export function SheetEditor({
   });
 
   // Group filtered commands by category
-  const categoryOrder: CommandItem['category'][] = ['stats', 'widgets', 'actions', 'utility'];
+  const categoryOrder: CommandItem['category'][] = ['stats', 'widgets', 'actions', 'utility', 'templates'];
   const categoryLabels: Record<string, string> = {
     stats: 'Stats',
     widgets: 'Widgets',
     actions: 'Actions',
     utility: 'Utility',
+    templates: 'Templates',
   };
 
   const groupedCommands: { category: string; label: string; items: CommandItem[] }[] = [];
