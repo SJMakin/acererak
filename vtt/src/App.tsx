@@ -13,7 +13,7 @@ import GMDisconnectModal from './components/GMDisconnectModal';
 import { SheetModal } from './components/character/SheetModal';
 
 function App() {
-  const { game, performUndo, performRedo, selectElement, selectedElementId, selectedTool } = useGameStore();
+  const { game, performUndo, performRedo, selectElement, selectedTool } = useGameStore();
   const room = useRoom();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -38,11 +38,8 @@ function App() {
       performRedo();
       room.broadcastSync();
     },
-    onDelete: () => {
-      // Broadcast deletion to other players
-      if (selectedElementId) {
-        room.broadcastElementDelete(selectedElementId);
-      }
+    onDelete: (deletedIds) => {
+      deletedIds.forEach((id) => room.broadcastElementDelete(id));
     },
     onSave: () => {
       // Save notification could be added here
@@ -64,8 +61,12 @@ function App() {
   // Expose test hooks in dev mode for e2e tests
   useEffect(() => {
     if (import.meta.env.DEV) {
-      (window as any).__testGameStore = useGameStore;
-      (window as any).__testGetRoomState = () => room;
+      const testWindow = window as unknown as {
+        __testGameStore?: typeof useGameStore;
+        __testGetRoomState?: () => typeof room;
+      };
+      testWindow.__testGameStore = useGameStore;
+      testWindow.__testGetRoomState = () => room;
     }
   });
 

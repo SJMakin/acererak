@@ -81,6 +81,25 @@ function updateActiveScene(game: GameState, sceneUpdates: Partial<Scene>): GameS
   };
 }
 
+function applyHistoryPatch(game: GameState, patch: Partial<GameState>): GameState {
+  const { elements, fogOfWar, ...gamePatch } = patch;
+  let updatedGame: GameState = {
+    ...game,
+    ...gamePatch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const sceneUpdates: Partial<Scene> = {};
+  if (elements) sceneUpdates.elements = elements;
+  if (fogOfWar) sceneUpdates.fogOfWar = fogOfWar;
+
+  if (Object.keys(sceneUpdates).length > 0) {
+    updatedGame = updateActiveScene(updatedGame, sceneUpdates);
+  }
+
+  return updatedGame;
+}
+
 // Helper to create a default scene
 function createDefaultScene(name: string, settings: Settings): Scene {
   const now = new Date().toISOString();
@@ -462,6 +481,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       // Build map of updates for efficient lookup
       const updateMap = new Map(updates.map(u => [u.id, u.updates]));
+      const updatedElements = activeScene.elements.map((el) => {
+        const elUpdates = updateMap.get(el.id);
+        return elUpdates
+          ? { ...el, ...elUpdates, version: (el.version || 0) + 1 } as CanvasElement
+          : el;
+      });
 
       // Track action in history
       const hasPositionUpdates = updates.some(u => u.updates.x !== undefined || u.updates.y !== undefined);
@@ -471,21 +496,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
           type: 'move',
           timestamp: Date.now(),
           before: { elements: activeScene.elements },
-          after: {
-            elements: activeScene.elements.map((el) => {
-              const elUpdates = updateMap.get(el.id);
-              return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
-            })
-          },
+          after: { elements: updatedElements },
           description: `Moved ${updates.length} element${updates.length > 1 ? 's' : ''}`,
         });
       }
 
       const updatedGame = updateActiveScene(state.game, {
-        elements: activeScene.elements.map((el) => {
-          const elUpdates = updateMap.get(el.id);
-          return elUpdates ? { ...el, ...elUpdates } as CanvasElement : el;
-        }),
+        elements: updatedElements,
       });
       debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame };
@@ -1293,11 +1310,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Apply the before state
     set({
-      game: {
-        ...state.game,
-        ...action.before,
-        updatedAt: new Date().toISOString(),
-      },
+      game: applyHistoryPatch(state.game, action.before),
     });
   },
 
@@ -1310,11 +1323,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Apply the after state
     set({
-      game: {
-        ...state.game,
-        ...action.after,
-        updatedAt: new Date().toISOString(),
-      },
+      game: applyHistoryPatch(state.game, action.after),
     });
   },
 

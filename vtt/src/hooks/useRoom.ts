@@ -45,32 +45,52 @@ function collectImageIds(game: GameState): Set<string> {
   return ids;
 }
 
-// Simple hash function for state comparison
+// Stable hash for visible shared state comparison. Omit timestamps and local-only
+// cursor data so equivalent states do not report false desyncs.
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    const record = value as Record<string, unknown>;
+    for (const key of Object.keys(record).sort()) {
+      result[key] = canonicalize(record[key]);
+    }
+    return result;
+  }
+
+  return value;
+}
+
 function hashGameState(game: GameState): string {
-  // Get active scene for per-scene data
-  const activeScene = getActiveScene(game);
+  const players = Object.values(game.players)
+    .map(({ id, name, color, isGM, controlledTokens }) => ({
+      id,
+      name,
+      color,
+      isGM,
+      controlledTokens: [...controlledTokens].sort(),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 
-  const elementSignatures = activeScene
-    ? activeScene.elements
-        .map((el) => ({
-          id: el.id,
-          version: el.version ?? 0,
-          x: Math.round(el.x),
-          y: Math.round(el.y),
-        }))
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    : [];
+  const scenes = game.scenes.map((scene) => ({
+    id: scene.id,
+    name: scene.name,
+    backgroundUrl: scene.backgroundUrl,
+    backgroundImageId: scene.backgroundImageId,
+    gridSettings: scene.gridSettings,
+    elements: scene.elements,
+    fogOfWar: scene.fogOfWar,
+  }));
 
-  const stateStr = JSON.stringify({
+  const stateStr = JSON.stringify(canonicalize({
     activeSceneId: game.activeSceneId,
-    sceneCount: game.scenes.length,
-    elementCount: elementSignatures.length,
-    elementSignatures,
-    fogEnabled: activeScene?.fogOfWar.enabled || false,
-    fogRevealedCount: activeScene?.fogOfWar.revealed.length || 0,
-    combatRound: game.combat?.round,
-    combatTurn: game.combat?.currentTurn,
-  });
+    scenes,
+    players,
+    combat: game.combat ?? null,
+  }));
 
   // Simple djb2 hash
   let hash = 5381;
@@ -123,6 +143,7 @@ const unreliableRtcConfig: TrysteroRtcConfig = {
 };
 
 const PRESENCE_ROOM_SUFFIX = ':presence';
+const AUTO_RESYNC_COOLDOWN_MS = 30_000;
 
 // Trystero room configuration
 interface RoomConfig {
@@ -211,6 +232,9 @@ export function useRoom() {
 
   // Pending AI request promises (player side)
   const pendingAIRequestsRef = useRef<Map<string, { resolve: (res: AIResponse) => void; reject: (err: Error) => void }>>(new Map());
+  const gmPeerIdRef = useRef<string | null>(null);
+  const peerPlayerIdsRef = useRef<Map<string, string>>(new Map());
+  const lastAutoSyncAtRef = useRef(0);
 
   const presenceActionsRef = useRef<{
     sendCursor?: ActionSender<Point>;
@@ -218,7 +242,6 @@ export function useRoom() {
   }>({});
 
   const {
-    game,
     loadGame,
     addOrUpdateElement,
     deleteElement,
@@ -246,9 +269,12 @@ export function useRoom() {
       isHost: true,
       connectionState: 'connecting',
       error: null,
-      gmPeerId: myPeerId,
+      gmPeerId: null,
       gmDisconnected: false,
     }));
+    gmPeerIdRef.current = null;
+    peerPlayerIdsRef.current.clear();
+    lastAutoSyncAtRef.current = 0;
 
     // Start async loading
     (async () => {
@@ -302,7 +328,12 @@ export function useRoom() {
       isHost: false,
       connectionState: 'connecting',
       error: null,
+      gmPeerId: null,
+      gmDisconnected: false,
     }));
+    gmPeerIdRef.current = null;
+    peerPlayerIdsRef.current.clear();
+    lastAutoSyncAtRef.current = 0;
 
     // Start async loading
     (async () => {
@@ -514,10 +545,12 @@ export function useRoom() {
       console.log('Peer left:', peerId);
       syncedPeers.delete(peerId);
 
-      // Check if the GM disconnected
-      const game = useGameStore.getState().game;
-      const gmPeerId = game?.gmPeerId;
-      const isGMLeaving = gmPeerId && peerId === gmPeerId;
+      const isGMLeaving = !isHost && gmPeerIdRef.current === peerId;
+      if (isGMLeaving) {
+        gmPeerIdRef.current = null;
+      }
+      const playerId = peerPlayerIdsRef.current.get(peerId) || peerId;
+      peerPlayerIdsRef.current.delete(peerId);
 
       setRoomState((prev) => ({
         ...prev,
@@ -534,11 +567,32 @@ export function useRoom() {
         });
       }
 
-      removePlayer(peerId);
+      removePlayer(playerId);
+      if (isHost) {
+        const currentGame = useGameStore.getState().game;
+        if (currentGame) {
+          sendSync({
+            ...currentGame,
+            sheets: useSheetStore.getState().sheets,
+          });
+        }
+      }
     });
 
     // Handle incoming data
     onSync((gameState: GameState, peerId: string) => {
+      if (isHost) {
+        console.warn('Ignoring full sync from non-authoritative peer:', peerId);
+        return;
+      }
+
+      const trustedGmPeerId = gmPeerIdRef.current;
+      if (trustedGmPeerId && peerId !== trustedGmPeerId) {
+        console.warn('Ignoring full sync from untrusted peer:', peerId);
+        return;
+      }
+
+      gmPeerIdRef.current = peerId;
       console.log('Received sync from:', peerId, 'Game:', gameState?.name);
       loadGame(gameState);
       if (gameState.sheets) {
@@ -548,8 +602,10 @@ export function useRoom() {
       setRoomState(prev => ({
         ...prev,
         lastSyncedAt: Date.now(),
-        gmPeerId: gameState.gmPeerId || peerId,
+        gmPeerId: peerId,
+        gmDisconnected: false,
         connectionState: 'connected',
+        isDesynced: false,
       }));
       console.log('Game loaded, should now show canvas');
     });
@@ -560,11 +616,21 @@ export function useRoom() {
     });
 
     onElementDelete((elementId: string, _peerId: string) => {
-      deleteElement(elementId);
+      deleteElement(elementId, true);
     });
 
-    onPlayerJoin((player: Player, _peerId: string) => {
+    onPlayerJoin((player: Player, peerId: string) => {
+      peerPlayerIdsRef.current.set(peerId, player.id);
       addPlayer(player);
+      if (isHost) {
+        const currentGame = useGameStore.getState().game;
+        if (currentGame) {
+          sendSync({
+            ...currentGame,
+            sheets: useSheetStore.getState().sheets,
+          });
+        }
+      }
       notifications.show({
         title: 'Player Joined',
         message: `${player.name} has joined the game`,
@@ -578,6 +644,21 @@ export function useRoom() {
       const player = useGameStore.getState().game?.players[playerId];
       const playerName = player?.name || 'Unknown player';
       removePlayer(playerId);
+      for (const [transportPeerId, mappedPlayerId] of peerPlayerIdsRef.current.entries()) {
+        if (mappedPlayerId === playerId) {
+          peerPlayerIdsRef.current.delete(transportPeerId);
+          break;
+        }
+      }
+      if (isHost) {
+        const currentGame = useGameStore.getState().game;
+        if (currentGame) {
+          sendSync({
+            ...currentGame,
+            sheets: useSheetStore.getState().sheets,
+          });
+        }
+      }
       notifications.show({
         title: 'Player Left',
         message: `${playerName} has left the game`,
@@ -691,11 +772,20 @@ export function useRoom() {
       // Only flag desync after 2 consecutive mismatches (20s of sustained mismatch)
       const isDesynced = consecutiveMismatches >= 2;
 
+      if (isDesynced && actionsRef.current.sendRequestSync) {
+        const now = Date.now();
+        if (now - lastAutoSyncAtRef.current >= AUTO_RESYNC_COOLDOWN_MS) {
+          lastAutoSyncAtRef.current = now;
+          actionsRef.current.sendRequestSync(null);
+        }
+      }
+
       setRoomState(prev => ({
         ...prev,
         localHash,
         gmHash,
         isDesynced,
+        connectionState: isDesynced ? 'syncing' : prev.connectionState,
       }));
     });
 
@@ -849,10 +939,9 @@ export function useRoom() {
 
     // Handle AI capabilities broadcast (GM → all, players only accept from known GM)
     onAICap((capabilities: AICapabilities, peerId: string) => {
-      // Only accept capabilities from the GM peer (prevent spoofing by other players)
-      const currentGame = useGameStore.getState().game;
-      const gmPeerId = currentGame?.gmPeerId;
-      if (gmPeerId && peerId !== gmPeerId) {
+      // Only accept capabilities from the trusted GM transport peer.
+      const trustedGmPeerId = gmPeerIdRef.current;
+      if (trustedGmPeerId && peerId !== trustedGmPeerId) {
         console.warn('Ignoring AI capabilities from non-GM peer:', peerId);
         return;
       }
@@ -1004,13 +1093,14 @@ export function useRoom() {
   }, []);
 
   const broadcastSync = useCallback(() => {
-    if (actionsRef.current.sendSync && game) {
+    const currentGame = useGameStore.getState().game;
+    if (actionsRef.current.sendSync && currentGame && roomState.isHost) {
       actionsRef.current.sendSync({
-        ...game,
+        ...currentGame,
         sheets: useSheetStore.getState().sheets,
       });
     }
-  }, [game]);
+  }, [roomState.isHost]);
 
   const broadcastFogUpdate = useCallback((fogOfWar: { enabled: boolean; revealed: Point[][] }) => {
     if (actionsRef.current.sendFogUpdate) {
@@ -1168,6 +1258,9 @@ export function useRoom() {
       presenceRoomRef.current.leave();
       presenceRoomRef.current = null;
     }
+    gmPeerIdRef.current = null;
+    peerPlayerIdsRef.current.clear();
+    lastAutoSyncAtRef.current = 0;
     presenceActionsRef.current = {};
     setImageMissingCallback(null);
     setRoomState({

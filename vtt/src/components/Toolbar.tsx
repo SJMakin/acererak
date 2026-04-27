@@ -226,6 +226,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
       const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
       if (newScene) {
         room.broadcastSceneUpdate(newScene);
+        room.broadcastSceneSwitch(newSceneId);
       }
     }
     
@@ -236,6 +237,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
   // Handle scene manager actions
   const handleDeleteScene = (sceneId: string) => {
     useGameStore.getState().deleteScene(sceneId);
+    room.broadcastSync();
     setSceneManagerOpened(false);
   };
 
@@ -326,7 +328,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                       onClick={() => {
                         if (activeScene) {
                           const newSceneId = useGameStore.getState().duplicateScene(activeScene.id);
-                          const newScene = game.scenes.find(s => s.id === newSceneId);
+                          const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
                           if (newScene) {
                             room.broadcastSceneUpdate(newScene);
                           }
@@ -381,7 +383,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                   performUndo();
                   room.broadcastSync();
                 }}
-                disabled={!canUndo()}
+                disabled={!isGM || !canUndo()}
               >
                 ↶
               </ActionIcon>
@@ -394,7 +396,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                   performRedo();
                   room.broadcastSync();
                 }}
-                disabled={!canRedo()}
+                disabled={!isGM || !canRedo()}
               >
                 ↷
               </ActionIcon>
@@ -823,7 +825,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                   onClick={() => {
                     if (activeScene) {
                       const newSceneId = useGameStore.getState().duplicateScene(activeScene.id);
-                      const newScene = game.scenes.find(s => s.id === newSceneId);
+                      const newScene = useGameStore.getState().game?.scenes.find(s => s.id === newSceneId);
                       if (newScene) {
                         room.broadcastSceneUpdate(newScene);
                       }
@@ -868,7 +870,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                 performUndo();
                 room.broadcastSync();
               }}
-              disabled={!canUndo()}
+              disabled={!isGM || !canUndo()}
             >
               ↶
             </ActionIcon>
@@ -881,7 +883,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                 performRedo();
                 room.broadcastSync();
               }}
-              disabled={!canRedo()}
+              disabled={!isGM || !canRedo()}
             >
               ↷
             </ActionIcon>

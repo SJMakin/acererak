@@ -733,9 +733,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           hideFog(points);
         }
         
-        // Broadcast fog update
-        if (room.broadcastFogUpdate && activeScene?.fogOfWar) {
-          room.broadcastFogUpdate(activeScene.fogOfWar);
+        // Broadcast fresh fog state after the local store update.
+        if (room.broadcastFogUpdate) {
+          const freshGame = useGameStore.getState().game;
+          const freshScene = freshGame?.scenes.find(s => s.id === freshGame.activeSceneId) || freshGame?.scenes[0];
+          if (freshScene?.fogOfWar) {
+            room.broadcastFogUpdate(freshScene.fogOfWar);
+          }
         }
       } else {
         // Use shape creators for all drawing tools

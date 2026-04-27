@@ -7,7 +7,7 @@ import { saveGame } from '../db/database';
 interface UseKeyboardShortcutsOptions {
   onUndo?: () => void;
   onRedo?: () => void;
-  onDelete?: () => void;
+  onDelete?: (deletedIds: string[]) => void;
   onSave?: () => void;
   onEscape?: () => void;
   onCopy?: () => void;
@@ -27,7 +27,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     game,
     isGM,
   } = useGameStore();
-  const { undo, redo, canUndo, canRedo } = useHistoryStore();
+  const { canUndo, canRedo } = useHistoryStore();
   const spacePressed = useRef(false);
   const previousTool = useRef<ToolType>('select');
 
@@ -71,11 +71,8 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     // Handle Ctrl+Z for undo
     if (ctrl && key === 'z' && !e.shiftKey) {
       e.preventDefault();
-      if (canUndo()) {
-        const action = undo();
-        if (action && options.onUndo) {
-          options.onUndo();
-        }
+      if (isGM && canUndo() && options.onUndo) {
+        options.onUndo();
       }
       return;
     }
@@ -83,11 +80,8 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     // Handle Ctrl+Y or Ctrl+Shift+Z for redo
     if ((ctrl && key === 'y') || (ctrl && e.shiftKey && key === 'z')) {
       e.preventDefault();
-      if (canRedo()) {
-        const action = redo();
-        if (action && options.onRedo) {
-          options.onRedo();
-        }
+      if (isGM && canRedo() && options.onRedo) {
+        options.onRedo();
       }
       return;
     }
@@ -109,6 +103,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     // Handle Delete key - delete all selected elements
     if (key === 'delete' && selectedElementIds.length > 0) {
       e.preventDefault();
+      const deletedIds = [...selectedElementIds];
       if (selectedElementIds.length > 1) {
         deleteElements(selectedElementIds);
       } else if (selectedElementId) {
@@ -116,7 +111,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       }
       clearSelection();
       if (options.onDelete) {
-        options.onDelete();
+        options.onDelete(deletedIds);
       }
       return;
     }
@@ -194,8 +189,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     clearSelection,
     game,
     isGM,
-    undo,
-    redo,
     canUndo,
     canRedo,
     options,
