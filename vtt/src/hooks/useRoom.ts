@@ -81,9 +81,14 @@ function hashGameState(game: GameState): string {
     backgroundUrl: scene.backgroundUrl,
     backgroundImageId: scene.backgroundImageId,
     gridSettings: scene.gridSettings,
-    elements: scene.elements,
-    fogOfWar: scene.fogOfWar,
-  }));
+    elements: [...scene.elements].sort((a, b) => a.id.localeCompare(b.id)),
+    fogOfWar: {
+      enabled: scene.fogOfWar.enabled,
+      revealed: scene.fogOfWar.revealed
+        .map((polygon) => [...polygon])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    },
+  })).sort((a, b) => a.id.localeCompare(b.id));
 
   const stateStr = JSON.stringify(canonicalize({
     activeSceneId: game.activeSceneId,
@@ -481,6 +486,10 @@ export function useRoom() {
 
     // Track peers we've already synced to avoid duplicate onPeerJoin from trystero renegotiation
     const syncedPeers = new Set<string>();
+    const isFromTrustedGM = (peerId: string) => {
+      const trustedGmPeerId = gmPeerIdRef.current;
+      return Boolean(trustedGmPeerId && peerId === trustedGmPeerId);
+    };
 
     // Handle peer events
     const peerJoinHandler = (peerId: string) => {
@@ -610,13 +619,27 @@ export function useRoom() {
       console.log('Game loaded, should now show canvas');
     });
 
-    onElementUpdate((element: CanvasElement, _peerId: string) => {
+    onElementUpdate((element: CanvasElement, peerId: string) => {
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring element update from non-GM peer:', peerId);
+        return;
+      }
       // Use addOrUpdateElement to preserve incoming IDs (fixes duplication bug)
       addOrUpdateElement(element, true); // skipHistory = true for P2P updates
+      if (isHost) {
+        sendElementUpdate(element);
+      }
     });
 
-    onElementDelete((elementId: string, _peerId: string) => {
+    onElementDelete((elementId: string, peerId: string) => {
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring element delete from non-GM peer:', peerId);
+        return;
+      }
       deleteElement(elementId, true);
+      if (isHost) {
+        sendElementDelete(elementId);
+      }
     });
 
     onPlayerJoin((player: Player, peerId: string) => {
@@ -683,6 +706,10 @@ export function useRoom() {
 
     onFogUpdate((fogOfWar: { enabled?: boolean; revealed?: Point[][] }, peerId: string) => {
       console.log('Received fog update from:', peerId);
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring fog update from non-GM peer:', peerId);
+        return;
+      }
 
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
@@ -714,6 +741,12 @@ export function useRoom() {
           updatedAt: new Date().toISOString(),
         },
       });
+      if (isHost) {
+        sendFogUpdate({
+          enabled: fogOfWar.enabled ?? activeScene.fogOfWar.enabled,
+          revealed: fogOfWar.revealed ?? activeScene.fogOfWar.revealed,
+        });
+      }
     });
 
     // Handle incoming chat messages (including roll-type messages)
@@ -792,6 +825,10 @@ export function useRoom() {
     // Handle grid settings update (GM only can broadcast)
     onGridUpdate((gridSettings: Partial<GridSettings>, peerId: string) => {
       console.log('Received grid update from:', peerId);
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring grid update from non-GM peer:', peerId);
+        return;
+      }
 
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
@@ -803,6 +840,10 @@ export function useRoom() {
     // Handle scene switch (GM-only action, players receive)
     onSceneSwitch((sceneId: string, peerId: string) => {
       console.log('Received scene switch from:', peerId, 'to scene:', sceneId);
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring scene switch from non-GM peer:', peerId);
+        return;
+      }
 
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
@@ -821,6 +862,10 @@ export function useRoom() {
     // Handle scene updates (new or updated scene data)
     onSceneUpdate((scene: Scene, peerId: string) => {
       console.log('Received scene update from:', peerId, 'scene:', scene.name);
+      if (!isHost && !isFromTrustedGM(peerId)) {
+        console.warn('Ignoring scene update from non-GM peer:', peerId);
+        return;
+      }
 
       const currentGame = useGameStore.getState().game;
       if (!currentGame) return;
@@ -1070,15 +1115,25 @@ export function useRoom() {
   // Broadcast element updates
   const broadcastElementUpdate = useCallback((element: CanvasElement) => {
     if (actionsRef.current.sendElementUpdate) {
-      actionsRef.current.sendElementUpdate(element);
+      const trustedGmPeerId = gmPeerIdRef.current;
+      if (!roomState.isHost && trustedGmPeerId) {
+        actionsRef.current.sendElementUpdate(element, [trustedGmPeerId]);
+      } else {
+        actionsRef.current.sendElementUpdate(element);
+      }
     }
-  }, []);
+  }, [roomState.isHost]);
 
   const broadcastElementDelete = useCallback((elementId: string) => {
     if (actionsRef.current.sendElementDelete) {
-      actionsRef.current.sendElementDelete(elementId);
+      const trustedGmPeerId = gmPeerIdRef.current;
+      if (!roomState.isHost && trustedGmPeerId) {
+        actionsRef.current.sendElementDelete(elementId, [trustedGmPeerId]);
+      } else {
+        actionsRef.current.sendElementDelete(elementId);
+      }
     }
-  }, []);
+  }, [roomState.isHost]);
 
   const broadcastCursor = useCallback((position: Point) => {
     if (presenceActionsRef.current.sendCursor) {
@@ -1104,9 +1159,14 @@ export function useRoom() {
 
   const broadcastFogUpdate = useCallback((fogOfWar: { enabled: boolean; revealed: Point[][] }) => {
     if (actionsRef.current.sendFogUpdate) {
-      actionsRef.current.sendFogUpdate(fogOfWar);
+      const trustedGmPeerId = gmPeerIdRef.current;
+      if (!roomState.isHost && trustedGmPeerId) {
+        actionsRef.current.sendFogUpdate(fogOfWar, [trustedGmPeerId]);
+      } else {
+        actionsRef.current.sendFogUpdate(fogOfWar);
+      }
     }
-  }, []);
+  }, [roomState.isHost]);
 
   // Dice rolls are now sent as chat messages
   const broadcastDiceRoll = useCallback((message: ChatMessage) => {
