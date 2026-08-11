@@ -77,20 +77,14 @@ test.describe('Game Creation Flow', () => {
   });
 
   test('should show recent games tab', async ({ page }) => {
-    // Recent games tab should be active by default
     const recentTab = page.getByRole('tab', { name: /Recent Games/i });
-    await expect(recentTab).toBeVisible();
-    
-    // Should show empty state or list of games
-    const emptyMessage = page.getByText(/No saved games yet/i);
-    const gamesList = page.locator('[role="article"]');
-    
-    // Either empty message or games list should be visible
-    try {
-      await expect(emptyMessage).toBeVisible({ timeout: 2000 });
-    } catch {
-      await expect(gamesList.first()).toBeVisible();
-    }
+    await recentTab.click();
+    await expect(recentTab).toHaveAttribute('data-active', 'true');
+
+    const recentPanel = page.getByRole('tabpanel', { name: /Recent Games/i });
+    const emptyMessage = recentPanel.getByText(/No saved games yet/i);
+    const savedGame = recentPanel.getByRole('button', { name: /Continue/i }).first();
+    await expect(emptyMessage.or(savedGame)).toBeVisible();
   });
 
   test('should populate join form from URL parameter', async ({ page }) => {

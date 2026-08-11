@@ -1,6 +1,49 @@
-import { test, expect, Browser, BrowserContext, Page } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 const BASE_URL = process.env.TEST_URL || 'http://localhost:5174';
+
+interface TestPlayer {
+  isGM: boolean;
+}
+
+interface TestGame {
+  gmPeerId?: string | null;
+  players: Record<string, TestPlayer>;
+}
+
+interface TestWindow extends Window {
+  __testGameStore: {
+    getState: () => { game: TestGame | null };
+  };
+  __testGetRoomState: () => { peers: string[]; gmPeerId: string | null };
+  __testTriggerPeerJoin?: (peerId: string) => void;
+  __testTriggerPlayerPeerJoin?: (peerId: string) => void;
+}
+
+async function waitForSinglePeer(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => (window as unknown as TestWindow).__testGetRoomState().peers.length === 1,
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
+async function getOnlyPeerId(page: Page): Promise<string> {
+  const peerId = await page.evaluate(
+    () => (window as unknown as TestWindow).__testGetRoomState().peers[0],
+  );
+  if (!peerId) {
+    throw new Error('Expected exactly one connected peer');
+  }
+  return peerId;
+}
+
+async function getNonGMPlayerCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const game = (window as unknown as TestWindow).__testGameStore.getState().game;
+    return Object.values(game?.players ?? {}).filter((player) => !player.isGM).length;
+  });
+}
 
 /**
  * E2E tests: Duplicate onPeerJoin deduplication with real state verification.
@@ -90,20 +133,18 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     await expect(playerPage.locator('canvas').first()).toBeVisible({ timeout: 90000 });
 
     // Assert via waitForFunction: __testGetRoomState().peers.length === 1
-    await gmPage.waitForFunction(
-      () => (window as any).__testGetRoomState().peers.length === 1,
-      undefined,
-      { timeout: 15000 }
-    );
+    await waitForSinglePeer(gmPage);
 
     // Assert via waitForFunction: game.players has exactly 1 non-GM entry with correct name
-    const playerCount = await gmPage.waitForFunction(() => {
-      const store = (window as any).__testGameStore.getState();
-      const players = Object.values(store.game.players) as any[];
-      const nonGMPlayers = players.filter(p => !p.isGM);
-      return nonGMPlayers.length;
-    }, undefined, { timeout: 15000 });
-    expect(await playerCount.jsonValue()).toBe(1);
+    await gmPage.waitForFunction(
+      () => {
+        const game = (window as unknown as TestWindow).__testGameStore.getState().game;
+        return Object.values(game?.players ?? {}).filter((player) => !player.isGM).length === 1;
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
+    expect(await getNonGMPlayerCount(gmPage)).toBe(1);
 
     // Assert player-side game is loaded (canvas present)
     await expect(playerPage.locator('canvas').first()).toBeVisible();
@@ -118,21 +159,15 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     await expect(playerPage.locator('canvas').first()).toBeVisible({ timeout: 90000 });
 
     // Wait for GM to see peer
-    await gmPage.waitForFunction(
-      () => (window as any).__testGetRoomState().peers.length === 1,
-      undefined,
-      { timeout: 15000 }
-    );
+    await waitForSinglePeer(gmPage);
 
     // Capture the real peerId from __testGetRoomState().peers[0]
-    const peerId = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers[0];
-    });
+    const peerId = await getOnlyPeerId(gmPage);
     expect(peerId).toBeTruthy();
 
     // Fire __testTriggerPeerJoin(peerId) 10 more times
     const fired = await gmPage.evaluate((id) => {
-      const trigger = (window as any).__testTriggerPeerJoin;
+      const trigger = (window as unknown as TestWindow).__testTriggerPeerJoin;
       if (!trigger) return { ok: false, fired: 0 };
       for (let i = 0; i < 10; i++) {
         trigger(id);
@@ -142,18 +177,13 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     expect(fired.ok).toBe(true);
 
     // Assert peers.length is still 1 via waitForFunction
-    const peerResult = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers.length;
-    });
+    const peerResult = await gmPage.evaluate(
+      () => (window as unknown as TestWindow).__testGetRoomState().peers.length,
+    );
     expect(peerResult).toBe(1);
 
     // Assert game.players non-GM count is still 1
-    const playerResult = await gmPage.evaluate(() => {
-      const store = (window as any).__testGameStore.getState();
-      const players = Object.values(store.game.players) as any[];
-      return players.filter((p: any) => !p.isGM).length;
-    });
-    expect(playerResult).toBe(1);
+    expect(await getNonGMPlayerCount(gmPage)).toBe(1);
 
     // Assert canvas visible
     await expect(gmPage.locator('canvas').first()).toBeVisible();
@@ -166,20 +196,17 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
 
     await expect(playerPage.locator('canvas').first()).toBeVisible({ timeout: 90000 });
 
-    await gmPage.waitForFunction(
-      () => (window as any).__testGetRoomState().peers.length === 1,
-      undefined,
-      { timeout: 15000 }
-    );
+    await waitForSinglePeer(gmPage);
 
-    const peerId = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers[0];
-    });
+    const peerId = await getOnlyPeerId(gmPage);
 
     // Fire 10 duplicates with 50ms setTimeout delays between each (returns a Promise)
     await gmPage.evaluate((id) => {
       return new Promise<void>((resolve) => {
-        const trigger = (window as any).__testTriggerPeerJoin;
+        const trigger = (window as unknown as TestWindow).__testTriggerPeerJoin;
+        if (!trigger) {
+          throw new Error('Peer-join test hook is unavailable');
+        }
         let count = 0;
         function fireNext() {
           if (count >= 10) {
@@ -195,18 +222,13 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     }, peerId);
 
     // Assert peers.length === 1
-    const peerResult = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers.length;
-    });
+    const peerResult = await gmPage.evaluate(
+      () => (window as unknown as TestWindow).__testGetRoomState().peers.length,
+    );
     expect(peerResult).toBe(1);
 
     // Assert game.players non-GM count is 1
-    const playerResult = await gmPage.evaluate(() => {
-      const store = (window as any).__testGameStore.getState();
-      const players = Object.values(store.game.players) as any[];
-      return players.filter((p: any) => !p.isGM).length;
-    });
-    expect(playerResult).toBe(1);
+    expect(await getNonGMPlayerCount(gmPage)).toBe(1);
   });
 
   test('Player-side duplicate peer events', async () => {
@@ -217,22 +239,20 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     await expect(playerPage.locator('canvas').first()).toBeVisible({ timeout: 90000 });
 
     // Wait for GM-side connection
-    await gmPage.waitForFunction(
-      () => (window as any).__testGetRoomState().peers.length === 1,
-      undefined,
-      { timeout: 15000 }
-    );
+    await waitForSinglePeer(gmPage);
 
     // Get the GM's peerId from player's perspective
     const gmPeerId = await playerPage.evaluate(() => {
-      const store = (window as any).__testGameStore.getState();
-      return store.game?.gmPeerId;
+      return (window as unknown as TestWindow).__testGetRoomState().gmPeerId;
     });
     expect(gmPeerId).toBeTruthy();
+    if (!gmPeerId) {
+      throw new Error('Expected the player to know the GM peer ID');
+    }
 
     // On player page, fire __testTriggerPlayerPeerJoin 10 times with the GM's peerId
     const fired = await playerPage.evaluate((id) => {
-      const trigger = (window as any).__testTriggerPlayerPeerJoin;
+      const trigger = (window as unknown as TestWindow).__testTriggerPlayerPeerJoin;
       if (!trigger) return { ok: false };
       for (let i = 0; i < 10; i++) {
         trigger(id);
@@ -241,13 +261,13 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
     }, gmPeerId);
     expect(fired.ok).toBe(true);
 
+    const playerPeerCount = await playerPage.evaluate(
+      () => (window as unknown as TestWindow).__testGetRoomState().peers.length,
+    );
+    expect(playerPeerCount).toBe(1);
+
     // Assert on GM page: game.players non-GM count is still 1
-    const playerResult = await gmPage.evaluate(() => {
-      const store = (window as any).__testGameStore.getState();
-      const players = Object.values(store.game.players) as any[];
-      return players.filter((p: any) => !p.isGM).length;
-    });
-    expect(playerResult).toBe(1);
+    expect(await getNonGMPlayerCount(gmPage)).toBe(1);
 
     // Assert on GM page: at most 1 "Player Joined" notification in DOM
     const notifications = gmPage.locator('text=Player Joined');
@@ -261,39 +281,34 @@ test.describe('Duplicate onPeerJoin deduplication', () => {
 
     await expect(playerPage.locator('canvas').first()).toBeVisible({ timeout: 90000 });
 
-    await gmPage.waitForFunction(
-      () => (window as any).__testGetRoomState().peers.length === 1,
-      undefined,
-      { timeout: 15000 }
-    );
+    await waitForSinglePeer(gmPage);
 
-    const peerId = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers[0];
-    });
+    const peerId = await getOnlyPeerId(gmPage);
 
     // Fire 100 duplicates on GM side
     await gmPage.evaluate((id) => {
-      const trigger = (window as any).__testTriggerPeerJoin;
-      if (!trigger) return;
+      const trigger = (window as unknown as TestWindow).__testTriggerPeerJoin;
+      if (!trigger) {
+        throw new Error('Peer-join test hook is unavailable');
+      }
       for (let i = 0; i < 100; i++) {
         trigger(id);
       }
     }, peerId);
 
     // Assert peers.length === 1
-    const peerResult = await gmPage.evaluate(() => {
-      return (window as any).__testGetRoomState().peers.length;
-    });
+    const peerResult = await gmPage.evaluate(
+      () => (window as unknown as TestWindow).__testGetRoomState().peers.length,
+    );
     expect(peerResult).toBe(1);
 
     // Assert canvas visible
     await expect(gmPage.locator('canvas').first()).toBeVisible();
 
     // Perform a real UI interaction (click sidebar toggle) to prove the page isn't frozen
-    const sidebarToggle = gmPage.getByRole('button', { name: /toggle sidebar/i });
-    if (await sidebarToggle.isVisible()) {
-      await sidebarToggle.click();
-    }
+    const sidebarToggle = gmPage.getByRole('button', { name: /◀|▶/ });
+    await expect(sidebarToggle).toBeVisible();
+    await sidebarToggle.click();
 
     // Assert zero page errors
     const errorCount = await gmPage.evaluate(() => {

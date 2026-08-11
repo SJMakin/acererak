@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { saveGame } from '../db/database';
 import { useHistoryStore } from './historyStore';
+import { resetSheetStoreSession, setSheetStoreGM } from './sheetStore';
 import type {
   GameState,
   CanvasElement,
@@ -22,7 +23,16 @@ import { DEFAULT_SETTINGS } from '../types';
 
 // Debounce helper
 let saveTimeout: NodeJS.Timeout | null = null;
+let gameSaveQueue: Promise<void> = Promise.resolve();
 const SAVE_DEBOUNCE_MS = 1000;
+
+function persistGame(game: GameState, isGM: boolean): Promise<void> {
+  const queuedSave = gameSaveQueue
+    .catch(() => undefined)
+    .then(() => saveGame(game, isGM));
+  gameSaveQueue = queuedSave;
+  return queuedSave;
+}
 
 function debouncedSave(game: GameState, isGM: boolean) {
   if (!isGM) return; // Only save if current user is GM
@@ -32,7 +42,8 @@ function debouncedSave(game: GameState, isGM: boolean) {
   }
 
   saveTimeout = setTimeout(() => {
-    saveGame(game, isGM).catch((err) => {
+    saveTimeout = null;
+    persistGame(game, isGM).catch((err) => {
       console.error('Failed to save game:', err);
     });
   }, SAVE_DEBOUNCE_MS);
@@ -68,6 +79,91 @@ function getActiveScene(game: GameState | null): Scene | null {
   return game.scenes.find(s => s.id === game.activeSceneId) || game.scenes[0] || null;
 }
 
+function prepareLoadedGame(game: GameState): GameState {
+  let migratedGame = game.roomId
+    ? game
+    : { ...game, roomId: nanoid(22) };
+
+  // Older saves stored a single canvas directly on the game. Materialize it as
+  // a scene before any selector assumes the multi-scene shape exists.
+  if (!Array.isArray(migratedGame.scenes) || migratedGame.scenes.length === 0) {
+    const legacyScene = createDefaultScene('Scene 1', DEFAULT_SETTINGS);
+    migratedGame = {
+      ...migratedGame,
+      scenes: [{
+        ...legacyScene,
+        gridSettings: migratedGame.gridSettings || legacyScene.gridSettings,
+        elements: migratedGame.elements || [],
+        fogOfWar: migratedGame.fogOfWar || legacyScene.fogOfWar,
+      }],
+      activeSceneId: legacyScene.id,
+    };
+  } else if (!migratedGame.scenes.some((scene) => scene.id === migratedGame.activeSceneId)) {
+    migratedGame = { ...migratedGame, activeSceneId: migratedGame.scenes[0].id };
+  }
+
+  if (!migratedGame.diceRolls?.length) return migratedGame;
+
+  const existingChat = migratedGame.chatMessages || [];
+  const existingMessageIds = new Set(existingChat.map((message) => message.id));
+  const rollMessages: ChatMessage[] = migratedGame.diceRolls
+    .filter((roll) => !existingMessageIds.has(roll.id))
+    .map((roll) => ({
+      id: roll.id,
+      playerId: roll.playerId,
+      playerName: roll.playerName,
+      playerColor: migratedGame.players[roll.playerId]?.color || '#7c3aed',
+      timestamp: roll.timestamp,
+      type: 'roll',
+      content: '',
+      isGMOnly: false,
+      formula: roll.formula,
+      result: roll.result,
+      breakdown: roll.breakdown,
+    }));
+
+  if (rollMessages.length === 0 && migratedGame.chatMessages) {
+    return migratedGame;
+  }
+
+  return {
+    ...migratedGame,
+    chatMessages: [...existingChat, ...rollMessages]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-100),
+  };
+}
+
+function claimHostIdentity(game: GameState): { game: GameState; peerId: string } {
+  const existingGM = Object.values(game.players).find((player) => player.isGM);
+  const peerId = game.gmPeerId || existingGM?.id || nanoid(10);
+  const savedHost = game.players[peerId] || existingGM;
+  const players = Object.fromEntries(
+    Object.entries(game.players).map(([id, player]) => [
+      id,
+      { ...player, isGM: id === peerId },
+    ]),
+  );
+
+  players[peerId] = {
+    id: peerId,
+    name: savedHost?.name || 'Game Master',
+    color: savedHost?.color || '#7c3aed',
+    isGM: true,
+    controlledTokens: savedHost?.controlledTokens || [],
+  };
+
+  return {
+    peerId,
+    game: {
+      ...game,
+      players,
+      gmPeerId: peerId,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+}
+
 // Helper to update the active scene in game state
 function updateActiveScene(game: GameState, sceneUpdates: Partial<Scene>): GameState {
   return {
@@ -79,6 +175,13 @@ function updateActiveScene(game: GameState, sceneUpdates: Partial<Scene>): GameS
     ),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function cancelDebouncedSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
 }
 
 function applyHistoryPatch(game: GameState, patch: Partial<GameState>): GameState {
@@ -168,8 +271,10 @@ interface GameStore {
   previewAsPlayer: boolean;
 
   // Actions - Game management
-  createGame: (name: string, playerName: string) => void;
+  createGame: (name: string, playerName: string, roomId?: string) => void;
   loadGame: (game: GameState) => void;
+  loadGameAsHost: (game: GameState) => void;
+  resetSession: () => void;
   setConnected: (connected: boolean, peerId?: string) => void;
 
   // Actions - Elements
@@ -289,7 +394,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   previewAsPlayer: false,
 
   // Game management
-  createGame: (name, playerName) => {
+  createGame: (name, playerName, roomId) => {
+    cancelDebouncedSave();
+    useHistoryStore.getState().clearHistory();
     const peerId = nanoid(10);
     const state = get();
     const now = new Date().toISOString();
@@ -300,7 +407,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const game: GameState = {
       id: nanoid(12),
       name,
-      roomId: nanoid(8),
+      roomId: roomId || nanoid(22),
       createdAt: now,
       updatedAt: now,
       // Multi-scene architecture
@@ -318,42 +425,94 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       gmPeerId: peerId,
     };
-    set({ game, myPeerId: peerId, isGM: true });
+    set({
+      game,
+      myPeerId: peerId,
+      isGM: true,
+      selectedTool: 'select',
+      selectedElementId: null,
+      selectedElementIds: [],
+      pings: [],
+      previewAsPlayer: false,
+    });
+    setSheetStoreGM(true);
     debouncedSave(game, true);
   },
 
   loadGame: (game) => {
-    // Migrate legacy saves without a roomId
-    if (!game.roomId) {
-      game = { ...game, roomId: nanoid(8) };
+    cancelDebouncedSave();
+    useHistoryStore.getState().clearHistory();
+    const state = get();
+    const loadedGame = prepareLoadedGame(game);
+
+    if (!state.isGM) {
+      setSheetStoreGM(false);
     }
 
-    // Migrate legacy diceRolls to roll-type chat messages
-    if (game.diceRolls && game.diceRolls.length > 0) {
-      const rollMessages: ChatMessage[] = game.diceRolls.map(roll => ({
-        id: roll.id,
-        playerId: roll.playerId,
-        playerName: roll.playerName,
-        playerColor: game.players[roll.playerId]?.color || '#7c3aed',
-        timestamp: roll.timestamp,
-        type: 'roll',
-        content: '',
-        isGMOnly: false,
-        formula: roll.formula,
-        result: roll.result,
-        breakdown: roll.breakdown,
-      }));
-      
-      // Merge with existing chat messages, keeping only last 100
-      const existingChat = game.chatMessages || [];
-      const allMessages = [...existingChat, ...rollMessages]
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .slice(-100);
-      
-      set({ game: { ...game, chatMessages: allMessages } });
-    } else {
-      set({ game });
+    set({
+      game: loadedGame,
+      selectedTool: 'select',
+      selectedElementId: null,
+      selectedElementIds: [],
+      pings: [],
+      previewAsPlayer: false,
+    });
+
+    debouncedSave(loadedGame, state.isGM);
+  },
+
+  loadGameAsHost: (game) => {
+    cancelDebouncedSave();
+    useHistoryStore.getState().clearHistory();
+    const claimed = claimHostIdentity(prepareLoadedGame(game));
+
+    set({
+      game: claimed.game,
+      myPeerId: claimed.peerId,
+      isGM: true,
+      selectedTool: 'select',
+      selectedElementId: null,
+      selectedElementIds: [],
+      pings: [],
+      previewAsPlayer: false,
+    });
+    setSheetStoreGM(true);
+    debouncedSave(claimed.game, true);
+  },
+
+  resetSession: () => {
+    const state = get();
+    cancelDebouncedSave();
+    if (state.game && state.isGM) {
+      const finalGame = { ...state.game, updatedAt: new Date().toISOString() };
+      void persistGame(finalGame, true).catch((err) => {
+        console.error('Failed to save game before leaving:', err);
+      });
     }
+
+    useHistoryStore.getState().clearHistory();
+    resetSheetStoreSession();
+    set({
+      game: null,
+      isConnected: false,
+      myPeerId: null,
+      isGM: false,
+      pings: [],
+      selectedTool: 'select',
+      selectedElementId: null,
+      selectedElementIds: [],
+      viewportOffset: { x: 0, y: 0 },
+      viewportScale: 1,
+      layerVisibility: {
+        grid: true,
+        map: true,
+        tokens: true,
+        drawings: true,
+        text: true,
+        fog: true,
+      },
+      previewAsPlayer: false,
+    });
   },
 
   setConnected: (connected, peerId) => {
@@ -533,10 +692,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: activeScene.elements.filter((el) => el.id !== id),
       });
       debouncedSave(updatedGame, state.isGM);
+      const selectedElementIds = state.selectedElementIds.filter((elementId) => elementId !== id);
       return {
         game: updatedGame,
-        selectedElementId:
-          state.selectedElementId === id ? null : state.selectedElementId,
+        selectedElementIds,
+        selectedElementId: selectedElementIds.length === 1 ? selectedElementIds[0] : null,
       };
     });
   },
@@ -620,10 +780,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elements: activeScene.elements.filter((el) => !ids.includes(el.id)),
       });
       debouncedSave(updatedGame, state.isGM);
+      const selectedElementIds = state.selectedElementIds.filter((id) => !ids.includes(id));
       return {
         game: updatedGame,
-        selectedElementId: ids.includes(state.selectedElementId || '') ? null : state.selectedElementId,
-        selectedElementIds: state.selectedElementIds.filter(id => !ids.includes(id)),
+        selectedElementIds,
+        selectedElementId: selectedElementIds.length === 1 ? selectedElementIds[0] : null,
       };
     });
   },
@@ -691,6 +852,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   createScene: (name, backgroundUrl, copyFromCurrent = false) => {
     const state = get();
+    if (!state.game) return '';
+
     const now = new Date().toISOString();
     let newScene: Scene;
 
@@ -723,18 +886,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
         updatedAt: now,
       };
       debouncedSave(updatedGame, s.isGM);
-      return { game: updatedGame };
+      return {
+        game: updatedGame,
+        selectedElementId: null,
+        selectedElementIds: [],
+      };
     });
+
+    useHistoryStore.getState().clearHistory();
 
     return newScene.id;
   },
 
   switchScene: (sceneId) => {
+    let didSwitch = false;
     set((state) => {
       if (!state.game) return state;
       const sceneExists = state.game.scenes.some(s => s.id === sceneId);
-      if (!sceneExists) return state;
+      if (!sceneExists || state.game.activeSceneId === sceneId) return state;
 
+      didSwitch = true;
       const updatedGame = {
         ...state.game,
         activeSceneId: sceneId,
@@ -743,6 +914,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       debouncedSave(updatedGame, state.isGM);
       return { game: updatedGame, selectedElementId: null, selectedElementIds: [] };
     });
+    if (didSwitch) {
+      useHistoryStore.getState().clearHistory();
+    }
   },
 
   updateScene: (sceneId, updates) => {
@@ -762,6 +936,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   deleteScene: (sceneId) => {
+    let didSwitch = false;
     set((state) => {
       if (!state.game) return state;
       // Don't delete the last scene
@@ -771,6 +946,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const newActiveId = state.game.activeSceneId === sceneId
         ? filteredScenes[0].id
         : state.game.activeSceneId;
+      didSwitch = newActiveId !== state.game.activeSceneId;
 
       const updatedGame = {
         ...state.game,
@@ -779,8 +955,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       };
       debouncedSave(updatedGame, state.isGM);
-      return { game: updatedGame, selectedElementId: null, selectedElementIds: [] };
+      return didSwitch
+        ? { game: updatedGame, selectedElementId: null, selectedElementIds: [] }
+        : { game: updatedGame };
     });
+    if (didSwitch) {
+      useHistoryStore.getState().clearHistory();
+    }
   },
 
   duplicateScene: (sceneId) => {
@@ -1145,8 +1326,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set((state) => {
       if (!state.game) return state;
       const chatMessages = state.game.chatMessages || [];
-      if (chatMessages.some((existingMessage) => existingMessage.id === message.id)) {
-        return state;
+      const existingIndex = chatMessages.findIndex((existingMessage) => existingMessage.id === message.id);
+      if (existingIndex >= 0) {
+        const existingMessage = chatMessages[existingIndex];
+        if (JSON.stringify(existingMessage) === JSON.stringify(message)) return state;
+        const updatedMessages = [...chatMessages];
+        updatedMessages[existingIndex] = message;
+        return {
+          game: {
+            ...state.game,
+            chatMessages: updatedMessages,
+          },
+        };
       }
       // Keep only last 100 messages
       const updatedMessages = [...chatMessages, message].slice(-100);
@@ -1249,7 +1440,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // UI actions
   setTool: (tool) => {
-    set({ selectedTool: tool, selectedElementId: null });
+    set({ selectedTool: tool, selectedElementId: null, selectedElementIds: [] });
   },
 
   setViewport: (offset, scale) => {
@@ -1309,8 +1500,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!state.game) return;
 
     // Apply the before state
+    const updatedGame = applyHistoryPatch(state.game, action.before);
+    debouncedSave(updatedGame, state.isGM);
     set({
-      game: applyHistoryPatch(state.game, action.before),
+      game: updatedGame,
+      selectedElementId: null,
+      selectedElementIds: [],
     });
   },
 
@@ -1322,8 +1517,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!state.game) return;
 
     // Apply the after state
+    const updatedGame = applyHistoryPatch(state.game, action.after);
+    debouncedSave(updatedGame, state.isGM);
     set({
-      game: applyHistoryPatch(state.game, action.after),
+      game: updatedGame,
+      selectedElementId: null,
+      selectedElementIds: [],
     });
   },
 

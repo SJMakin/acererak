@@ -18,15 +18,49 @@ interface MarkdownEditorProps {
   disabled?: boolean;
 }
 
-// Simple markdown to HTML converter (basic support)
-function parseMarkdown(markdown: string): string {
-  if (!markdown) return '';
-  
-  const html = markdown
-    // Escape HTML
+function escapeHtml(value: string): string {
+  return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeHttpUrl(value: string): string | null {
+  const trimmed = value.trim();
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// Simple markdown to HTML converter (basic support)
+function parseMarkdown(markdown: string): string {
+  if (!markdown) return '';
+
+  // Extract links before applying the other formatting rules. This keeps
+  // markdown characters in a URL from being turned into HTML inside href.
+  const links: string[] = [];
+  const withLinkTokens = markdown.replace(
+    /\[([^\]]+)\]\(([^)\r\n]+)\)/g,
+    (_match, linkText: string, rawUrl: string) => {
+      const text = escapeHtml(linkText);
+      const url = safeHttpUrl(rawUrl);
+      const rendered = url
+        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color: #7c3aed;">${text}</a>`
+        : text;
+      const index = links.push(rendered) - 1;
+      return `\uE000LINK${index}\uE001`;
+    },
+  );
+
+  const html = escapeHtml(withLinkTokens)
     // Headers (must be before bold to avoid conflicts)
     .replace(/^### (.+)$/gm, '<h4>$1</h4>')
     .replace(/^## (.+)$/gm, '<h3>$1</h3>')
@@ -42,14 +76,6 @@ function parseMarkdown(markdown: string): string {
     .replace(/~~(.+?)~~/g, '<del>$1</del>')
     // Inline code
     .replace(/`(.+?)`/g, '<code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">$1</code>')
-    // Links (only allow http/https to prevent javascript: XSS)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, url) => {
-      const trimmed = url.trim().toLowerCase();
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        return `<a href="${url}" target="_blank" rel="noopener" style="color: #7c3aed;">${text}</a>`;
-      }
-      return text;
-    })
     // Horizontal rule
     .replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 8px 0;">')
     // Unordered lists
@@ -62,8 +88,11 @@ function parseMarkdown(markdown: string): string {
     // Line breaks (double newline = paragraph)
     .replace(/\n\n/g, '</p><p>')
     // Single line breaks
-    .replace(/\n/g, '<br>');
-  
+    .replace(/\n/g, '<br>')
+    // Restore only links generated above. Both text and href were escaped
+    // independently, and the URL scheme was parsed and allow-listed.
+    .replace(/\uE000LINK(\d+)\uE001/g, (token, index: string) => links[Number(index)] ?? token);
+
   return `<p>${html}</p>`;
 }
 

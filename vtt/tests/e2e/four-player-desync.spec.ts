@@ -16,6 +16,8 @@ type TestWindow = Window & {
       } | null;
       addElement: (element: Record<string, unknown>, skipHistory?: boolean) => string;
       updateElement: (id: string, updates: Record<string, unknown>, skipHistory?: boolean) => void;
+      toggleFog: (enabled: boolean) => void;
+      revealFog: (polygon: Array<{ x: number; y: number }>, skipHistory?: boolean) => void;
     };
   };
   __testGetRoomState: () => {
@@ -25,6 +27,11 @@ type TestWindow = Window & {
     broadcastElementUpdate: (element: Record<string, unknown>) => void;
     broadcastFogUpdate: (fog: { enabled: boolean; revealed: Array<Array<{ x: number; y: number }>> }) => void;
   };
+  __testInjectNetworkMessage: (
+    action: string,
+    data: unknown,
+    peerId: string,
+  ) => void | Promise<void>;
 };
 
 async function createGame(page: Page): Promise<string> {
@@ -95,9 +102,17 @@ test.describe('Four-player desync resistance', () => {
     playerPages = [];
   });
 
-  test('four players racing token and fog updates converge to the GM state', async () => {
+  test('four players racing token updates converge while spoofed fog is rejected', async () => {
+    test.setTimeout(300_000);
     const roomId = await createGame(gmPage);
-    await Promise.all(playerPages.map((page, index) => joinGame(page, roomId, `Player ${index + 1}`)));
+    for (const [index, page] of playerPages.entries()) {
+      await joinGame(page, roomId, `Player ${index + 1}`);
+      await gmPage.waitForFunction(
+        (expectedPeers) => (window as unknown as TestWindow).__testGetRoomState().peers.length >= expectedPeers,
+        index + 1,
+        { timeout: 30_000 },
+      );
+    }
 
     await gmPage.waitForFunction(
       () => (window as unknown as TestWindow).__testGetRoomState().peers.length === 4,
@@ -153,18 +168,33 @@ test.describe('Four-player desync resistance', () => {
       testWindow.__testGetRoomState().broadcastElementUpdate(token);
     }, { id: tokenId, index })));
 
-    await Promise.all(playerPages.map((page, index) => page.evaluate((playerIndex) => {
+    // Even a mapped player transport must not be able to change authoritative fog.
+    await gmPage.evaluate(async () => {
       const testWindow = window as unknown as TestWindow;
-      const fog = {
+      const mappedPlayerPeer = testWindow.__testGetRoomState().peers[0];
+      await testWindow.__testInjectNetworkMessage('fogUpdate', {
         enabled: true,
-        revealed: [[
-          { x: 10 + playerIndex, y: 10 },
-          { x: 40 + playerIndex, y: 10 },
-          { x: 40 + playerIndex, y: 40 },
-        ]],
-      };
-      testWindow.__testGetRoomState().broadcastFogUpdate(fog);
-    }, index)));
+        revealed: [[{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 40 }]],
+      }, mappedPlayerPeer);
+    });
+    const fogAfterSpoof = await gmPage.evaluate(() => {
+      const store = (window as unknown as TestWindow).__testGameStore.getState();
+      const scene = store.game!.scenes.find((candidate) => candidate.id === store.game!.activeSceneId)!;
+      return scene.fogOfWar;
+    });
+    expect(fogAfterSpoof.enabled).toBe(false);
+    expect(fogAfterSpoof.revealed).toEqual([]);
+
+    // The GM then publishes the canonical fog state to every player.
+    await gmPage.evaluate(() => {
+      const testWindow = window as unknown as TestWindow;
+      const store = testWindow.__testGameStore.getState();
+      const polygon = [{ x: 20, y: 20 }, { x: 80, y: 20 }, { x: 80, y: 80 }];
+      store.toggleFog(true);
+      store.revealFog(polygon, true);
+      const scene = store.game!.scenes.find((candidate) => candidate.id === store.game!.activeSceneId)!;
+      testWindow.__testGetRoomState().broadcastFogUpdate(scene.fogOfWar);
+    });
 
     await gmPage.waitForTimeout(3000);
     const gmSnapshot = await getActiveSceneSnapshot(gmPage);

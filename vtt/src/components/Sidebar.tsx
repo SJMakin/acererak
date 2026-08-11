@@ -22,6 +22,7 @@ import PropertyInspector from './PropertyInspector';
 import LibraryPanel from './LibraryPanel';
 import NotesPanel from './NotesPanel';
 import ChatPanel from './ChatPanel';
+import CombatTracker from './CombatTracker';
 
 interface SidebarProps {
   room: {
@@ -98,7 +99,8 @@ export default function Sidebar({ room }: SidebarProps) {
           <Tabs.Tab value="chat">Chat</Tabs.Tab>
           <Tabs.Tab value="players">Players</Tabs.Tab>
           <Tabs.Tab value="dice">Dice</Tabs.Tab>
-          {selectedElement && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
+          <Tabs.Tab value="combat">Combat</Tabs.Tab>
+          {selectedElement && isGM && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
           {isGM && <Tabs.Tab value="gm">GM Tools</Tabs.Tab>}
         </Tabs.List>
 
@@ -164,18 +166,20 @@ export default function Sidebar({ room }: SidebarProps) {
                             📋
                           </ActionIcon>
                         )}
-                        <ActionIcon
-                          size="xs"
-                          color="red"
-                          variant="subtle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteElement(token.id);
-                          }}
-                          title="Delete"
-                        >
-                          ×
-                        </ActionIcon>
+                        {isGM && (
+                          <ActionIcon
+                            size="xs"
+                            color="red"
+                            variant="subtle"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteElement(token.id);
+                            }}
+                            title="Delete"
+                          >
+                            ×
+                          </ActionIcon>
+                        )}
                       </Group>
                     </Group>
                   </Paper>
@@ -195,7 +199,7 @@ export default function Sidebar({ room }: SidebarProps) {
           </Tabs.Panel>
 
           <Tabs.Panel value="notes">
-            <NotesPanel />
+            <NotesPanel onNotesChange={room.broadcastSync} />
           </Tabs.Panel>
 
           <Tabs.Panel value="chat">
@@ -237,9 +241,15 @@ export default function Sidebar({ room }: SidebarProps) {
             <DiceRoller onRoll={handleDiceRoll} />
           </Tabs.Panel>
 
-          <Tabs.Panel value="properties">
-            <PropertyInspector room={room}/>
+          <Tabs.Panel value="combat">
+            <CombatTracker onBroadcastCombat={room.broadcastCombat ?? room.broadcastSync} />
           </Tabs.Panel>
+
+          {isGM && (
+            <Tabs.Panel value="properties">
+              <PropertyInspector room={room}/>
+            </Tabs.Panel>
+          )}
 
           {isGM && (
             <Tabs.Panel value="gm">

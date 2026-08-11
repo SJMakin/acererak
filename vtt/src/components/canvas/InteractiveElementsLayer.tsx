@@ -19,6 +19,8 @@ interface InteractiveElementsLayerProps {
   };
   gridSettings: GridSettings;
   isGM: boolean;
+  playerId: string | null;
+  controlledTokenIds: string[];
   isDrawingTool: boolean;
   showTokenMetadata: boolean;
   onSelect: (id: string) => void;
@@ -35,6 +37,8 @@ export function InteractiveElementsLayer({
   layerVisibility,
   gridSettings,
   isGM,
+  playerId,
+  controlledTokenIds,
   isDrawingTool,
   showTokenMetadata,
   onSelect,
@@ -105,6 +109,12 @@ export function InteractiveElementsLayer({
             onDragStart={() => onDragStart(el.id)}
             onDragEnd={(x, y) => onDragEnd(el.id, x, y)}
             isGM={isGM}
+            canInteract={
+              isGM
+              || !el.controlledBy
+              || el.controlledBy === playerId
+              || controlledTokenIds.includes(el.id)
+            }
             showMetadata={showTokenMetadata}
           />
         ))}

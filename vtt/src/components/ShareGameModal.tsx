@@ -1,6 +1,7 @@
 import { Modal, Stack, Text, Group, Button, Paper, Center, CopyButton, Code } from '@mantine/core';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconCheck, IconCopy, IconQrcode, IconShare } from '@tabler/icons-react';
+import { buildInviteLink } from '../services/inviteLink';
 
 interface ShareGameModalProps {
   opened: boolean;
@@ -11,8 +12,7 @@ interface ShareGameModalProps {
 export default function ShareGameModal({ opened, onClose, roomId }: ShareGameModalProps) {
   if (!roomId) return null;
 
-  // Construct the join link with room ID as query parameter
-  const joinLink = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+  const joinLink = buildInviteLink(roomId);
 
   return (
     <Modal

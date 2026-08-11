@@ -1,6 +1,6 @@
 # Lychgate VTT - Decentralized Virtual Tabletop
 
-A peer-to-peer virtual tabletop for TTRPGs built with React, Konva.js, and Trystero. **No server needed** - all game data flows directly between players via WebRTC.
+A peer-to-peer virtual tabletop for TTRPGs built with React, Konva.js, and Trystero. No application backend stores game data: peers exchange it directly over WebRTC. Internet play still depends on tracker, STUN, and TURN infrastructure for discovery and NAT traversal.
 
 ## 🎯 Project Vision
 
@@ -38,7 +38,7 @@ This is intended to eventually integrate with the main Acererak app (the choose-
 ```
 
 **Key Technical Decisions:**
-- **Trystero** with BitTorrent strategy for signaling (no dedicated server)
+- **`@trystero-p2p/torrent`** for encrypted room discovery and WebRTC signaling
 - **WebRTC data channels** for P2P game state sync
 - **Zustand** for client-side state management
 - **Konva.js/react-konva** for canvas rendering
@@ -47,12 +47,12 @@ This is intended to eventually integrate with the main Acererak app (the choose-
 
 ### Data Flow
 
-1. GM creates game → generates unique room ID → creates Trystero room
-2. Players scan QR or enter room ID → join Trystero room
-3. Peers exchange SDP/ICE via BitTorrent DHT
-4. WebRTC data channels established
-5. GM broadcasts game state → peers receive and sync
-6. All changes broadcast via P2P (no centralized state)
+1. The GM creates a game and a high-entropy bearer room code.
+2. Players scan a fragment-based invite link or enter the room code manually.
+3. Peers complete the v3 role handshake; players prove a room-scoped resume identity before becoming active.
+4. The GM sends a validated projection containing only the active visible scene, visible combat data, and sheets linked from visible tokens.
+5. Player mutations are allowlisted, versioned by the GM, and relayed back as canonical state. Public unlocked tokens are collaborative unless the GM assigns explicit control.
+6. Ordered per-peer queues, state hashes, timeouts, and recovery snapshots keep peers converged.
 
 ### Action Name Constraints
 
@@ -60,11 +60,11 @@ Trystero has a **12-byte limit** on action names. We use shortened names:
 - `sync` - Full game state sync
 - `elUpdate` - Element update (not `element-update`)
 - `elDelete` - Element delete
-- `plyJoin` - Player join (not `player-join`)
-- `plyLeave` - Player leave
 - `reqSync` - Request sync
 - `cursor` - Cursor position
 - `ping` - Ping location
+- `sheetUpd` / `sheetDel` - Character-sheet convergence
+- `imgReq` / `imgData` - Authorized, metadata-bound image transfer
 
 ## 📁 Project Structure
 
@@ -310,44 +310,17 @@ Canvas layers consolidated to 4 (optimized from 6):
 - **Drawing Layer**: All shapes, tokens, text combined
 - **UI Layer**: Current drawing preview, fog of war overlay
 
-### Known Issues & Future Improvements
+### Operational considerations
 
-1. ✅ ~~**Drawing Tools**: Only freehand works currently~~ - **FIXED**
-   - All drawing tools (line, rectangle, circle) now fully implemented
-
-2. ✅ ~~**Token Tool**: Not implemented~~ - **FIXED**
-   - TokenConfigModal now allows click-to-place with full configuration
-
-3. ✅ ~~**Text Tool**: Not implemented~~ - **FIXED**
-   - Text tool now working with click-to-place
-
-4. ✅ ~~**Measure Tool**: Not implemented~~ - **FIXED**
-   - Measure tool shows distance in grid cells
-
-5. ✅ ~~**Fog of War**: Toggle exists but no reveal/hide tools~~ - **FIXED**
-   - Reveal and hide tools fully implemented
-
-6. ✅ ~~**Ping Tool**: Broadcasts but no visual indicator~~ - **FIXED**
-   - Animated pulse effect now displays
-
-7. ✅ ~~**Layer Performance**: Canvas had 6 layers~~ - **OPTIMIZED**
-   - Reduced to 4 layers for better performance
-
-8. **Pan Tool**: Drag works but may conflict with element dragging
-   - Consider hold-space-bar mode or improve gesture detection
-
-9. **Mobile Support**: Touch events need optimization
-   - Pan/zoom gestures could be improved
-   - Toolbar may need mobile-friendly layout
-
-10. **Image Upload**: Image elements exist but no UI for uploading
-    - Need file picker or drag-and-drop for map images
-    - Consider image hosting integration
+- Room codes are bearer secrets. Share the generated fragment link privately and create a new room when a code should be rotated.
+- The resume credential protects a player's identity inside a room; it does not turn the bearer room into an account or replace private invite handling.
+- Public tracker and STUN/TURN services have no application-owned SLA. A production deployment should provision monitored signaling and short-lived TURN credentials.
+- The GM browser is the authority and persistence owner; closing it pauses the live session until the GM reconnects.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22.12+
 - npm or yarn
 
 ### Installation
@@ -372,6 +345,52 @@ npm run build
 ```
 
 Outputs to `dist/`
+
+### Verification
+
+```bash
+npm run check          # typecheck, lint, and pure safety tests
+npm run test:e2e       # Chromium and Firefox browser suites
+npm run test:e2e:ai    # explicitly gated paid-provider tests
+```
+
+Paid AI tests require both `RUN_PAID_AI_TESTS=1` (set by the script) and an explicit `OPENROUTER_API_KEY`. Normal test discovery never reads local environment files for a key.
+
+### Production deployment
+
+The production host expects Nginx and Certbot on the existing Ubuntu VPS, a
+deployment account with non-interactive `sudo`, DNS for `lychgate.sammak.in` to
+point at that host, and inbound TCP ports 80 and 443 to be open. Pin the VPS host
+key in the trusted machine's SSH `known_hosts` file before running either script;
+both scripts refuse unknown or changed host keys. Run the server bootstrap with:
+
+```bash
+LETSENCRYPT_EMAIL=admin@example.com bash init-server.sh
+```
+
+The setup is safe to rerun. It obtains or renews the certificate through the
+ACME webroot, redirects HTTP to HTTPS, installs the renewal reload hook, and
+validates Nginx before reloading it. The generated configuration includes the
+app-compatible CSP, Permissions Policy, HSTS, and standard browser security
+headers. Existing files in the legacy document root are retained as the first
+versioned release.
+
+Production releases run through the GitHub deployment workflow on pushes to
+`main` or by manual dispatch. In addition to the existing `VPS_HOST`, `VPS_USER`,
+`VPS_SSH_KEY`, and `VPS_PATH` secrets, configure `VPS_SSH_KNOWN_HOSTS` with the
+VPS host key obtained through a trusted channel. The workflow deliberately fails
+closed when that pinned host key is absent or does not match `VPS_HOST`.
+Set `VPS_PATH` to `/var/www/lychgate.sammak.in/html`, which is the document root
+configured by `init-server.sh`.
+
+Deployments are uploaded as versioned releases beneath the configured
+`VPS_PATH/releases`. Activation atomically replaces the `current` symlink, then
+checks an uncached release marker over public HTTPS. A failed check restores the
+previous release automatically. Old releases are retained for manual rollback
+and should only be pruned after confirming they are not the target of `current`.
+
+For a manual release, use the workflow's `workflow_dispatch` trigger so the same
+checks, atomic activation, health check, and rollback path are retained.
 
 ## 🎮 Usage
 
@@ -409,7 +428,7 @@ Outputs to `dist/`
 - `react-konva` ^18.2.10
 
 ### P2P Networking
-- `trystero` ^0.20.0
+- `@trystero-p2p/torrent` 0.25.3
 
 ### State Management
 - `zustand` ^4.5.2
@@ -419,13 +438,11 @@ Outputs to `dist/`
 - `@mantine/hooks` ^7.11.0
 
 ### Utilities
-- `nanoid` ^5.0.7 (unique IDs)
+- `nanoid` ^6.0.1 (cryptographically random IDs)
 - `qrcode.react` ^3.1.0 (QR generation)
-- `html5-qrcode` ^2.3.8 (QR scanning)
 
 ### Storage
 - `dexie` ^4.0.4 (IndexedDB wrapper)
-- `dexie-react-hooks` ^1.1.7 (React integration)
 
 ## 🔗 Integration with Main App
 

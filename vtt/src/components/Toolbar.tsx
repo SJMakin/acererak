@@ -57,6 +57,7 @@ import {
 import { useGameStore } from '../stores/gameStore';
 import { useHistoryStore } from '../stores/historyStore';
 import { useAIStore } from '../stores/aiStore';
+import { buildInviteLink } from '../services/inviteLink';
 import type { ToolType, Scene } from '../types';
 import SettingsModal from './SettingsModal';
 import ExportImportModal from './ExportImportModal';
@@ -456,7 +457,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                     <Menu.Item
                       leftSection={<IconCopy size={16} />}
                       onClick={() => {
-                        const joinLink = `${window.location.origin}${window.location.pathname}?room=${room.roomId}`;
+                        if (!room.roomId) return;
+                        const joinLink = buildInviteLink(room.roomId);
                         navigator.clipboard.writeText(joinLink);
                       }}
                     >
@@ -508,6 +510,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                 position="bottom"
               >
                 <ActionIcon
+                  aria-label={tool.label}
                   variant={selectedTool === tool.id ? 'filled' : 'subtle'}
                   color={selectedTool === tool.id ? 'violet' : 'gray'}
                   size={actionSize}
@@ -902,6 +905,7 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
               position="bottom"
             >
               <ActionIcon
+                aria-label={tool.label}
                 variant={selectedTool === tool.id ? 'filled' : 'subtle'}
                 color={selectedTool === tool.id ? 'violet' : 'gray'}
                 size="lg"
@@ -1233,7 +1237,8 @@ export default function Toolbar({ sidebarOpen, onToggleSidebar, room }: ToolbarP
                   <Menu.Item
                     leftSection={<IconCopy size={16} />}
                     onClick={() => {
-                      const joinLink = `${window.location.origin}${window.location.pathname}?room=${room.roomId}`;
+                      if (!room.roomId) return;
+                      const joinLink = buildInviteLink(room.roomId);
                       navigator.clipboard.writeText(joinLink);
                     }}
                   >

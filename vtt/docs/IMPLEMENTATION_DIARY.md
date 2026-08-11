@@ -4,6 +4,17 @@ Development log and session notes for the Lychgate VTT project.
 
 ---
 
+## 2026-08-11: Networking and safety hardening
+
+- Migrated the transport to `@trystero-p2p/torrent` 0.25.3 and the v3 room protocol.
+- Added authenticated resume identities, authoritative projections, runtime schemas,
+  rate limits, ordered teardown/sends, and metadata-bound image transfer.
+- Replaced the historical `expr-eval` and Node-polyfill stack with a bounded internal
+  numeric evaluator and browser-native dependencies. Older entries below describe
+  the implementation as it existed at the time.
+
+---
+
 ## 2026-01-07: Rebranding & First Deployment
 
 ### Rebranding from "Acererak" to "Lychgate"
@@ -27,14 +38,14 @@ Development log and session notes for the Lychgate VTT project.
 - Added missing `gridType: 'square'` to default gridSettings in `gameStore.ts`
 
 **Deployment to https://lychgate.sammak.in/:**
-- VPS: ubuntu@51.79.156.185
+- VPS: production host for `lychgate.sammak.in`
 - Directory: `/var/www/lychgate.sammak.in/html/`
 - Nginx configured with security headers and SPA fallback
 - SSL certificate via Let's Encrypt (supports Cloudflare Full Strict mode)
 - Old acererak deployment archived to `/var/www/acererak.sammak.in.archive/`
 
-**New Files:**
-- `deploy.sh` - Deployment script for future updates
+**Deployment note:** the later tracked GitHub workflow replaced the original
+local `deploy.sh` helper with atomic releases, health checks, and rollback.
 
 ---
 

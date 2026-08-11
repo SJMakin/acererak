@@ -7,6 +7,13 @@ const baseURL = process.env.TEST_URL || 'http://localhost:5174';
 // HEADED=1 npx playwright test  → visible browsers with slowMo
 const headed = !!process.env.HEADED;
 const slowMo = headed ? Number(process.env.SLOW_MO || 400) : 0;
+const runPaidAI = process.env.RUN_PAID_AI_TESTS === '1';
+const paidAITest = /ai-image-generation\.spec\.ts/;
+const pureTest = /safe-(dice|expression|invite|markdown)\.spec\.ts/;
+
+if (runPaidAI && !process.env.OPENROUTER_API_KEY?.trim()) {
+  throw new Error('RUN_PAID_AI_TESTS=1 requires OPENROUTER_API_KEY');
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -31,25 +38,34 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'unit',
+      testMatch: pureTest,
+      use: { trace: 'off', video: 'off', screenshot: 'off' },
+    },
+    {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: /ai-image-generation/,
+      testIgnore: [paidAITest, pureTest],
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-      testIgnore: /ai-image-generation/,
+      testIgnore: [paidAITest, pureTest],
     },
-    // Costly tests that hit real paid APIs — run explicitly:
-    //   npx playwright test --project=ai
-    {
+    // This project does not exist unless the explicit paid-test gate is set.
+    ...(runPaidAI ? [{
       name: 'ai',
-      use: { ...devices['Desktop Chrome'] },
-      testMatch: /ai-image-generation/,
-    },
+      use: {
+        ...devices['Desktop Chrome'],
+        trace: 'off' as const,
+        video: 'off' as const,
+        screenshot: 'off' as const,
+      },
+      testMatch: paidAITest,
+    }] : []),
   ],
   // Auto-start dev server unless testing against a deployed URL
-  ...(!process.env.TEST_URL && {
+  ...(!process.env.TEST_URL && process.env.PLAYWRIGHT_SKIP_WEBSERVER !== '1' && {
     webServer: {
       command: 'npm run dev',
       url: 'http://localhost:5174',

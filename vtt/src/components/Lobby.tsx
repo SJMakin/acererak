@@ -25,6 +25,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { nanoid } from 'nanoid';
 import { useGameStore } from '../stores/gameStore';
 import { getRecentGames, deleteGame, type SavedGame } from '../db/database';
+import { buildInviteLink, consumeInviteFromLocation } from '../services/inviteLink';
 
 interface LobbyProps {
   room: {
@@ -38,7 +39,7 @@ interface LobbyProps {
 }
 
 export default function Lobby({ room }: LobbyProps) {
-  const { createGame, loadGame } = useGameStore();
+  const { createGame, loadGameAsHost } = useGameStore();
   const [activeTab, setActiveTab] = useState<string | null>('create');
   const isMobile = useMediaQuery('(max-width: 768px)');
   const formSpacing = isMobile ? 'sm' : 'md';
@@ -64,7 +65,7 @@ export default function Lobby({ room }: LobbyProps) {
     if (!gameName.trim() || !gmName.trim()) return;
 
     // Create P2P room and store game data for later
-    const roomId = nanoid(8);
+    const roomId = nanoid(22);
     room.createRoom(roomId);
     setCreatedRoomId(roomId);
 
@@ -75,11 +76,15 @@ export default function Lobby({ room }: LobbyProps) {
 
   const handleStartGame = () => {
     if (pendingLoadGame) {
-      // Continue flow: load existing game state
-      loadGame(pendingLoadGame.gameState);
+      // Continue flow: explicitly reclaim the saved GM identity.
+      loadGameAsHost(pendingLoadGame.gameState);
     } else if (pendingGameData) {
       // Create flow: create new game
-      createGame(pendingGameData.name, pendingGameData.gmName);
+      createGame(
+        pendingGameData.name,
+        pendingGameData.gmName,
+        createdRoomId || undefined,
+      );
     }
   };
 
@@ -90,8 +95,7 @@ export default function Lobby({ room }: LobbyProps) {
 
   const getShareUrl = () => {
     if (!createdRoomId) return '';
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?room=${createdRoomId}`;
+    return buildInviteLink(createdRoomId);
   };
 
   // Load recent games on mount
@@ -99,10 +103,10 @@ export default function Lobby({ room }: LobbyProps) {
     loadRecentGames();
   }, []);
 
-  // Check for room ID in URL on component mount
+  // Read fragment invites (and legacy query links), then clear the bearer
+  // room code from browser history once the form has been populated.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlRoomId = params.get('room');
+    const urlRoomId = consumeInviteFromLocation();
     if (urlRoomId) {
       setJoinRoomId(urlRoomId);
       setActiveTab('join');
@@ -116,10 +120,15 @@ export default function Lobby({ room }: LobbyProps) {
 
   const handleLoadGame = (game: SavedGame) => {
     // Use the saved roomId if available, otherwise generate one
-    const roomId = game.gameState.roomId || nanoid(8);
+    const roomId = game.gameState.roomId || nanoid(22);
     room.createRoom(roomId);
     setCreatedRoomId(roomId);
-    setPendingLoadGame(game);
+    // Persist the generated room ID into legacy saves before the host loads it,
+    // keeping the advertised room and game state in agreement.
+    setPendingLoadGame({
+      ...game,
+      gameState: { ...game.gameState, roomId },
+    });
     setActiveTab('create');
   };
 
@@ -166,9 +175,9 @@ export default function Lobby({ room }: LobbyProps) {
               mb={isMobile ? 'md' : 'lg'}
               style={{ flexWrap: isMobile ? 'wrap' : 'nowrap', gap: isMobile ? 8 : undefined }}
             >
-              <Tabs.Tab value="recent">Recent Games</Tabs.Tab>
+              <Tabs.Tab value="recent" disabled={Boolean(createdRoomId)}>Recent Games</Tabs.Tab>
               <Tabs.Tab value="create">Create Game</Tabs.Tab>
-              <Tabs.Tab value="join">Join Game</Tabs.Tab>
+              <Tabs.Tab value="join" disabled={Boolean(createdRoomId)}>Join Game</Tabs.Tab>
             </Tabs.List>
 
             <Tabs.Panel value="recent">
@@ -315,6 +324,7 @@ export default function Lobby({ room }: LobbyProps) {
                             variant="subtle"
                             size={isMobile ? 'md' : 'sm'}
                             onClick={copy}
+                            aria-label={copied ? 'Room ID copied' : 'Copy room ID'}
                           >
                             {copied ? '✓' : '📋'}
                           </ActionIcon>
@@ -363,7 +373,7 @@ export default function Lobby({ room }: LobbyProps) {
                   <Alert color="blue" title="Connecting">
                     <Group gap="xs">
                       <Loader size="sm" />
-                      <Text size="sm">Establishing P2P connection... This may take up to 30 seconds.</Text>
+                      <Text size="sm">Establishing P2P connection... This may take up to 40 seconds.</Text>
                     </Group>
                   </Alert>
                 )}

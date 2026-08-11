@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { AppShell, Box, Drawer, useMantineTheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useGameStore } from './stores/gameStore';
+import { useSheetStore } from './stores/sheetStore';
+import { useImageStore } from './stores/imageStore';
 import { useRoom } from './hooks/useRoom';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { db } from './db/database';
@@ -14,7 +16,11 @@ import { SheetModal } from './components/character/SheetModal';
 
 function App() {
   const { game, performUndo, performRedo, selectElement, selectedTool } = useGameStore();
+  const sheetsLoading = useSheetStore((state) => state.isLoading);
   const room = useRoom();
+  const roomIsHost = room.isHost;
+  const roomPeerCount = room.peers.length;
+  const broadcastRoomSync = room.broadcastSync;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const theme = useMantineTheme();
@@ -63,9 +69,11 @@ function App() {
     if (import.meta.env.DEV) {
       const testWindow = window as unknown as {
         __testGameStore?: typeof useGameStore;
+        __testImageStore?: typeof useImageStore;
         __testGetRoomState?: () => typeof room;
       };
       testWindow.__testGameStore = useGameStore;
+      testWindow.__testImageStore = useImageStore;
       testWindow.__testGetRoomState = () => room;
     }
   });
@@ -85,6 +93,13 @@ function App() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- specific room properties are tracked; adding room object would cause infinite re-renders
   }, [room.isHost, room.peers.length, room.broadcastStateHash]);
+
+  // A player can arrive while the GM is still on the pre-game invite screen.
+  // Publish the first authoritative snapshot as soon as that game is created or loaded.
+  useEffect(() => {
+    if (!game?.id || !roomIsHost || roomPeerCount === 0 || sheetsLoading) return;
+    broadcastRoomSync();
+  }, [game?.id, roomIsHost, roomPeerCount, sheetsLoading, broadcastRoomSync]);
 
   // Show lobby if no game is loaded
   if (!game) {

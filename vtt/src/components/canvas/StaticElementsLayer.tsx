@@ -42,7 +42,7 @@ export function StaticElementsLayer({
   onTextDoubleClick,
 }: StaticElementsLayerProps) {
   return (
-    <Layer listening={false}>
+    <Layer listening={isGM}>
       {/* Map images */}
       {layerVisibility.map && elements
         .filter((el): el is ImageElement => el.layer === 'map' && el.type === 'image')

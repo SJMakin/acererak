@@ -61,7 +61,7 @@ export function ActionButtonComponent({
 
       // Create a roll-type chat message
       const rollMessage: ChatMessage = {
-        id: nanoid(10),
+        id: `${myPeerId}:${nanoid(10)}`,
         playerId: myPeerId,
         playerName: myPlayer.name,
         playerColor: myPlayer.color,

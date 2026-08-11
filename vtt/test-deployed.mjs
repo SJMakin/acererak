@@ -2,126 +2,127 @@ import { chromium, firefox } from '@playwright/test';
 
 const url = process.argv[2] || 'http://localhost:5174/';
 
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function testBrowser(browserType, name) {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Testing ${name} against ${url}`);
   console.log('='.repeat(60));
 
-  const browser = await browserType.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
-  const errors = [];
+  let browser;
+  const pageErrors = [];
   const consoleMessages = [];
 
-  page.on('console', msg => {
-    const text = `[${msg.type()}] ${msg.text()}`;
-    consoleMessages.push(text);
-    if (msg.type() === 'error') {
-      console.log(`❌ Console Error: ${msg.text()}`);
-    }
-  });
-
-  page.on('pageerror', error => {
-    errors.push(error.message);
-    console.log(`❌ Page Error: ${error.message}`);
-  });
-
-  page.on('requestfailed', request => {
-    console.log(`❌ Failed Request: ${request.url()} - ${request.failure()?.errorText}`);
-  });
-
   try {
-    console.log('Navigating to page...');
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    console.log('✓ Page loaded');
+    browser = await browserType.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
 
-    // Wait a moment for any delayed errors
-    await page.waitForTimeout(3000);
-
-    // Check if main elements are visible
-    const heading = page.getByRole('heading', { name: /Lychgate VTT/i });
-    const isVisible = await heading.isVisible().catch(() => false);
-    console.log(`Heading visible: ${isVisible}`);
-
-    // Try to interact with the page
-    const createTab = page.getByRole('tab', { name: /Create Game/i });
-    const createTabVisible = await createTab.isVisible().catch(() => false);
-    console.log(`Create Game tab visible: ${createTabVisible}`);
-
-    if (createTabVisible) {
-      await createTab.click();
-      console.log('✓ Clicked Create Game tab');
-      await page.waitForTimeout(1000);
-
-      // Try to create a game
-      const gameNameInput = page.getByLabel(/Game Name/i);
-      if (await gameNameInput.isVisible().catch(() => false)) {
-        await gameNameInput.fill('Test Game');
-        console.log('✓ Filled game name');
-
-        const gmNameInput = page.getByPlaceholder('Game Master');
-        if (await gmNameInput.isVisible().catch(() => false)) {
-          await gmNameInput.fill('Test GM');
-          console.log('✓ Filled GM name');
-        }
-
-        const createButton = page.getByRole('button', { name: /Create Game/i });
-        if (await createButton.isVisible().catch(() => false)) {
-          console.log('Clicking Create Game button...');
-          await createButton.click();
-
-          // Wait for game creation or error
-          console.log('Waiting for game creation results...');
-          await page.waitForTimeout(10000);
-
-          // Check what happened
-          const gameCreated = await page.getByText(/Game Created!/i).isVisible().catch(() => false);
-          const roomCode = await page.getByText(/Room Code:/i).isVisible().catch(() => false);
-          const anyError = await page.locator('[role="alert"], .mantine-Alert-root').isVisible().catch(() => false);
-
-          console.log(`Game Created message: ${gameCreated}`);
-          console.log(`Room Code visible: ${roomCode}`);
-          console.log(`Error alert visible: ${anyError}`);
-
-          if (anyError) {
-            const alertText = await page.locator('[role="alert"], .mantine-Alert-root').textContent().catch(() => 'unknown');
-            console.log(`Alert content: ${alertText}`);
-          }
-        }
+    page.on('console', message => {
+      const text = `[${message.type()}] ${message.text()}`;
+      consoleMessages.push(text);
+      if (message.type() === 'error') {
+        console.log(`❌ Console Error: ${message.text()}`);
       }
+    });
+
+    page.on('pageerror', error => {
+      pageErrors.push(error.message);
+      console.log(`❌ Page Error: ${error.message}`);
+    });
+
+    page.on('requestfailed', request => {
+      console.log(`❌ Failed Request: ${request.url()} - ${request.failure()?.errorText}`);
+    });
+
+    console.log('Navigating to page...');
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    if (!response || !response.ok()) {
+      throw new Error(`Navigation returned ${response?.status() ?? 'no HTTP response'}`);
+    }
+    console.log(`✓ Page loaded (${response.status()})`);
+
+    const heading = page.getByRole('heading', { name: /Lychgate VTT/i });
+    await heading.waitFor({ state: 'visible', timeout: 10000 });
+    console.log('✓ Lobby heading visible');
+
+    const createTab = page.getByRole('tab', { name: /Create Game/i });
+    await createTab.waitFor({ state: 'visible', timeout: 10000 });
+    await createTab.click();
+    console.log('✓ Create Game tab opened');
+
+    const gameNameInput = page.getByLabel(/Game Name/i);
+    const gmNameInput = page.getByPlaceholder('Game Master');
+    const createButton = page.getByRole('button', { name: /Create Game/i });
+
+    await gameNameInput.waitFor({ state: 'visible', timeout: 5000 });
+    await gmNameInput.waitFor({ state: 'visible', timeout: 5000 });
+    await createButton.waitFor({ state: 'visible', timeout: 5000 });
+    await gameNameInput.fill(`Deployment Smoke ${name}`);
+    await gmNameInput.fill('Smoke Test GM');
+
+    if (!(await createButton.isEnabled())) {
+      throw new Error('Create Game button remained disabled after filling required fields');
     }
 
-    // Check for any error dialogs or messages
-    const errorMessage = await page.locator('.mantine-Alert-message, [role="alert"]').textContent().catch(() => null);
-    if (errorMessage) {
-      console.log(`Alert message found: ${errorMessage}`);
+    console.log('Creating a signaling room...');
+    await createButton.click();
+
+    const gameCreated = page.getByText(/Game Created!/i);
+    try {
+      await gameCreated.waitFor({ state: 'visible', timeout: 30000 });
+    } catch (error) {
+      const alertText = await page.locator('[role="alert"], .mantine-Alert-root').first().textContent().catch(() => null);
+      throw new Error(
+        alertText
+          ? `Game creation failed: ${alertText.trim()}`
+          : `Game creation did not complete: ${errorMessage(error)}`
+      );
     }
 
-    console.log('\n--- Console Messages Summary ---');
-    const errorMsgs = consoleMessages.filter(m => m.includes('[error]'));
-    const warnMsgs = consoleMessages.filter(m => m.includes('[warning]'));
-    console.log(`Total messages: ${consoleMessages.length}`);
-    console.log(`Errors: ${errorMsgs.length}`);
-    console.log(`Warnings: ${warnMsgs.length}`);
+    const roomCode = page.getByTestId('room-code');
+    await roomCode.waitFor({ state: 'visible', timeout: 10000 });
+    if (!(await roomCode.textContent())?.trim()) {
+      throw new Error('Game was created without a room code');
+    }
+    console.log('✓ Game created and room code visible');
 
-    if (errorMsgs.length > 0) {
-      console.log('\nAll error messages:');
-      errorMsgs.forEach(m => console.log(`  ${m}`));
+    if (pageErrors.length > 0) {
+      throw new Error(`Uncaught page errors: ${pageErrors.join(' | ')}`);
     }
 
-  } catch (e) {
-    console.log(`❌ Test failed: ${e.message}`);
+    const errorMessages = consoleMessages.filter(message => message.startsWith('[error]'));
+    const warningMessages = consoleMessages.filter(message => message.startsWith('[warning]'));
+    console.log(`Console summary: ${errorMessages.length} errors, ${warningMessages.length} warnings`);
+    console.log(`✓ ${name} deployment smoke passed`);
+    return { name, passed: true };
+  } catch (error) {
+    const message = errorMessage(error);
+    console.error(`❌ ${name} deployment smoke failed: ${message}`);
+    return { name, passed: false, error: message };
+  } finally {
+    await browser?.close().catch(error => {
+      console.error(`Failed to close ${name}: ${errorMessage(error)}`);
+    });
   }
-
-  await browser.close();
-
-  return { errors, consoleMessages };
 }
 
 async function main() {
-  await testBrowser(chromium, 'Chromium');
-  await testBrowser(firefox, 'Firefox');
+  const results = [];
+  for (const [browserType, name] of [[chromium, 'Chromium'], [firefox, 'Firefox']]) {
+    results.push(await testBrowser(browserType, name));
+  }
+
+  const failures = results.filter(result => !result.passed);
+  if (failures.length > 0) {
+    const details = failures.map(result => `${result.name}: ${result.error}`).join('\n');
+    throw new Error(`${failures.length} deployment smoke check(s) failed:\n${details}`);
+  }
 }
 
-main().catch(console.error);
+main().catch(error => {
+  console.error(`\n${errorMessage(error)}`);
+  process.exitCode = 1;
+});

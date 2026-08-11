@@ -12,6 +12,9 @@ export interface EmbeddedImage {
   prompt?: string;
 }
 
+const MAX_IMAGE_DIMENSION = 8192;
+const MAX_IMAGE_PIXELS = 40_000_000;
+
 /** Compress any image Blob/File to WebP at quality 0.8 via offscreen canvas */
 export async function compressToWebP(
   source: Blob | File,
@@ -19,8 +22,23 @@ export async function compressToWebP(
   const bitmap = await createImageBitmap(source);
   const { width, height } = bitmap;
 
+  if (
+    width < 1 ||
+    height < 1 ||
+    width > MAX_IMAGE_DIMENSION ||
+    height > MAX_IMAGE_DIMENSION ||
+    width * height > MAX_IMAGE_PIXELS
+  ) {
+    bitmap.close();
+    throw new Error('Image dimensions are too large');
+  }
+
   const canvas = new OffscreenCanvas(width, height);
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    throw new Error('Image processing is not available');
+  }
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
 

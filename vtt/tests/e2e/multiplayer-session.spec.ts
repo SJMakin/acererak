@@ -2,6 +2,40 @@ import { test, expect, Browser, BrowserContext, Page } from '@playwright/test';
 
 const BASE_URL = process.env.TEST_URL || 'http://localhost:5174';
 
+async function expectActiveScene(page: Page, sceneName: string): Promise<void> {
+  await page.waitForFunction((expectedName) => {
+    const testWindow = window as unknown as {
+      __testGameStore?: {
+        getState: () => {
+          game: {
+            activeSceneId: string;
+            scenes: Array<{ id: string; name: string }>;
+          } | null;
+        };
+      };
+    };
+    const game = testWindow.__testGameStore?.getState().game;
+    return game?.scenes.find((scene) => scene.id === game.activeSceneId)?.name === expectedName;
+  }, sceneName, { timeout: 15_000 });
+}
+
+async function placeToken(page: Page, name: string, x: number, y: number): Promise<void> {
+  const canvas = page.locator('canvas').first();
+  const canvasBox = await canvas.boundingBox();
+  expect(canvasBox).toBeTruthy();
+
+  // Select explicitly: the placement tool remains active after creating a token,
+  // so an extra canvas "focus" click would open and then dismiss the next modal.
+  await page.getByRole('button', { name: 'Place Token' }).click();
+  await page.mouse.click(canvasBox!.x + x, canvasBox!.y + y);
+
+  const modal = page.getByRole('dialog');
+  await expect(modal).toBeVisible({ timeout: 5000 });
+  await modal.getByLabel(/Token Name/i).fill(name);
+  await modal.getByRole('button', { name: /Create Token/i }).click();
+  await expect(modal).not.toBeVisible({ timeout: 3000 });
+}
+
 /**
  * Multiplayer session E2E — a full game played by GM + player.
  *
@@ -116,16 +150,13 @@ test.describe.serial('Multiplayer session', () => {
     await gmPage.getByRole('tab', { name: 'Tokens' }).click();
     await expect(gmPage.getByText('No tokens on map')).toBeVisible();
 
-    await gmPage.getByPlaceholder('Token name').fill('Skeleton Guardian');
-    await gmPage.getByRole('button', { name: 'Add' }).click();
+    await placeToken(gmPage, 'Skeleton Guardian', 200, 180);
     await expect(gmTokens.getByText('Skeleton Guardian')).toBeVisible({ timeout: 5000 });
 
-    await gmPage.getByPlaceholder('Token name').fill('Skeleton Archer');
-    await gmPage.getByRole('button', { name: 'Add' }).click();
+    await placeToken(gmPage, 'Skeleton Archer', 300, 180);
     await expect(gmTokens.getByText('Skeleton Archer')).toBeVisible({ timeout: 5000 });
 
-    await gmPage.getByPlaceholder('Token name').fill('Tomb Spider');
-    await gmPage.getByRole('button', { name: 'Add' }).click();
+    await placeToken(gmPage, 'Tomb Spider', 400, 180);
     await expect(gmTokens.getByText('Tomb Spider')).toBeVisible({ timeout: 5000 });
 
     // Player sees all tokens appear on their side
@@ -235,16 +266,15 @@ test.describe.serial('Multiplayer session', () => {
     // Creating a scene auto-switches to it — toolbar should now show the new name
     await expect(gmPage.locator('button').filter({ hasText: /Inner Sanctum/ }).first()).toBeVisible({ timeout: 5000 });
 
-    // Give scene switch time to sync to player
-    await gmPage.waitForTimeout(2000);
+    // The scene picker is GM-only, so verify the player's actual synchronized state.
+    await expectActiveScene(playerPage, 'The Inner Sanctum');
     await expect(playerPage.locator('canvas').first()).toBeVisible();
 
     // GM switches back to Scene 1 via the scene menu
     await gmPage.locator('button').filter({ hasText: /Inner Sanctum/ }).first().click();
     await gmPage.getByRole('menuitem', { name: /Scene 1/ }).click();
-    await gmPage.waitForTimeout(2000);
-
     // Player sees the scene change again
+    await expectActiveScene(playerPage, 'Scene 1');
     await expect(playerPage.locator('canvas').first()).toBeVisible();
 
     // ========================================
@@ -257,7 +287,7 @@ test.describe.serial('Multiplayer session', () => {
 
     // GM removes the Skeleton Guardian (defeated!)
     const guardianRow = gmTokens.locator('[class*="Paper"]', { has: gmPage.getByText('Skeleton Guardian', { exact: true }) });
-    await guardianRow.getByText('🗑️').click();
+    await guardianRow.getByTitle('Delete').click();
 
     await expect(gmTokens.getByText('Skeleton Guardian')).not.toBeVisible({ timeout: 5000 });
     await expect(gmTokens.getByText('Skeleton Archer')).toBeVisible();
@@ -280,7 +310,7 @@ test.describe.serial('Multiplayer session', () => {
 
     // Finish off the Tomb Spider
     const spiderRow = gmTokens.locator('[class*="Paper"]', { has: gmPage.getByText('Tomb Spider', { exact: true }) });
-    await spiderRow.getByText('🗑️').click();
+    await spiderRow.getByTitle('Delete').click();
 
     await expect(gmTokens.getByText('Tomb Spider')).not.toBeVisible({ timeout: 5000 });
     await expect(playerTokens.getByText('Tomb Spider')).not.toBeVisible({ timeout: 15000 });
@@ -289,7 +319,7 @@ test.describe.serial('Multiplayer session', () => {
 
     // Final enemy down
     const archerRow = gmTokens.locator('[class*="Paper"]', { has: gmPage.getByText('Skeleton Archer', { exact: true }) });
-    await archerRow.getByText('🗑️').click();
+    await archerRow.getByTitle('Delete').click();
 
     await expect(gmTokens.getByText('Skeleton Archer')).not.toBeVisible({ timeout: 5000 });
     await expect(gmTokens.getByText('No tokens on map')).toBeVisible();

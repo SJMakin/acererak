@@ -22,7 +22,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] Konva.js canvas rendering (4 optimized layers)
 
 ### P2P Networking (v1.6.0 / v1.7.0)
-- [x] Trystero integration (Torrent strategy with Node.js polyfills)
+- [x] Trystero integration (`@trystero-p2p/torrent` with the browser-native 0.25 API)
 - [x] WebRTC peer connections with STUN/TURN servers
 - [x] Room creation/joining via ID or QR code
 - [x] Real-time state sync (elements, fog, combat, dice, chat)
@@ -127,7 +127,7 @@ A **decentralized P2P Virtual Tabletop** - the VTT they can't turn off.
 - [x] `Key:: Value` stat declarations with editable pills and autocomplete
 - [x] Shadow state JSON auto-parsed from document (bidirectional sync)
 - [x] Projection tags: `#bar` (HP bar on token), `#badge` (AC badge on token)
-- [x] `{{ expression }}` computed fields via expr-eval (reactive to stat changes)
+- [x] `{{ expression }}` computed fields via the bounded internal evaluator (reactive to stat changes)
 - [x] `[Label](action: dice)` action buttons with dice rolling and P2P broadcast
 - [x] `[Label](action: dice; cost: Var)` actions with resource cost deduction
 - [x] `[bar: HP/MaxHP]` progress bar widget (color-coded, click to adjust)
@@ -480,7 +480,9 @@ src/
 
 ### GitHub Actions CI/CD
 
-Automated deployment to VPS via SCP on push to main branch.
+Automated deployment to the VPS on pushes to `main`. The workflow uploads an
+immutable build archive, serializes deployments, atomically switches the active
+release, and rolls back when its public HTTPS release-marker check fails.
 
 **Workflow:** `.github/workflows/deploy-vtt.yml`
 
@@ -488,15 +490,18 @@ Automated deployment to VPS via SCP on push to main branch.
 - `VPS_HOST` - Server hostname or IP
 - `VPS_USER` - SSH username
 - `VPS_SSH_KEY` - Private SSH key (ed25519 or RSA)
-- `VPS_PATH` - Deployment path (e.g., `/var/www/vtt`)
+- `VPS_SSH_KNOWN_HOSTS` - Pinned host-key entry obtained through a trusted channel
+- `VPS_PATH` - Nginx document root (`/var/www/lychgate.sammak.in/html`)
 
 **Pipeline Steps:**
 1. Checkout code
-2. Setup Node.js 20
+2. Setup Node.js 22.12+
 3. Install dependencies (`npm ci`)
-4. Build production bundle (`npm run build`)
-5. SCP `dist/` folder to VPS
-6. Optional: Restart nginx or run post-deploy script
+4. Run type, lint, and safety checks (`npm run check`)
+5. Build production bundle (`npm run build`)
+6. Upload a packaged build to a versioned staging directory
+7. Atomically activate the release and verify its marker over HTTPS
+8. Restore the previous release automatically if the health check fails
 
 **Trigger:** Push to `main` branch (paths: `vtt/**`)
 

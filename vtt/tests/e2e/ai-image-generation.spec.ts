@@ -1,32 +1,12 @@
-import { test, expect, Page } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
-
-import { fileURLToPath } from 'url';
-const __filename2 = fileURLToPath(import.meta.url);
-const __dirname2 = path.dirname(__filename2);
-
-// Load the OpenRouter API key from the parent directory's .env.local
-function loadEnvKey(): string {
-  // Try multiple possible locations
-  const candidates = [
-    path.resolve(process.cwd(), '.env'),
-    path.resolve(process.cwd(), '.env.local'),
-    path.resolve(__dirname2, '../../../.env.local'),
-    path.resolve(process.cwd(), '../.env.local'),
-  ];
-  for (const envPath of candidates) {
-    try {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      const match = content.match(/^VITE_OPENROUTER_API_KEY=(.+)$/m);
-      if (match?.[1]?.trim()) return match[1].trim();
-    } catch { /* try next */ }
-  }
-  return '';
-}
+import { test, expect, type Page } from '@playwright/test';
 
 const BASE_URL = process.env.TEST_URL || 'http://localhost:5174';
-const OPENROUTER_KEY = process.env.VITE_OPENROUTER_API_KEY || loadEnvKey();
+const PAID_AI_ENABLED = process.env.RUN_PAID_AI_TESTS === '1';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY?.trim() || '';
+
+// API keys can appear in input actions and rendered password fields. Never
+// retain screenshots, traces, or video for this paid integration suite.
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
 /** Helper: create a game and get to the canvas */
 async function createGameAndStart(page: Page, gameName: string) {
@@ -80,7 +60,8 @@ async function configureAI(page: Page, apiKey: string) {
 }
 
 test.describe('AI Image Generation', () => {
-  test.skip(!OPENROUTER_KEY, 'Skipping AI tests — no VITE_OPENROUTER_API_KEY in .env.local');
+  test.skip(!PAID_AI_ENABLED, 'Paid AI tests require RUN_PAID_AI_TESTS=1');
+  test.skip(!OPENROUTER_KEY, 'Paid AI tests require OPENROUTER_API_KEY');
 
   test('Configure AI key, generate image in TokenConfigModal, verify embedded result', async ({ page }) => {
     await createGameAndStart(page, 'AI Image Gen Test');
@@ -142,7 +123,7 @@ test.describe('AI Image Generation', () => {
     await expect(modal.locator('img[alt="Embedded image preview"]')).toBeVisible({ timeout: 5000 });
 
     // Place the token
-    await modal.getByRole('button', { name: /Place Token/i }).click();
+    await modal.getByRole('button', { name: /Create Token/i }).click();
     await expect(modal).not.toBeVisible({ timeout: 3000 });
 
     // Verify the token appears

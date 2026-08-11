@@ -1,6 +1,6 @@
 import { NodeViewWrapper } from '@tiptap/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Parser } from 'expr-eval';
+import { evaluateNumericExpression } from '../../../services/safeExpression';
 import type { ShadowState } from '../../../services/shadowStateService';
 import { useShadowState } from './ShadowStateContext';
 import './Expression.css';
@@ -37,35 +37,26 @@ export function ExpressionComponent({
     }
 
     try {
-      // Sandbox: only allow safe operations
-      const parser = new Parser();
-      const expr = parser.parse(formulaText);
-
       // Prepare variables from shadow state
       const variables: Record<string, number> = {};
       for (const [key, value] of Object.entries(context.stats)) {
         if (typeof value === 'number') {
           variables[key] = value;
-        } else if (typeof value === 'string') {
-          // Try to parse string values as numbers
-          const parsed = parseFloat(value);
-          if (!isNaN(parsed)) {
+        } else if (typeof value === 'string' && value.trim()) {
+          const parsed = Number(value);
+          if (Number.isFinite(parsed)) {
             variables[key] = parsed;
           }
         }
       }
 
-      const evalResult = expr.evaluate(variables);
+      const evalResult = evaluateNumericExpression(formulaText, variables);
 
       // Format result
-      if (typeof evalResult === 'number') {
-        // Round to reasonable precision
-        if (Number.isInteger(evalResult)) {
-          return evalResult.toString();
-        }
-        return evalResult.toFixed(2).replace(/\.?0+$/, '');
+      if (Number.isInteger(evalResult)) {
+        return evalResult.toString();
       }
-      return String(evalResult);
+      return evalResult.toFixed(2).replace(/\.?0+$/, '');
     } catch {
       return 'Error';
     }

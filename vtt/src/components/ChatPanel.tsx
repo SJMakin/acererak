@@ -43,7 +43,7 @@ export default function ChatPanel({ onSendMessage }: ChatPanelProps) {
     if (!messageText.trim() || !myPeerId) return;
 
     const message: ChatMessage = {
-      id: nanoid(10),
+      id: `${myPeerId}:${nanoid(10)}`,
       playerId: myPeerId,
       playerName,
       playerColor,

@@ -7,19 +7,37 @@ const pendingUrlRequests = new Map<string, Promise<string | null>>();
 
 // Callback for requesting missing images over P2P — set by useRoom
 let onImageMissing: ((imageId: string) => void) | null = null;
-// Track which IDs we've already requested to avoid spamming
-const requestedImages = new Set<string>();
+// Retry missing-image requests at a bounded cadence until delivery or teardown.
+// This handles dropped requests without allowing every render to spam the GM.
+const IMAGE_REQUEST_RETRY_MS = 10_000;
+const requestedImages = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearImageRequest(imageId: string) {
+  const timer = requestedImages.get(imageId);
+  if (timer) clearTimeout(timer);
+  requestedImages.delete(imageId);
+}
+
+function requestMissingImage(imageId: string) {
+  if (!onImageMissing || requestedImages.has(imageId)) return;
+  onImageMissing(imageId);
+  const timer = setTimeout(() => {
+    requestedImages.delete(imageId);
+    requestMissingImage(imageId);
+  }, IMAGE_REQUEST_RETRY_MS);
+  requestedImages.set(imageId, timer);
+}
 
 export function setImageMissingCallback(cb: ((imageId: string) => void) | null) {
   onImageMissing = cb;
-  if (!cb) requestedImages.clear();
+  if (!cb) {
+    for (const timer of requestedImages.values()) clearTimeout(timer);
+    requestedImages.clear();
+  }
 }
 
 export function notifyImageMissing(imageId: string) {
-  if (onImageMissing && !requestedImages.has(imageId)) {
-    requestedImages.add(imageId);
-    onImageMissing(imageId);
-  }
+  requestMissingImage(imageId);
 }
 
 interface ImageStoreState {
@@ -87,6 +105,7 @@ export const useImageStore = create<ImageStoreState>((set, get) => ({
   },
 
   storeImage: async (image: EmbeddedImage) => {
+    const shouldPublishUrl = requestedImages.has(image.id) || get().urlCache.has(image.id);
     await db.images.put({
       id: image.id,
       blob: image.blob,
@@ -97,6 +116,23 @@ export const useImageStore = create<ImageStoreState>((set, get) => ({
       createdAt: image.createdAt,
       source: image.source,
       prompt: image.prompt,
+    });
+    clearImageRequest(image.id);
+
+    // Most callers can resolve lazily from IndexedDB. Only publish immediately
+    // when a mounted consumer was waiting for this P2P image (or is replacing an
+    // existing cache entry), avoiding object-URL retention during bulk imports.
+    if (!shouldPublishUrl) return image.id;
+
+    // Publish a fresh object URL so existing useImage subscribers rerender as
+    // soon as a P2P blob lands, rather than waiting for another component event.
+    const objectUrl = URL.createObjectURL(image.blob);
+    set((state) => {
+      const newCache = new Map(state.urlCache);
+      const oldUrl = newCache.get(image.id);
+      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      newCache.set(image.id, objectUrl);
+      return { urlCache: newCache };
     });
     return image.id;
   },

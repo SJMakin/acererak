@@ -7,11 +7,22 @@ on:
     paths:
       - 'vtt/**'
       - '.github/workflows/deploy-vtt.yml'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vtt-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_DOMAIN: lychgate.sammak.in
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -20,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.12.0'
           cache: 'npm'
           cache-dependency-path: vtt/package-lock.json
 
@@ -28,21 +39,233 @@ jobs:
         working-directory: ./vtt
         run: npm ci
 
+      - name: Verify source
+        working-directory: ./vtt
+        run: npm run check
+
       - name: Build production bundle
         working-directory: ./vtt
         run: npm run build
 
-      - name: Setup SSH key
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          set -Eeuo pipefail
+          install -d -m 0700 "${HOME}/.ssh"
+          printf '%s\n' "${VPS_SSH_KEY}" > "${HOME}/.ssh/deploy_key"
+          chmod 0600 "${HOME}/.ssh/deploy_key"
+          if ! ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null 2>&1; then
+            printf '%s\n' 'VPS_SSH_KEY is missing, encrypted, or invalid.' >&2
+            exit 1
+          fi
+          printf '%s\n' "${VPS_SSH_KNOWN_HOSTS}" > "${HOME}/.ssh/known_hosts"
+          test -s "${HOME}/.ssh/known_hosts"
+          chmod 0600 "${HOME}/.ssh/known_hosts"
+          if ! ssh-keygen -F "${VPS_HOST}" -f "${HOME}/.ssh/known_hosts" >/dev/null; then
+            printf '%s\n' 'VPS_SSH_KNOWN_HOSTS does not contain VPS_HOST.' >&2
+            exit 1
+          fi
 
-      - name: Deploy to VPS via SCP
+      - name: Upload and atomically activate release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          scp -i ~/.ssh/deploy_key -r ./vtt/dist/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH }}
+          set -Eeuo pipefail
+          IFS=$'\n\t'
 
-      - name: Cleanup SSH key
+          readonly ssh_key="${HOME}/.ssh/deploy_key"
+          readonly known_hosts="${HOME}/.ssh/known_hosts"
+          readonly release_id="$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          readonly local_archive="${RUNNER_TEMP}/lychgate-${release_id}.tar.gz"
+          readonly remote_archive="/tmp/lychgate-${release_id}.tar.gz"
+          readonly -a ssh_options=(
+            -i "${ssh_key}"
+            -o BatchMode=yes
+            -o ConnectTimeout=15
+            -o ServerAliveCountMax=3
+            -o ServerAliveInterval=10
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=${known_hosts}"
+          )
+
+          if [[ ! "${VPS_HOST}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            printf '%s\n' 'VPS_HOST contains unsupported characters.' >&2
+            exit 1
+          fi
+          if [[ ! "${VPS_USER}" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]; then
+            printf '%s\n' 'VPS_USER contains unsupported characters.' >&2
+            exit 1
+          fi
+          if [[ ! "${VPS_PATH}" =~ ^/var/www/[A-Za-z0-9._/-]+$ ]] \
+            || [[ "${VPS_PATH}" == *//* ]] \
+            || [[ "${VPS_PATH}" == */./* ]] \
+            || [[ "${VPS_PATH}" == */../* ]] \
+            || [[ "${VPS_PATH}" == */. ]] \
+            || [[ "${VPS_PATH}" == */.. ]]; then
+            printf '%s\n' 'VPS_PATH must be a safe path below /var/www.' >&2
+            exit 1
+          fi
+          if [[ ! -f vtt/dist/index.html ]]; then
+            printf '%s\n' 'Build validation failed: dist/index.html is missing.' >&2
+            exit 1
+          fi
+          if find vtt/dist -type l -print -quit | grep -q .; then
+            printf '%s\n' 'Build validation failed: symbolic links are not allowed.' >&2
+            exit 1
+          fi
+
+          tar -C vtt/dist -czf "${local_archive}" .
+          scp "${ssh_options[@]}" -- \
+            "${local_archive}" \
+            "${VPS_USER}@${VPS_HOST}:${remote_archive}"
+
+          ssh "${ssh_options[@]}" "${VPS_USER}@${VPS_HOST}" bash -s -- \
+            "${VPS_PATH}" \
+            "${DEPLOY_DOMAIN}" \
+            "${release_id}" \
+            "${remote_archive}" <<'REMOTE_SCRIPT'
+          set -Eeuo pipefail
+          IFS=$'\n\t'
+
+          readonly deploy_path="${1%/}"
+          readonly domain="$2"
+          readonly release_id="$3"
+          readonly remote_archive="$4"
+          readonly releases_path="${deploy_path}/releases"
+          readonly current_link="${deploy_path}/current"
+          readonly staged_release="${releases_path}/.incoming-${release_id}"
+          readonly final_release="${releases_path}/${release_id}"
+          readonly next_link="${deploy_path}/.current-${release_id}"
+
+          case "${release_id}" in
+            *[!A-Za-z0-9._-]*|'')
+              printf '%s\n' 'Invalid release identifier.' >&2
+              exit 1
+              ;;
+          esac
+          case "${deploy_path}" in
+            /var/www/*) ;;
+            *)
+              printf '%s\n' 'Unsafe deployment path.' >&2
+              exit 1
+              ;;
+          esac
+          case "${staged_release}" in
+            "${releases_path}"/.incoming-*) ;;
+            *)
+              printf '%s\n' 'Unsafe staging path.' >&2
+              exit 1
+              ;;
+          esac
+          if [[ "${remote_archive}" != "/tmp/lychgate-${release_id}.tar.gz" ]]; then
+            printf '%s\n' 'Unsafe archive path.' >&2
+            exit 1
+          fi
+
+          cleanup() {
+            rm -f -- "${remote_archive}" "${next_link}"
+            rm -rf -- "${staged_release}"
+          }
+          trap cleanup EXIT
+
+          for command_name in curl flock tar; do
+            if ! command -v "${command_name}" >/dev/null 2>&1; then
+              printf 'Required server command is missing: %s\n' "${command_name}" >&2
+              exit 1
+            fi
+          done
+
+          mkdir -p -- "${releases_path}"
+          exec 9>"${deploy_path}/.deploy.lock"
+          if ! flock -n 9; then
+            printf '%s\n' 'Another Lychgate deployment is already running.' >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${remote_archive}" ]]; then
+            printf '%s\n' 'Uploaded release archive was not found.' >&2
+            exit 1
+          fi
+          if [[ -e "${final_release}" ]]; then
+            printf 'Release already exists: %s\n' "${final_release}" >&2
+            exit 1
+          fi
+
+          mkdir -- "${staged_release}"
+          tar -xzf "${remote_archive}" \
+            --directory "${staged_release}" \
+            --no-same-owner \
+            --no-same-permissions
+
+          if [[ ! -f "${staged_release}/index.html" ]]; then
+            printf '%s\n' 'Release validation failed: index.html is missing.' >&2
+            exit 1
+          fi
+          if find "${staged_release}" -type l -print -quit | grep -q .; then
+            printf '%s\n' 'Release validation failed: symbolic links are not allowed.' >&2
+            exit 1
+          fi
+
+          printf '%s\n' "${release_id}" > "${staged_release}/release-id.txt"
+          mv -- "${staged_release}" "${final_release}"
+
+          previous_target=''
+          if [[ -L "${current_link}" ]]; then
+            previous_target="$(readlink -- "${current_link}")"
+          elif [[ -e "${current_link}" ]]; then
+            printf '%s\n' "Cannot activate: ${current_link} exists and is not a symbolic link." >&2
+            exit 1
+          fi
+
+          ln -s -- "${final_release}" "${next_link}"
+          mv -Tf -- "${next_link}" "${current_link}"
+
+          health_url="https://${domain}/release-id.txt?release=${release_id}"
+          health_body=''
+          if health_body="$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --max-time 15 \
+            --retry 5 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --header 'Cache-Control: no-cache' \
+            "${health_url}")" && [[ "${health_body}" == "${release_id}" ]]; then
+            printf 'Health check passed for release %s.\n' "${release_id}"
+          else
+            printf 'Health check failed for release %s; restoring the previous release.\n' "${release_id}" >&2
+
+            if [[ -n "${previous_target}" ]]; then
+              case "${previous_target}" in
+                "${releases_path}"/*)
+                  if [[ ! -d "${previous_target}" ]]; then
+                    printf 'Previous release is missing: %s\n' "${previous_target}" >&2
+                    exit 1
+                  fi
+                  ;;
+                *)
+                  printf 'Refusing unsafe rollback target: %s\n' "${previous_target}" >&2
+                  exit 1
+                  ;;
+              esac
+
+              ln -s -- "${previous_target}" "${next_link}"
+              mv -Tf -- "${next_link}" "${current_link}"
+            else
+              rm -f -- "${current_link}"
+            fi
+
+            exit 1
+          fi
+          REMOTE_SCRIPT
+
+      - name: Remove SSH key
         if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: rm -f -- "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"

@@ -57,7 +57,7 @@ export function BackgroundLayer({
           width={gridSettings.width}
           height={gridSettings.height}
           cellSize={gridSettings.cellSize}
-          color={settings.gridColor}
+          color={gridSettings.gridColor}
         />
       )}
     </Layer>

@@ -70,7 +70,6 @@ export function SheetEditor({
   const [showMarkdownImport, setShowMarkdownImport] = useState(false);
   const [markdownText, setMarkdownText] = useState('');
 
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousJsonRef = useRef<string>('');
   const commandInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -80,15 +79,12 @@ export function SheetEditor({
 
   const iconSize = 16;
 
-  // Stable callback — uses ref to avoid re-creating when onChange identity changes.
-  // Content is reported immediately; shadow state recomputation is debounced.
+  // Stable callback — uses a ref to avoid re-creating the editor when the
+  // parent's callback identity changes.
   const parseAndNotifyShadowState = useCallback(
     (json: string) => {
       if (json === previousJsonRef.current) return;
       previousJsonRef.current = json;
-
-      // Report content immediately so parent always has current content for save
-      onChangeRef.current(json);
 
       try {
         const document = JSON.parse(json);
@@ -97,16 +93,12 @@ export function SheetEditor({
           setLocalShadowState(result);
         }
 
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-
-        // Debounce only the shadow state notification
-        debounceTimerRef.current = setTimeout(() => {
-          onChangeRef.current(json, result);
-        }, 300);
+        // Keep the document and its derived values in the same notification so
+        // saving immediately after a keystroke cannot persist stale stats.
+        onChangeRef.current(json, result);
       } catch (e) {
         console.error('Failed to parse shadow state:', e);
+        onChangeRef.current(json);
       }
     },
     [externalShadowState]
@@ -144,7 +136,6 @@ export function SheetEditor({
   }), []);
 
   // Memoize extensions to avoid TipTap view recreation on re-render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const extensions = useMemo(() => [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -188,9 +179,15 @@ export function SheetEditor({
 
   // Expose editor on window for e2e debugging (dev only)
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production' && editor) {
-      (window as any).__tiptapEditor = editor;
-    }
+    if (!import.meta.env.DEV || !editor) return;
+
+    const debugWindow = window as Window & { __tiptapEditor?: typeof editor };
+    debugWindow.__tiptapEditor = editor;
+    return () => {
+      if (debugWindow.__tiptapEditor === editor) {
+        delete debugWindow.__tiptapEditor;
+      }
+    };
   }, [editor]);
 
   // Callback to update a stat declaration in the editor document.
@@ -226,16 +223,17 @@ export function SheetEditor({
 
   // Initialize shadow state from content on first mount
   useEffect(() => {
-    if (!editor || !content) return;
+    if (!editor || !parsedContent) return;
     try {
-      const document = typeof content === 'string' ? JSON.parse(content) : content;
+      const document = typeof parsedContent === 'string'
+        ? JSON.parse(parsedContent)
+        : parsedContent;
       const result = parseShadowState(document);
       setLocalShadowState(result);
     } catch {
       // Ignore parse errors on initial load
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor]);
+  }, [editor, parsedContent]);
 
   // Custom copy handler — sets text/plain to DSL syntax and text/html via
   // ProseMirror's serializer (which preserves marks, headings, data attributes).
@@ -282,15 +280,6 @@ export function SheetEditor({
     dom.addEventListener('copy', handleCopy, { capture: true });
     return () => dom.removeEventListener('copy', handleCopy, { capture: true });
   }, [editor]);
-
-  // Cleanup debounce timer
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
 
   // Focus command input when palette opens, and capture Escape at the document
   // level (capture phase) so it doesn't propagate to Mantine's Modal listener.

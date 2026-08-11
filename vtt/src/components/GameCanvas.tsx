@@ -122,6 +122,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     updateElement,
     updateElements,
     addElement,
+    setViewport,
     panViewport,
     zoomViewport,
     revealFog,
@@ -309,7 +310,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     if (initialPinchDistance.current && initialPinchCenter.current) {
       // Calculate scale factor
       const scaleDelta = currentDistance / initialPinchDistance.current;
-      const newScale = Math.max(0.1, Math.min(5, initialViewportScale.current * scaleDelta));
+      const newScale = Math.max(0.25, Math.min(3, initialViewportScale.current * scaleDelta));
       
       // Calculate pan offset (two-finger pan)
       const dx = currentCenter.x - initialPinchCenter.current.x;
@@ -326,13 +327,13 @@ export default function GameCanvas({ room }: GameCanvasProps) {
         y: initialPinchCenter.current.y - zoomCenter.y * (newScale / initialViewportScale.current) + dy,
       };
       
-      // Update viewport
-      zoomViewport(newScale - initialViewportScale.current, initialPinchCenter.current);
-      panViewport({ x: newOffset.x - viewportOffset.x, y: newOffset.y - viewportOffset.y });
+      // Both values are relative to the gesture start, so apply them atomically.
+      // Applying a start-relative delta to already-updated state compounds the zoom.
+      setViewport(newOffset, newScale);
     }
     
     return memo;
-  }, [getTouchDistance, getTouchCenter, viewportScale, viewportOffset, zoomViewport, panViewport]);
+  }, [getTouchDistance, getTouchCenter, viewportScale, viewportOffset, setViewport]);
 
   // Set up touch gesture handlers
   const bind = useGesture({
@@ -343,7 +344,7 @@ export default function GameCanvas({ room }: GameCanvasProps) {
       initialPinchCenter.current = null;
     },
   }, {
-    pinch: { from: () => [0, 0], scaleBounds: { min: 0.1, max: 5 } },
+    pinch: { from: () => [0, 0], scaleBounds: { min: 0.25, max: 3 } },
   });
 
   // Finish polygon helper function - defined early so it can be used by handlers below
@@ -564,31 +565,33 @@ export default function GameCanvas({ room }: GameCanvasProps) {
     if (stage) {
       const pointer = stage.getPointerPosition();
       if (pointer) {
+        const canvasPosition = {
+          x: (pointer.x - viewportOffset.x) / viewportScale,
+          y: (pointer.y - viewportOffset.y) / viewportScale,
+        };
+        mousePosition.current = canvasPosition;
+
         const now = Date.now();
         const last = lastCursorBroadcast.current;
-        const dx = pointer.x - last.position.x;
-        const dy = pointer.y - last.position.y;
+        const dx = canvasPosition.x - last.position.x;
+        const dy = canvasPosition.y - last.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         // Only broadcast if 100ms elapsed AND position changed by >5px
         if (now - last.time >= 100 && distance > 5) {
-          room.broadcastCursor(pointer);
-          lastCursorBroadcast.current = { time: now, position: pointer };
+          room.broadcastCursor(canvasPosition);
+          lastCursorBroadcast.current = { time: now, position: canvasPosition };
         }
         
         // Update marquee selection end point
         if (isMarqueeSelecting.current && marqueeStart) {
-          const x = (pointer.x - viewportOffset.x) / viewportScale;
-          const y = (pointer.y - viewportOffset.y) / viewportScale;
-          setMarqueeEnd({ x, y });
+          setMarqueeEnd(canvasPosition);
           return;
         }
         
         // Update measure tool current point for live preview
         if (selectedTool === 'measure' && measureWaypoints.length > 0) {
-          const x = (pointer.x - viewportOffset.x) / viewportScale;
-          const y = (pointer.y - viewportOffset.y) / viewportScale;
-          setMeasureCurrentPoint({ x, y });
+          setMeasureCurrentPoint(canvasPosition);
         }
       }
     }
@@ -902,6 +905,8 @@ export default function GameCanvas({ room }: GameCanvasProps) {
           layerVisibility={layerVisibility}
           gridSettings={gridSettings}
           isGM={effectiveIsDM}
+          playerId={myPeerId}
+          controlledTokenIds={myPeerId ? game.players[myPeerId]?.controlledTokens ?? [] : []}
           isDrawingTool={isDrawingTool}
           showTokenMetadata={settings.showTokenMetadata}
           onSelect={selectElement}

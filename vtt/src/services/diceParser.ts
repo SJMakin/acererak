@@ -1,7 +1,13 @@
 // Dice formula parser for VTT
 // Supports formulas like: "2d6+3", "1d20", "4d6 drop lowest", "1d20 advantage", "1d20 disadvantage"
 
-import { Parser as ExprParser } from 'expr-eval';
+import { evaluateNumericExpression } from './safeExpression';
+
+const MAX_FORMULA_LENGTH = 256;
+const MAX_DICE_GROUPS = 20;
+const MAX_TOTAL_DICE = 100;
+const MAX_DIE_SIDES = 100_000;
+const MAX_MODIFIER = 1_000_000;
 
 export interface DiceRollResult {
   formula: string;
@@ -28,6 +34,9 @@ interface DiceGroup {
  */
 export function parseDiceFormula(formula: string): ParsedFormula {
   const normalized = formula.toLowerCase().trim();
+  if (!normalized || normalized.length > MAX_FORMULA_LENGTH) {
+    throw new Error('Dice formula is empty or too long');
+  }
   
   const result: ParsedFormula = {
     diceGroups: [],
@@ -35,28 +44,38 @@ export function parseDiceFormula(formula: string): ParsedFormula {
   };
 
   // Check for advantage/disadvantage
-  if (normalized.includes('advantage') || normalized.includes('adv')) {
-    result.advantage = 'advantage';
-  } else if (normalized.includes('disadvantage') || normalized.includes('dis')) {
+  if (/\b(?:disadvantage|dis)\b/.test(normalized)) {
     result.advantage = 'disadvantage';
+  } else if (/\b(?:advantage|adv)\b/.test(normalized)) {
+    result.advantage = 'advantage';
   }
 
   // Check for drop lowest/highest
   const dropLowestMatch = normalized.match(/drop\s+lowest\s*(\d+)?/);
   if (dropLowestMatch) {
     result.dropLowest = parseInt(dropLowestMatch[1] || '1', 10);
+    if (!Number.isSafeInteger(result.dropLowest) || result.dropLowest < 1) {
+      throw new Error('Drop count must be a positive integer');
+    }
   }
 
   const dropHighestMatch = normalized.match(/drop\s+highest\s*(\d+)?/);
   if (dropHighestMatch) {
     result.dropHighest = parseInt(dropHighestMatch[1] || '1', 10);
+    if (!Number.isSafeInteger(result.dropHighest) || result.dropHighest < 1) {
+      throw new Error('Drop count must be a positive integer');
+    }
   }
 
   // Remove modifiers text for dice parsing
   const cleanFormula = normalized
-    .replace(/advantage|adv|disadvantage|dis/g, '')
+    .replace(/\b(?:disadvantage|advantage|dis|adv)\b/g, '')
     .replace(/drop\s+(lowest|highest)\s*\d*/g, '')
     .trim();
+  const compactFormula = cleanFormula.replace(/\s/g, '');
+  if (!/^\d*d\d+(?:\+\d*d\d+)*(?:[+-]\d+)*$/.test(compactFormula)) {
+    throw new Error('Invalid dice formula');
+  }
 
   // Parse dice groups (e.g., "2d6", "1d20")
   const diceRegex = /(\d+)?d(\d+)/g;
@@ -64,15 +83,45 @@ export function parseDiceFormula(formula: string): ParsedFormula {
   while ((match = diceRegex.exec(cleanFormula)) !== null) {
     const count = parseInt(match[1] || '1', 10);
     const sides = parseInt(match[2], 10);
+    if (!Number.isSafeInteger(count) || count < 1 || count > MAX_TOTAL_DICE) {
+      throw new Error(`Dice count must be between 1 and ${MAX_TOTAL_DICE}`);
+    }
+    if (!Number.isSafeInteger(sides) || sides < 2 || sides > MAX_DIE_SIDES) {
+      throw new Error(`Die sides must be between 2 and ${MAX_DIE_SIDES}`);
+    }
     result.diceGroups.push({ count, sides });
+    if (result.diceGroups.length > MAX_DICE_GROUPS) throw new Error('Too many dice groups');
+    if (result.diceGroups.reduce((sum, group) => sum + group.count, 0) > MAX_TOTAL_DICE) {
+      throw new Error(`A roll may contain at most ${MAX_TOTAL_DICE} dice`);
+    }
   }
 
   // Parse modifier (e.g., "+3", "-2")
-  const modifierRegex = /([+-]\s*\d+)/g;
+  const modifierSource = compactFormula.replace(/\d*d\d+/g, '');
+  const modifierRegex = /([+-]\d+)/g;
   let modMatch;
-  while ((modMatch = modifierRegex.exec(cleanFormula)) !== null) {
-    const mod = parseInt(modMatch[1].replace(/\s/g, ''), 10);
+  while ((modMatch = modifierRegex.exec(modifierSource)) !== null) {
+    const mod = parseInt(modMatch[1], 10);
     result.modifier += mod;
+    if (!Number.isSafeInteger(result.modifier) || Math.abs(result.modifier) > MAX_MODIFIER) {
+      throw new Error('Dice modifier is too large');
+    }
+  }
+
+  if (result.advantage && (
+    result.diceGroups.length !== 1
+    || result.diceGroups[0].count !== 1
+    || result.diceGroups[0].sides !== 20
+  )) throw new Error('Advantage and disadvantage require exactly 1d20');
+
+  const dropCount = (result.dropLowest ?? 0) + (result.dropHighest ?? 0);
+  const firstGroupCount = result.diceGroups[0]?.count ?? 0;
+  if (
+    dropCount >= firstGroupCount
+    || (dropCount > 0 && result.diceGroups.length !== 1)
+    || (result.dropLowest && result.dropHighest)
+  ) {
+    throw new Error('Invalid drop rule');
   }
 
   return result;
@@ -182,8 +231,8 @@ export function validateDiceFormula(formula: string): boolean {
 
     // Validate dice groups
     for (const group of parsed.diceGroups) {
-      if (group.count < 1 || group.count > 100) return false;
-      if (group.sides < 2 || group.sides > 100) return false;
+      if (group.count < 1 || group.count > MAX_TOTAL_DICE) return false;
+      if (group.sides < 2 || group.sides > MAX_DIE_SIDES) return false;
     }
 
     return true;
@@ -228,41 +277,30 @@ export function resolveVariables(
   const expressionRegex = /\{\{([^}]+)\}\}/g;
   let expressionMatch;
   
-  // Use expr-eval for expression evaluation
-  const Parser = ExprParser;
-  
   const expressions: Array<{ start: number; end: number; value: string; result: string }> = [];
   
   while ((expressionMatch = expressionRegex.exec(resolved)) !== null) {
     const expression = expressionMatch[1].trim();
     let result = expression;
     
-    if (Parser) {
-      try {
-        const parser = new Parser();
-        const expr = parser.parse(expression);
-        
-        // Prepare variables from shadow state
-        const variables: Record<string, number> = {};
-        for (const [key, value] of Object.entries(shadowState)) {
-          if (typeof value === 'number') {
-            variables[key] = value;
-          } else if (typeof value === 'string') {
-            const parsed = parseFloat(value);
-            if (!isNaN(parsed)) {
-              variables[key] = parsed;
-            }
+    try {
+      const variables: Record<string, number> = {};
+      for (const [key, value] of Object.entries(shadowState)) {
+        if (typeof value === 'number') {
+          variables[key] = value;
+        } else if (typeof value === 'string' && value.trim()) {
+          const parsed = Number(value);
+          if (Number.isFinite(parsed)) {
+            variables[key] = parsed;
           }
         }
-        
-        const evalResult = expr.evaluate(variables);
-        if (typeof evalResult === 'number') {
-          result = Number.isInteger(evalResult) ? evalResult.toString() : evalResult.toFixed(2).replace(/\.?0+$/, '');
-        }
-      } catch {
-        // Keep original if evaluation fails
-        result = expression;
       }
+
+      const evalResult = evaluateNumericExpression(expression, variables);
+      result = Number.isInteger(evalResult) ? evalResult.toString() : evalResult.toFixed(2).replace(/\.?0+$/, '');
+    } catch {
+      // Keep the original expression when it is invalid or references missing data.
+      result = expression;
     }
     
     expressions.push({

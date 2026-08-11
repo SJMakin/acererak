@@ -121,7 +121,11 @@ function NotesEditModal({ note, opened, onClose, onSave }: NotesEditModalProps) 
   );
 }
 
-export default function NotesPanel() {
+interface NotesPanelProps {
+  onNotesChange?: () => void;
+}
+
+export default function NotesPanel({ onNotesChange }: NotesPanelProps) {
   const { game, isGM, addCampaignNote, updateCampaignNote, deleteCampaignNote } = useGameStore();
 
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
@@ -170,6 +174,7 @@ export default function NotesPanel() {
     } else {
       addCampaignNote(noteData);
     }
+    onNotesChange?.();
   };
 
   const handleDeleteNote = (id: string) => {
@@ -177,6 +182,7 @@ export default function NotesPanel() {
       setSelectedNoteId(null);
     }
     deleteCampaignNote(id);
+    onNotesChange?.();
   };
 
   const getCategoryIcon = (category: string | undefined) => {

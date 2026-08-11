@@ -42,9 +42,10 @@ interface SheetStore {
   // Queries
   getSheetById: (id: string) => Sheet | undefined;
 
-  // Bulk operations (hydration only; does not persist or broadcast)
+  // Bulk hydration. GM snapshots persist locally; hydration never broadcasts.
   setSheets: (sheets: Sheet[]) => void;
   loadFromDB: () => Promise<void>;
+  resetSession: () => void;
 
   // Sync with game state
   syncToGameState: () => Sheet[];
@@ -54,6 +55,17 @@ interface SheetStore {
 }
 
 const FLOATING_BOUNDS_KEY = 'sheet.panelBounds';
+let sheetLoadRequestId = 0;
+let sheetSaveQueue: Promise<void> = Promise.resolve();
+
+function persistSheets(sheets: Sheet[]): Promise<void> {
+  const snapshot = [...sheets];
+  const queuedSave = sheetSaveQueue
+    .catch(() => undefined)
+    .then(() => saveSheets(snapshot));
+  sheetSaveQueue = queuedSave;
+  return queuedSave;
+}
 
 function loadFloatingBounds(): SheetFloatingBounds | null {
   try {
@@ -108,7 +120,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       const newSheets = [...state.sheets, sheet];
       // Persist to IndexedDB if GM
       if (state.isGM) {
-        saveSheets(newSheets).catch((err) => {
+        persistSheets(newSheets).catch((err) => {
           console.error('Failed to save sheets:', err);
         });
       }
@@ -143,7 +155,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     set((state) => {
       const newSheets = [...state.sheets, folder];
       if (state.isGM) {
-        saveSheets(newSheets).catch((err) => console.error('Failed to save sheets:', err));
+        persistSheets(newSheets).catch((err) => console.error('Failed to save sheets:', err));
       }
       return { sheets: newSheets };
     });
@@ -155,24 +167,43 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   },
 
   moveItem: (id, newParentId) => {
+    let movedItem: Sheet | undefined;
     set((state) => {
       const now = new Date().toISOString();
       const existing = state.sheets.find((s) => s.id === id);
       if (!existing) return state;
+
+      if (newParentId !== null) {
+        const destination = state.sheets.find((sheet) => sheet.id === newParentId);
+        if (!destination?.isFolder || destination.id === id) return state;
+
+        // A folder cannot be moved into one of its own descendants.
+        const visited = new Set<string>();
+        let ancestor: Sheet | undefined = destination;
+        while (ancestor) {
+          if (ancestor.id === id || visited.has(ancestor.id)) return state;
+          visited.add(ancestor.id);
+          ancestor = ancestor.parentId
+            ? state.sheets.find((sheet) => sheet.id === ancestor?.parentId)
+            : undefined;
+        }
+      }
+
+      if ((existing.parentId ?? null) === newParentId) return state;
       const updatedSheets = state.sheets.map((s) =>
         s.id === id
           ? { ...s, parentId: newParentId, version: (s.version || 0) + 1, updatedAt: now }
           : s
       );
+      movedItem = updatedSheets.find((sheet) => sheet.id === id);
       if (state.isGM) {
-        saveSheets(updatedSheets).catch((err) => console.error('Failed to save sheets:', err));
+        persistSheets(updatedSheets).catch((err) => console.error('Failed to save sheets:', err));
       }
       return { sheets: updatedSheets };
     });
 
-    const { onP2PUpdate, sheets } = get();
-    const updated = sheets.find((s) => s.id === id);
-    if (onP2PUpdate && updated) onP2PUpdate(updated);
+    const { onP2PUpdate } = get();
+    if (onP2PUpdate && movedItem) onP2PUpdate(movedItem);
   },
 
   updateSheet: (id, updates) => {
@@ -195,7 +226,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
 
       // Persist to IndexedDB if GM
       if (state.isGM) {
-        saveSheets(updatedSheets).catch((err) => {
+        persistSheets(updatedSheets).catch((err) => {
           console.error('Failed to save sheets:', err);
         });
       }
@@ -212,19 +243,25 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   },
 
   deleteSheet: (id) => {
-    // Collect all descendant IDs (for folder deletion)
-    const collectDescendants = (parentId: string, sheets: Sheet[]): string[] => {
-      const children = sheets.filter((s) => s.parentId === parentId);
-      return children.flatMap((c) => [c.id, ...collectDescendants(c.id, sheets)]);
-    };
-
     const state = get();
-    const idsToDelete = new Set([id, ...collectDescendants(id, state.sheets)]);
+    if (!state.sheets.some((sheet) => sheet.id === id)) return;
+
+    const idsToDelete = new Set([id]);
+    let foundDescendant = true;
+    while (foundDescendant) {
+      foundDescendant = false;
+      for (const sheet of state.sheets) {
+        if (sheet.parentId && idsToDelete.has(sheet.parentId) && !idsToDelete.has(sheet.id)) {
+          idsToDelete.add(sheet.id);
+          foundDescendant = true;
+        }
+      }
+    }
 
     set((state) => {
       const filteredSheets = state.sheets.filter((s) => !idsToDelete.has(s.id));
       if (state.isGM) {
-        saveSheets(filteredSheets).catch((err) => console.error('Failed to save sheets:', err));
+        persistSheets(filteredSheets).catch((err) => console.error('Failed to save sheets:', err));
       }
       return { sheets: filteredSheets };
     });
@@ -291,7 +328,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
 
         // Persist to IndexedDB if GM
         if (state.isGM) {
-          saveSheets(updatedSheets).catch((err) => {
+          persistSheets(updatedSheets).catch((err) => {
             console.error('Failed to save sheets:', err);
           });
         }
@@ -317,18 +354,44 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
 
   setSheets: (sheets) => {
     set({ sheets });
+    if (get().isGM) {
+      persistSheets(sheets).catch((err) => {
+        console.error('Failed to save sheets:', err);
+      });
+    }
   },
 
   loadFromDB: async () => {
+    if (!get().isGM) return;
+
+    const requestId = ++sheetLoadRequestId;
     set({ isLoading: true });
     try {
+      await sheetSaveQueue.catch(() => undefined);
       const sheets = await loadSheets();
-      set({ sheets });
+      if (requestId === sheetLoadRequestId && get().isGM) {
+        set({ sheets });
+      }
     } catch (err) {
       console.error('Failed to load sheets from DB:', err);
     } finally {
-      set({ isLoading: false });
+      if (requestId === sheetLoadRequestId) {
+        set({ isLoading: false });
+      }
     }
+  },
+
+  resetSession: () => {
+    sheetLoadRequestId += 1;
+    set({
+      sheets: [],
+      isLoading: false,
+      isGM: false,
+      sheetId: null,
+      sheetDisplayMode: 'modal',
+      onP2PUpdate: undefined,
+      onP2PDelete: undefined,
+    });
   },
 
   syncToGameState: () => {
@@ -348,7 +411,7 @@ export function handleIncomingSheetUpdate(sheet: Sheet) {
   const applySheets = (sheets: Sheet[]) => {
     useSheetStore.setState({ sheets });
     if (store.isGM) {
-      saveSheets(sheets).catch((err) => {
+      persistSheets(sheets).catch((err) => {
         console.error('Failed to save sheets:', err);
       });
     }
@@ -392,7 +455,7 @@ export function handleIncomingSheetDelete(sheetId: string) {
     const remaining = store.sheets.filter((s) => s.id !== sheetId);
     useSheetStore.setState({ sheets: remaining });
     if (store.isGM) {
-      saveSheets(remaining).catch((err) => {
+      persistSheets(remaining).catch((err) => {
         console.error('Failed to save sheets:', err);
       });
     }
@@ -401,9 +464,16 @@ export function handleIncomingSheetDelete(sheetId: string) {
 
 // Helper function to set GM mode (called from game initialization)
 export function setSheetStoreGM(isGM: boolean) {
+  if (!isGM) {
+    sheetLoadRequestId += 1;
+  }
   useSheetStore.setState({ isGM });
   if (isGM) {
     // Load from IndexedDB when becoming GM
     useSheetStore.getState().loadFromDB();
   }
+}
+
+export function resetSheetStoreSession() {
+  useSheetStore.getState().resetSession();
 }

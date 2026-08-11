@@ -173,7 +173,10 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     const token = tokens.find((t) => t.id === combatant.id);
     if (token) {
       return {
-        hp: getHpFromToken(token),
+        // Linked sheets remain the source of truth. Unlinked combatants must
+        // use their combat snapshot; reading token.hp here would undo every
+        // HP adjustment on the next render.
+        hp: token.sheetId ? getHpFromToken(token) : combatant.hp,
         name: getDisplayName(token),
       };
     }
@@ -210,7 +213,8 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
     );
   }
 
-  const currentCombatant = getCombatantData(combat.combatants[combat.currentTurn]);
+  const activeCombatant = combat.combatants[combat.currentTurn];
+  const currentCombatant = activeCombatant ? getCombatantData(activeCombatant) : null;
 
   return (
     <Stack h="100%">
@@ -304,6 +308,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
               return (
                 <Paper
                   key={combatant.id}
+                  data-testid="combatant-row"
                   p="sm"
                   withBorder
                   style={{
@@ -314,7 +319,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                   <Group justify="space-between" mb="xs">
                     <Group gap="xs">
                       <Badge size="sm" color="violet">{combatant.initiative}</Badge>
-                      <Text size="sm" fw={600}>
+                      <Text size="sm" fw={600} data-testid="combatant-name">
                         {combatantData.name}
                       </Text>
                       {isCurrentTurn && (
@@ -331,6 +336,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                         color="red"
                         variant="subtle"
                         onClick={() => handleRemoveCombatant(combatant.id)}
+                        aria-label={`Remove ${combatantData.name} from combat`}
                       >
                         🗑️
                       </ActionIcon>
@@ -348,6 +354,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                           size="xs"
                           variant="light"
                           onClick={() => handleUpdateHP(combatant.id, combatantData.hp.current - 1)}
+                          aria-label={`Decrease ${combatantData.name} hit points`}
                         >
                           -
                         </ActionIcon>
@@ -355,6 +362,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                           size="xs"
                           variant="light"
                           onClick={() => handleUpdateHP(combatant.id, combatantData.hp.current + 1)}
+                          aria-label={`Increase ${combatantData.name} hit points`}
                         >
                           +
                         </ActionIcon>
@@ -375,7 +383,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                   >
                     <div
                       style={{
-                        width: `${(combatantData.hp.current / combatantData.hp.max) * 100}%`,
+                        width: `${Math.max(0, Math.min(100, (combatantData.hp.current / Math.max(1, combatantData.hp.max)) * 100))}%`,
                         height: '100%',
                         backgroundColor:
                           combatantData.hp.current > combatantData.hp.max * 0.5
@@ -402,6 +410,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                                 size="xs"
                                 variant="transparent"
                                 onClick={() => handleRemoveCondition(combatant.id, condition)}
+                                aria-label={`Remove ${condition} from ${combatantData.name}`}
                               >
                                 ×
                               </ActionIcon>
@@ -423,7 +432,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                         onChange={(e) => setNewCondition(e.currentTarget.value)}
                         size="xs"
                         style={{ flex: 1 }}
-                        onKeyPress={(e) => {
+                        onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             handleAddCondition(combatant.id);
                           }
@@ -433,6 +442,7 @@ export default function CombatTracker({ onBroadcastCombat }: CombatTrackerProps)
                         size="sm"
                         variant="light"
                         onClick={() => handleAddCondition(combatant.id)}
+                        aria-label={`Add condition to ${combatantData.name}`}
                       >
                         +
                       </ActionIcon>

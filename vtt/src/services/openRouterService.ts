@@ -4,6 +4,10 @@ import type { Schema } from 'xsschema';
 import type { AIModelInfo } from '../types/ai';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/';
+const MODEL_REQUEST_TIMEOUT_MS = 15_000;
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 30_000;
+const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 /** Raw model shape from OpenRouter's /models endpoint */
 interface OpenRouterModel {
@@ -17,17 +21,35 @@ interface OpenRouterModel {
 
 /** Fetch and categorize models from OpenRouter (richer metadata than xsai's Model type) */
 export async function fetchModels(apiKey: string): Promise<AIModelInfo[]> {
-  const response = await fetch(`${OPENROUTER_BASE_URL}models`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MODEL_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${OPENROUTER_BASE_URL}models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch models: ${response.status}`);
   }
 
-  const json = await response.json() as { data: OpenRouterModel[] };
+  const json = await response.json() as { data?: unknown };
+  if (!Array.isArray(json.data)) {
+    throw new Error('Model response was malformed');
+  }
 
-  return json.data.map((m): AIModelInfo => {
+  return json.data
+    .slice(0, 10_000)
+    .filter((value): value is OpenRouterModel => (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as { id?: unknown }).id === 'string'
+    ))
+    .map((m): AIModelInfo => {
     const promptPrice = parseFloat(m.pricing?.prompt || '0');
     const completionPrice = parseFloat(m.pricing?.completion || '0');
     const isFree = promptPrice === 0 && completionPrice === 0;
@@ -55,7 +77,7 @@ export async function fetchModels(apiKey: string): Promise<AIModelInfo[]> {
       modelType: isImage ? 'image' : 'text',
       pricing: { prompt: promptPrice, completion: completionPrice },
     };
-  });
+    });
 }
 
 /** Generate text completion */
@@ -158,7 +180,16 @@ export async function createImageGeneration(
     const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (!match) throw new Error('Invalid data URI format');
     const [, mimeType, base64Data] = match;
+    if (!ALLOWED_IMAGE_TYPES.has(mimeType.toLowerCase())) {
+      throw new Error('Unsupported generated image type');
+    }
+    if (base64Data.length > Math.ceil(MAX_GENERATED_IMAGE_BYTES * 4 / 3) + 4) {
+      throw new Error('Generated image is too large');
+    }
     const byteChars = atob(base64Data);
+    if (byteChars.length > MAX_GENERATED_IMAGE_BYTES) {
+      throw new Error('Generated image is too large');
+    }
     const byteArray = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) {
       byteArray[i] = byteChars.charCodeAt(i);
@@ -167,9 +198,42 @@ export async function createImageGeneration(
   }
 
   // Handle regular URL
-  const imgResponse = await fetch(imageUrl);
-  if (!imgResponse.ok) throw new Error('Failed to fetch generated image');
-  return { blob: await imgResponse.blob(), revisedPrompt };
+  let parsedImageUrl: URL;
+  try {
+    parsedImageUrl = new URL(imageUrl);
+  } catch {
+    throw new Error('Generated image URL is invalid');
+  }
+  if (parsedImageUrl.protocol !== 'https:') {
+    throw new Error('Generated image URL must use HTTPS');
+  }
+
+  const downloadController = new AbortController();
+  const downloadTimeout = setTimeout(() => downloadController.abort(), IMAGE_DOWNLOAD_TIMEOUT_MS);
+  try {
+    const imgResponse = await fetch(parsedImageUrl, { signal: downloadController.signal });
+    if (!imgResponse.ok) throw new Error('Failed to fetch generated image');
+    if (new URL(imgResponse.url).protocol !== 'https:') {
+      throw new Error('Generated image redirect must use HTTPS');
+    }
+
+    const contentType = (imgResponse.headers.get('content-type') || '').split(';', 1)[0].toLowerCase();
+    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+      throw new Error('Generated image response has an unsupported type');
+    }
+    const declaredLength = Number(imgResponse.headers.get('content-length') || 0);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_GENERATED_IMAGE_BYTES) {
+      throw new Error('Generated image is too large');
+    }
+
+    const blob = await imgResponse.blob();
+    if (blob.size > MAX_GENERATED_IMAGE_BYTES) {
+      throw new Error('Generated image is too large');
+    }
+    return { blob, revisedPrompt };
+  } finally {
+    clearTimeout(downloadTimeout);
+  }
 }
 
 /** Generate a structured JSON object */

@@ -1,4 +1,4 @@
-import { test, expect, Browser, BrowserContext, Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -99,7 +99,7 @@ test.describe('Embedded images — upload & export/import', () => {
     await expect(modal.locator('img[alt="Embedded image preview"]')).toBeVisible({ timeout: 5000 });
 
     // Submit the token
-    await modal.getByRole('button', { name: /Place Token/i }).click();
+    await modal.getByRole('button', { name: /Create Token/i }).click();
     await expect(modal).not.toBeVisible({ timeout: 3000 });
 
     // --- Step 2: Verify the token appears in the sidebar ---
@@ -170,9 +170,6 @@ test.describe('Embedded images — upload & export/import', () => {
 
     // Switch to import tab
     await importModal.getByRole('tab', { name: /Import/i }).click();
-
-    // Upload the exported file
-    const importFileInput = importModal.locator('input[type="file"], button:has-text("Select File")');
 
     // Use fileChooser for the import
     const [fileChooser] = await Promise.all([
@@ -301,7 +298,7 @@ test.describe.serial('Embedded images — P2P transfer', () => {
     await expect(modal.locator('input[readonly][value="(embedded image)"]')).toBeVisible({ timeout: 10000 });
 
     // Place the token
-    await modal.getByRole('button', { name: /Place Token/i }).click();
+    await modal.getByRole('button', { name: /Create Token/i }).click();
     await expect(modal).not.toBeVisible({ timeout: 3000 });
 
     // Verify GM sees the token
@@ -317,6 +314,57 @@ test.describe.serial('Embedded images — P2P transfer', () => {
     // Player sees the token name (element sync)
     await expect(playerTokens.getByText('Dragon Boss')).toBeVisible({ timeout: 15000 });
 
+    // The binary arrived and was published into the render cache. This catches
+    // protocols that sync token metadata but leave the remote canvas on a
+    // placeholder because IndexedDB delivery never invalidated useImage.
+    await playerPage.waitForFunction(() => {
+      const testWindow = window as unknown as {
+        __testGameStore?: {
+          getState: () => {
+            game: {
+              activeSceneId: string;
+              scenes: Array<{ id: string; elements: Array<{ name?: string; imageId?: string }> }>;
+            } | null;
+          };
+        };
+        __testImageStore?: {
+          getState: () => { urlCache: Map<string, string> };
+        };
+      };
+      const game = testWindow.__testGameStore?.getState().game;
+      const scene = game?.scenes.find((candidate) => candidate.id === game.activeSceneId);
+      const imageId = scene?.elements.find((element) => element.name === 'Dragon Boss')?.imageId;
+      const cachedUrl = imageId
+        ? testWindow.__testImageStore?.getState().urlCache.get(imageId)
+        : undefined;
+      return Boolean(imageId && cachedUrl?.startsWith('blob:'));
+    }, undefined, { timeout: 15000 });
+
+    const decodedRemoteImage = await playerPage.evaluate(async () => {
+      const testWindow = window as unknown as {
+        __testGameStore: {
+          getState: () => {
+            game: {
+              activeSceneId: string;
+              scenes: Array<{ id: string; elements: Array<{ name?: string; imageId?: string }> }>;
+            };
+          };
+        };
+        __testImageStore: { getState: () => { urlCache: Map<string, string> } };
+      };
+      const game = testWindow.__testGameStore.getState().game;
+      const scene = game.scenes.find((candidate) => candidate.id === game.activeSceneId)!;
+      const imageId = scene.elements.find((element) => element.name === 'Dragon Boss')!.imageId!;
+      const source = testWindow.__testImageStore.getState().urlCache.get(imageId)!;
+      return new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const remoteImage = new Image();
+        remoteImage.onload = () => resolve({ width: remoteImage.naturalWidth, height: remoteImage.naturalHeight });
+        remoteImage.onerror = () => reject(new Error('Transferred image did not decode'));
+        remoteImage.src = source;
+      });
+    });
+    expect(decodedRemoteImage).toEqual({ width: 1, height: 1 });
+
     // Canvas should be alive on both sides — the image rendered without crashing
     await expect(gmPage.locator('canvas').first()).toBeVisible();
     await expect(playerPage.locator('canvas').first()).toBeVisible();
@@ -327,8 +375,16 @@ test.describe.serial('Embedded images — P2P transfer', () => {
 
     // --- Also add a URL-only token to verify backward compatibility ---
 
-    await gmPage.getByPlaceholder('Token name').fill('URL Skeleton');
-    await gmPage.getByRole('button', { name: 'Add' }).click();
+    await gmPage.keyboard.press('n');
+    await gmPage.waitForTimeout(300);
+    await gmPage.mouse.click(canvasBox!.x + 500, canvasBox!.y + 300);
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await modal.getByLabel(/Token Name/i).fill('URL Skeleton');
+    await modal.getByLabel(/Image URL/i).fill(
+      `data:image/png;base64,${createTestPng().toString('base64')}`,
+    );
+    await modal.getByRole('button', { name: /Create Token/i }).click();
+    await expect(modal).not.toBeVisible({ timeout: 3000 });
     await expect(gmTokens.getByText('URL Skeleton')).toBeVisible({ timeout: 5000 });
     await expect(playerTokens.getByText('URL Skeleton')).toBeVisible({ timeout: 15000 });
   });

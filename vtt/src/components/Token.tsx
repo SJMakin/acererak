@@ -6,7 +6,7 @@ import { useSheetStore } from '../stores/sheetStore';
 
 // Token component with character sheet integration
 export function Token({
-  element, cellSize, isSelected, isCurrentTurn, onSelect, onShiftSelect, onDragStart, onDragEnd, isGM, showMetadata = true,
+  element, cellSize, isSelected, isCurrentTurn, onSelect, onShiftSelect, onDragStart, onDragEnd, isGM, canInteract = true, showMetadata = true,
   onDamage, // Optional callback for damage clicks (bidirectional sync)
 }: {
   element: TokenElement;
@@ -18,6 +18,7 @@ export function Token({
   onDragStart: () => void;
   onDragEnd: (x: number, y: number) => void;
   isGM: boolean;
+  canInteract?: boolean;
   showMetadata?: boolean;
   onDamage?: (amount: number) => void; // For character sync damage
 }) {
@@ -26,9 +27,9 @@ export function Token({
   const height = element.height * cellSize;
 
   // Get linked sheet data
-  const sheet = element.sheetId
-    ? useSheetStore.getState().getSheetById(element.sheetId)
-    : undefined;
+  const sheet = useSheetStore((state) => (
+    element.sheetId ? state.sheets.find((candidate) => candidate.id === element.sheetId) : undefined
+  ));
 
   // Determine display name: sheet name if linked, otherwise token name
   const displayName = sheet?.name || element.name;
@@ -98,7 +99,7 @@ export function Token({
     <Group
       x={element.x}
       y={element.y}
-      draggable={!element.locked}
+      draggable={!element.locked && canInteract}
       onClick={handleClick}
       onTap={onSelect}
       onDragStart={onDragStart}
